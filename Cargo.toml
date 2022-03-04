@@ -1,5 +1,5 @@
 [package]
-name = "simple-irc"
+name = "simple-irc-server"
 authors = ["Mateusz Szpakowski"]
 license = "GNU Lesser General Public License v2.1"
 version = "0.1.0"
