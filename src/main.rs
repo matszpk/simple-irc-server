@@ -17,9 +17,35 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use toml;
 use std::net::IpAddr;
+use std::error::Error;
+use clap;
+use clap::Parser;
+use toml;
+use tokio;
 use serde_derive::{Serialize, Deserialize};
+use dashmap::DashMap;
+
+#[derive(clap::Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(short, long, help="Configuration file path")]
+    config: Option<String>,
+    #[clap(short, long, help="Listen bind address")]
+    listen: Option<String>,
+    #[clap(short, long, help="Listen port")]
+    port: Option<u16>,
+    #[clap(short='n', long, help="Server name")]
+    name: Option<String>,
+    #[clap(short='N', long, help="Network")]
+    network: Option<String>,
+    #[clap(short, long, help="DNS lookup if client connects")]
+    dns_lookup: bool,
+    #[clap(short='C', long, help="TLS certificate file")]
+    tls_cert_file: Option<String>,
+    #[clap(short='K', long, help="TLS certificate key file")]
+    tls_cert_key_file: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TLSConfig {
@@ -41,6 +67,13 @@ struct UserModes {
     local_oper: bool,
     registered: bool,
     wallops: bool,
+}
+
+impl Default for UserModes {
+    fn default() -> Self {
+        UserModes{ invisible: false, oper: false, local_oper: false,
+                registered: false, wallops: false }
+    }
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
@@ -65,7 +98,8 @@ struct ChannelConfig {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct UserConfig {
-    name: String, 
+    name: String,
+    nick: String,
     password: String,
 }
 
@@ -92,9 +126,35 @@ struct MainConfig {
     channels: Vec<ChannelConfig>,
 }
 
+impl Default for MainConfig {
+    fn default() -> Self {
+        MainConfig{ name: "irc".to_string(),
+            admin_info: "ircadmin is IRC admin".to_string(),
+            admin_info2: None,
+            info: "This is IRC server".to_string(),
+            listen: "127.0.0.1".parse().unwrap(),
+            port: 6667,
+            network: "IRCnetwork".to_string(),
+            max_connections: 0,
+            max_joins: 0,
+            max_nickname: 0,
+            ping_timeout: 180,
+            pong_timeout: 60,
+            dns_lookup: false,
+            channels: vec![],
+            operators: vec![],
+            users: vec![],
+            default_user_modes: UserModes::default(),
+            tls: None }
+    }
+}
+
 struct User {
     name: String,
+    nick: String,
     modes: UserModes,
+    ip_addr: IpAddr,
+    hostname: String,
 }
 
 enum OperatorType {
@@ -108,7 +168,7 @@ struct ChannelUser<'a> {
     founder: bool,
     protected: bool,
     voice: bool,
-    oper_type: OperatorType
+    oper_type: OperatorType,
 }
 
 struct Channel<'a> {
@@ -119,10 +179,13 @@ struct Channel<'a> {
 }
 
 struct MainState<'a> {
-    users: Vec<User>,
-    channels: Vec<Channel<'a>>,
+    users: DashMap<String, User>,
+    channels: DashMap<String, Channel<'a>>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let cli = Cli::parse();
     println!("Hello, world!");
+    Ok(())
 }
