@@ -59,8 +59,8 @@ struct ChannelModes {
 #[derive(Serialize, Deserialize, Debug)]
 struct ChannelConfig {
     name: String,
-    modes: ChannelModes,
     topic: String,
+    modes: ChannelModes,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -69,6 +69,7 @@ struct UserConfig {
     password: String,
 }
 
+/// Main configuration structure.
 #[derive(Serialize, Deserialize, Debug)]
 struct MainConfig {
     name: String,
@@ -89,6 +90,37 @@ struct MainConfig {
     operators: Vec<OperatorConfig>,
     users: Vec<UserConfig>,
     channels: Vec<ChannelConfig>,
+}
+
+struct User {
+    name: String,
+    modes: UserModes,
+}
+
+enum OperatorType {
+    NoOper,
+    Oper,
+    HalfOper,
+}
+
+struct ChannelUser<'a> {
+    user: &'a User,
+    founder: bool,
+    protected: bool,
+    voice: bool,
+    oper_type: OperatorType
+}
+
+struct Channel<'a> {
+    name: String,
+    topic: String,
+    modes: ChannelModes,
+    users: Vec<ChannelUser<'a>>,
+}
+
+struct MainState<'a> {
+    users: Vec<User>,
+    channels: Vec<Channel<'a>>,
 }
 
 fn main() {
