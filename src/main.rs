@@ -1,6 +1,6 @@
-// lib.rs - main library of sokoban
+// main.rs - main program
 //
-// sokoban - Sokoban game
+// simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski
 //
 // This library is free software; you can redistribute it and/or
