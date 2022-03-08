@@ -129,6 +129,47 @@ struct MainConfig {
     channels: Vec<ChannelConfig>,
 }
 
+impl MainConfig {
+    fn new_config(cli: Cli) -> Result<MainConfig, Box<dyn Error>> {
+        let config_path = cli.config.as_deref().unwrap_or("simple-irc-server.toml");
+        let mut config_file = File::open(config_path)?;
+        let mut config_str = String::new();
+        config_file.read_to_string(&mut config_str)?;
+        // modify configuration by CLI options
+        {
+            let mut config: MainConfig = toml::from_str(&config_str)?;
+            if let Some(addr) = cli.listen {
+                config.listen = addr;
+            }
+            if let Some(port) = cli.port {
+                config.port = port;
+            }
+            if let Some(name) = cli.name {
+                config.name = name;
+            }
+            if let Some(network) = cli.network {
+                config.network = network;
+            }
+            if config.dns_lookup {
+                config.dns_lookup = true;
+            }
+            let (have_cert, have_cert_key) = (cli.tls_cert_file.is_some(),
+                    cli.tls_cert_key_file.is_some());
+            if let Some(tls_cert_file) = cli.tls_cert_file {
+                if let Some(tls_cert_key_file) = cli.tls_cert_key_file {
+                    config.tls = Some(TLSConfig{ cert_file: tls_cert_file,
+                                cert_key_file: tls_cert_key_file });
+                }
+            }
+            if !config.tls.is_some() && (have_cert ^ have_cert_key) {
+                panic!("TLS certifcate file and certificate
+                        key file together are required");
+            }
+            Ok(config)
+        }
+    }
+}
+
 impl Default for MainConfig {
     fn default() -> Self {
         MainConfig{ name: "irc".to_string(),
@@ -189,43 +230,7 @@ struct MainState {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let config_path = cli.config.as_deref().unwrap_or("simple-irc-server.toml");
-    let config = {
-        let mut config_file = File::open(config_path)?;
-        let mut config_str = String::new();
-        config_file.read_to_string(&mut config_str)?;
-        let mut config: MainConfig = toml::from_str(&config_str)?;
-        // modify configuration by CLI options
-        {
-            if let Some(addr) = cli.listen {
-                config.listen = addr;
-            }
-            if let Some(port) = cli.port {
-                config.port = port;
-            }
-            if let Some(name) = cli.name {
-                config.name = name;
-            }
-            if let Some(network) = cli.network {
-                config.network = network;
-            }
-            if config.dns_lookup {
-                config.dns_lookup = true;
-            }
-            let (have_cert, have_cert_key) = (cli.tls_cert_file.is_some(),
-                    cli.tls_cert_key_file.is_some());
-            if let Some(tls_cert_file) = cli.tls_cert_file {
-                if let Some(tls_cert_key_file) = cli.tls_cert_key_file {
-                    config.tls = Some(TLSConfig{ cert_file: tls_cert_file,
-                                cert_key_file: tls_cert_key_file });
-                }
-            }
-            if !config.tls.is_some() && (have_cert ^ have_cert_key) {
-                panic!("TLS certifcate file and certificate key file together are required");
-            }
-        }
-        config
-    };
+    let config = MainConfig::new_config(cli)?;
     println!("Hello, world!");
     Ok(())
 }
