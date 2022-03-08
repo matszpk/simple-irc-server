@@ -190,37 +190,37 @@ struct MainState {
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let config_path = cli.config.as_deref().unwrap_or("simple-irc-server.toml");
-    let mut config: MainConfig = {
+    let config = {
         let mut config_file = File::open(config_path)?;
         let mut config_str = String::new();
         config_file.read_to_string(&mut config_str)?;
-        toml::from_str(&config_str)?
-    };
-    // modify configuration by CLI options
-    {
-        if let Some(addr) = cli.listen {
-            config.listen = addr;
-        }
-        if let Some(port) = cli.port {
-            config.port = port;
-        }
-        if let Some(name) = cli.name {
-            config.name = name;
-        }
-        if let Some(network) = cli.network {
-            config.network = network;
-        }
-        if config.dns_lookup {
-            config.dns_lookup = true;
-        }
-        if let Some(tls_cert_file) = cli.tls_cert_file {
-            if let Some(tls_cert_key_file) = cli.tls_cert_key_file {
-                config.tls = Some(TLSConfig{ cert_file: tls_cert_file,
-                            cert_key_file: tls_cert_key_file });
+        let mut config: MainConfig = toml::from_str(&config_str)?;
+        // modify configuration by CLI options
+        {
+            if let Some(addr) = cli.listen {
+                config.listen = addr;
+            }
+            if let Some(port) = cli.port {
+                config.port = port;
+            }
+            if let Some(name) = cli.name {
+                config.name = name;
+            }
+            if let Some(network) = cli.network {
+                config.network = network;
+            }
+            if config.dns_lookup {
+                config.dns_lookup = true;
+            }
+            if let Some(tls_cert_file) = cli.tls_cert_file {
+                if let Some(tls_cert_key_file) = cli.tls_cert_key_file {
+                    config.tls = Some(TLSConfig{ cert_file: tls_cert_file,
+                                cert_key_file: tls_cert_key_file });
+                }
             }
         }
-    }
-    
+        config
+    };
     println!("Hello, world!");
     Ok(())
 }
