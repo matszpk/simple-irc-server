@@ -212,11 +212,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if config.dns_lookup {
                 config.dns_lookup = true;
             }
+            let (have_cert, have_cert_key) = (cli.tls_cert_file.is_some(),
+                    cli.tls_cert_key_file.is_some());
             if let Some(tls_cert_file) = cli.tls_cert_file {
                 if let Some(tls_cert_key_file) = cli.tls_cert_key_file {
                     config.tls = Some(TLSConfig{ cert_file: tls_cert_file,
                                 cert_key_file: tls_cert_key_file });
                 }
+            }
+            if !config.tls.is_some() && (have_cert ^ have_cert_key) {
+                panic!("TLS certifcate file and certificate key file together are required");
             }
         }
         config
