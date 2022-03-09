@@ -17,6 +17,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+use std::fmt;
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Read;
@@ -224,9 +225,49 @@ struct Channel {
     users: Vec<ChannelUser>,
 }
 
+#[derive(Copy, Clone, Debug)]
+enum MainStateError {
+    NoSuchUser,
+}
+
+impl fmt::Display for MainStateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            NoSuchUser => write!(f, "No such user"),
+        }
+    }
+}
+
+impl Error for MainStateError {
+}
+
 struct MainState {
+    config: MainConfig,
     users: DashMap<String, User>,
     channels: DashMap<String, Channel>,
+}
+
+impl MainState {
+    pub fn check_password(username: &str, password: &str) -> Result<bool, MainStateError> {
+        Ok(false)
+    }
+    
+    pub fn set_nickname(username: &str, nickname: &str) -> Result<(), MainStateError> {
+        Ok(())
+    }
+    
+    pub fn begin_user(username: &str, realname: &str) -> Result<(), MainStateError> {
+        Ok(())
+    }
+    
+    pub fn set_oper(username: &str, password: &str) -> Result<bool, MainStateError> {
+        Ok(false)
+    }
+    
+    pub fn join_to_channel(username: &str, channels: Vec<(&str, &str)>) ->
+                Result<bool, MainStateError> {
+        Ok(false)
+    }
 }
 
 #[tokio::main]
