@@ -196,6 +196,178 @@ impl Default for MainConfig {
     }
 }
 
+struct Message<'a> {
+    source: &'a str,
+    command: &'a str,
+    params: Vec<&'a str>,
+}
+
+impl<'a> Message<'a> {
+    fn from_shared_str(s: &'a str) -> Result<Self, String> {
+        Ok(Message{ source: &s[..], command: &s[..], params: vec![] })
+    }
+}
+
+struct WhoIsChannelStruct<'a> {
+    prefix: Option<&'a str>,
+    channel: &'a str,
+}
+
+struct NameReplyStruct<'a> {
+    prefix: Option<&'a str>,
+    nick: &'a str,
+}
+
+enum Reply<'a> {
+    RplWelcome001{ client: &'a str, networkname: &'a str, nick: &'a str,
+            user: &'a str, host: &'a str },
+    RplYourHost002{ client: &'a str, servename: &'a str, version: &'a str },
+    RplCreated003{ client: &'a str,datetime: &'a str },
+    RplMyInfo004{ client: &'a str, servername: &'a str, avail_user_modes: &'a str,
+            avail_channel_modes: &'a str },
+    RplISupport005{ client: &'a str, tokens: &'a str },
+    RplBounce010{ client: &'a str, hostname: &'a str, port: u16, info: &'a str },
+    RplUModeIs221{ client: &'a str, user_modes: &'a str },
+    RplLUserClient251{ client: &'a str, users_num: usize, inv_users_num: usize,
+            servers_num: usize },
+    RplLUserOp252{ client: &'a str, ops_num: usize },
+    RplLUserUnknown253{ client: &'a str, conns: &'a str },
+    RplLUserChannels254{ client: &'a str, channels: &'a str },
+    RplLUserMe255{ client: &'a str, clients_num: usize, servers_num: usize },
+    RplAdminMe256{ client: &'a str, server: &'a str },
+    RplAdminLoc1257{ client: &'a str, info: &'a str },
+    RplAdminLoc2258{ client: &'a str, info: &'a str },
+    RplAdminEmail259{ client: &'a str, email: &'a str },
+    RplTryAgain263{ client: &'a str, command: &'a str },
+    RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
+    RplGlobalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
+    RplWhoIsCertFP276{ client: &'a str, nick: &'a str },
+    RplNone300{ },
+    RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
+    RplUserHost302{ client: &'a str, replies: Option<&'a [&'a str]> },
+    RplUnAway305{ client: &'a str },
+    RplNoAway306{ client: &'a str },
+    RplWhoReply352{ client: &'a str, channel: &'a str, username: &'a str, host: &'a str,
+            server: &'a str, nick: &'a str, flags: &'a str,
+            hopcount: usize, realname: &'a str },
+    RplEndOfWho315{ client: &'a str, mask: &'a str },
+    RplWhoIsRegNick307{ client: &'a str, nick: &'a str },
+    RplWhoIsUser311{ client: &'a str, nick: &'a str, host: &'a str, realname: &'a str },
+    RplWhoIsServer312{ client: &'a str, nick: &'a str, server: &'a str,
+            server_info: &'a str },
+    RplWhoIsOperator313{ client: &'a str, nick: &'a str },
+    RplWhoWasUser314{ client: &'a str, nick: &'a str, username: &'a str, host: &'a str,
+            realname: &'a str },
+    RplwhoIsIdle317{ client: &'a str, nick: &'a str, secs: u64, signon: u64 },
+    RplEndOfWhoIs318{ client: &'a str, nick: &'a str },
+    RplWhoIsChannels319{ client: &'a str, nick: &'a str,
+            channels: &'a [WhoIsChannelStruct<'a>] }, 
+    RplWhoIsSpecial320{ client: &'a str, nick: &'a str, special_info: &'a str },
+    RplListStart321{ client: &'a str },
+    RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
+    RplListEnd323{ client: &'a str },
+    RplChannelModeIs324{ client: &'a str, channel: &'a str, modestring: &'a str,
+            mode_args: &'a [&'a str] },
+    RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: &'a str },
+    RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
+    RplNoTopic331{ client: &'a str, nick: &'a str },
+    RplTopic332{ client: &'a str, nick: &'a str, topic: &'a str },
+    RplTopicWhoTime333{ client: &'a str, nick: &'a str, setat: u64 },
+    RplWhoIsActually338P1{ client: &'a str, nick: &'a str },
+    RplWhoIsActually338P2{ client: &'a str, nick: &'a str, host_ip: &'a str },
+    RplWhoIsActually338P3{ client: &'a str, nick: &'a str,
+            username: &'a str, hostname: &'a str },
+    RplInviting341{ client: &'a str, nick: &'a str, channel: &'a str },
+    RplInviteList346{ client: &'a str, channel: &'a str, mask: &'a str },
+    RplEndOfInviteList347{ client: &'a str, channel: &'a str },
+    RplExceptList348{ client: &'a str, channel: &'a str, mask: &'a str },
+    RplEndOfExceptList349{ client: &'a str, channel: &'a str },
+    RplVersion351{ client: &'a str, version: &'a str, server: &'a str,
+            comments: &'a str },
+    RplNameReply353{ client: &'a str, symbol: &'a str, channel: &'a str,
+            replies: &'a[NameReplyStruct<'a>] },
+    RplEndOfNames366{ client: &'a str, channel: &'a str },
+    RplBanList367{ client: &'a str, channel: &'a str, mask: &'a str,
+            who: &'a str, set_ts: u64 },
+    RplEndOfBanList368{ client: &'a str, channel: &'a str },
+    RplEndOfWhoWas369{ client: &'a str, nick: &'a str },
+    RplInfo371{ client: &'a str, info: &'a str },
+    RplEndOfInfo374{ client: &'a str },
+    RplMotdStart375{ client: &'a str, server: &'a str },
+    RplMotd372{ client: &'a str, motd: &'a str },
+    RplEndOfMotd376{ client: &'a str },
+    RplWhoIsHost378{ client: &'a str, nick: &'a str, host_info: &'a str },
+    RplWhoIsModes379{ client: &'a str, nick: &'a str, modes: &'a str },
+    RplYouReoper381{ client: &'a str },
+    RplRehashing382{ client: &'a str, config_file: &'a str },
+    RplTime391{ client: &'a str, server: &'a str, timestamp: u64, ts_offset: &'a str,
+            human_readable: &'a str },
+    ErrUnknownError400{ client: &'a str, command: &'a str, subcommand: Option<&'a str>,
+            info: &'a str },
+    ErrNoSuchNick401{ client: &'a str, nick: &'a str },
+    ErrNoSuchServer402{ client: &'a str, server: &'a str },
+    ErrNoSuchChannel403{ client: &'a str, channel: &'a str },
+    ErrCannotSendToChain404{ client: &'a str, channel: &'a str },
+    ErrTooManyChannels405{ client: &'a str, channel: &'a str },
+    ErrNoOrigin409{ client: &'a str },
+    ErrInputTooLong417{ client: &'a str },
+    ErrNoMotd422{ client: &'a str },
+    ErrErroneusNickname432{ client: &'a str, nick: &'a str },
+    ErrNicknameInUse433{ client: &'a str, nick: &'a str },
+    ErrUserNotInChannel441{ client: &'a str, nick: &'a str, channel: &'a str },
+    ErrNotOnChannel442{ client: &'a str, channel: &'a str },
+    ErrUserOnChannel443{ client: &'a str, nick: &'a str, channel: &'a str },
+    ErrNotRegistered451{ client: &'a str },
+    ErrNeedMoreParams461{ client: &'a str, command: &'a str },
+    ErrAlreadyRegistered462{ client: &'a str },
+    ErrPasswdMismatch464{ client: &'a str },
+    ErrYoureBannedCreep465{ client: &'a str },
+    ErrChannelIsFull471{ client: &'a str, channel: &'a str },
+    ErrUnknownMode472{ client: &'a str, modechar: char },
+    ErrBannedFromChan474{ client: &'a str, channel: &'a str },
+    ErrBadChannelKey475{ client: &'a str, channel: &'a str },
+    ErrBadChanMask476{ channel: &'a str },
+    ErrNoPrivileges481{ client: &'a str },
+    ErrChanOpPrivsNeeded482{ client: &'a str, channel: &'a str },
+    ErrCantKillServer483{ client: &'a str },
+    ErrNoOperhost482{ client: &'a str },
+    ErrUmodeUnknownFlag501{ client: &'a str },
+    ErrUsersDontMatch502{ client: &'a str },
+    ErrHelpNotFound524{ client: &'a str, subject: &'a str },
+    ErrInvalidKey525{ client: &'a str, target_chan: &'a str },
+    RplStartTls670{ client: &'a str },
+    RplWhoIsSecure671{ client: &'a str, nick: &'a str },
+    ErrStartTls691{ client: &'a str },
+    ErrInvalidModeParam696{ client: &'a str, target: &'a str },
+    RplHelpStart704{ client: &'a str, subject: &'a str, line: &'a str },
+    RplHelpTxt705{ client: &'a str, subject: &'a str, line: &'a str },
+    RplEndOfHelp706{ client: &'a str, subject: &'a str, line: &'a str },
+    ErrNoPrivs723{ client: &'a str, privil: &'a str },
+    RplLoggedIn900{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str,
+            account: &'a str, username: &'a str },
+    RplLoggedOut901{ client: &'a str, nick: &'a str, host: &'a str },
+    ErrNickLocked902{ client: &'a str },
+    RplSaslSuccess903{ client: &'a str },
+    ErrSaslFail904{ client: &'a str },
+    ErrSaslTooLong905{ client: &'a str },
+    ErrSaslAborted906{ client: &'a str },
+    ErrSaslAlready907{ client: &'a str },
+    RplSaslMechs908{ client: &'a str, mechasnisms: &'a str },
+}
+
+use Reply::*;
+
+impl<'a> fmt::Display for Reply<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RplWelcome001{ client, networkname, nick, user, host } => {
+                  write!(f, "{} :Welcome to the {} Network, {}!{}@{}",
+                    client, networkname, nick, user, host) }
+            _ => { Ok(()) }
+        }
+    }
+}
+
 struct User {
     name: String,
     nick: String,
@@ -233,7 +405,7 @@ enum MainStateError {
 impl fmt::Display for MainStateError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NoSuchUser => write!(f, "No such user"),
+            MainStateError::NoSuchUser => write!(f, "No such user"),
         }
     }
 }
