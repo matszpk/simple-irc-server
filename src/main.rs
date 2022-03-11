@@ -221,8 +221,8 @@ struct NameReplyStruct<'a> {
 enum Reply<'a> {
     RplWelcome001{ client: &'a str, networkname: &'a str, nick: &'a str,
             user: &'a str, host: &'a str },
-    RplYourHost002{ client: &'a str, servename: &'a str, version: &'a str },
-    RplCreated003{ client: &'a str,datetime: &'a str },
+    RplYourHost002{ client: &'a str, servername: &'a str, version: &'a str },
+    RplCreated003{ client: &'a str, datetime: &'a str },
     RplMyInfo004{ client: &'a str, servername: &'a str, avail_user_modes: &'a str,
             avail_channel_modes: &'a str },
     RplISupport005{ client: &'a str, tokens: &'a str },
@@ -361,9 +361,130 @@ impl<'a> fmt::Display for Reply<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RplWelcome001{ client, networkname, nick, user, host } => {
-                  write!(f, "{} :Welcome to the {} Network, {}!{}@{}",
+                write!(f, "{} :Welcome to the {} Network, {}!{}@{}",
                     client, networkname, nick, user, host) }
-            _ => { Ok(()) }
+            RplYourHost002{ client, servername, version } => {
+                write!(f, "{} :Your host is {}, running version {}",
+                    client, servername, version) }
+            RplCreated003{ client, datetime } => {
+                write!(f, "{} :This server was created {}", client, datetime) }
+            RplMyInfo004{ client, servername, avail_user_modes,
+                    avail_channel_modes } => { Ok(()) }
+            RplISupport005{ client, tokens } => { Ok(()) }
+            RplBounce010{ client, hostname, port, info } => { Ok(()) }
+            RplUModeIs221{ client, user_modes } => { Ok(()) }
+            RplLUserClient251{ client, users_num, inv_users_num, servers_num } => { Ok(()) }
+            RplLUserOp252{ client, ops_num } => { Ok(()) }
+            RplLUserUnknown253{ client, conns } => { Ok(()) }
+            RplLUserChannels254{ client, channels } => { Ok(()) }
+            RplLUserMe255{ client, clients_num, servers_num } => { Ok(()) }
+            RplAdminMe256{ client, server } => { Ok(()) }
+            RplAdminLoc1257{ client, info } => { Ok(()) }
+            RplAdminLoc2258{ client, info } => { Ok(()) }
+            RplAdminEmail259{ client, email } => { Ok(()) }
+            RplTryAgain263{ client, command } => { Ok(()) }
+            RplLocalUsers265{ client, clients_num, max_clients_num } => { Ok(()) }
+            RplGlobalUsers265{ client, clients_num, max_clients_num } => { Ok(()) }
+            RplWhoIsCertFP276{ client, nick } => { Ok(()) }
+            RplNone300{ } => { Ok(()) }
+            RplAway301{ client, nick, message } => { Ok(()) }
+            RplUserHost302{ client, replies } => { Ok(()) }
+            RplUnAway305{ client } => { Ok(()) }
+            RplNoAway306{ client } => { Ok(()) }
+            RplWhoReply352{ client, channel, username, host, server, nick, flags,
+                    hopcount, realname } => { Ok(()) }
+            RplEndOfWho315{ client, mask } => { Ok(()) }
+            RplWhoIsRegNick307{ client, nick } => { Ok(()) }
+            RplWhoIsUser311{ client, nick, host, realname } => { Ok(()) }
+            RplWhoIsServer312{ client, nick, server, server_info } => { Ok(()) }
+            RplWhoIsOperator313{ client, nick } => { Ok(()) }
+            RplWhoWasUser314{ client, nick, username, host, realname } => { Ok(()) }
+            RplwhoIsIdle317{ client, nick, secs, signon } => { Ok(()) }
+            RplEndOfWhoIs318{ client, nick } => { Ok(()) }
+            RplWhoIsChannels319{ client, nick, channels } => { Ok(()) }
+            RplWhoIsSpecial320{ client, nick, special_info } => { Ok(()) }
+            RplListStart321{ client } => { Ok(()) }
+            RplList322{ client, channel, client_count, topic } => { Ok(()) }
+            RplListEnd323{ client } => { Ok(()) }
+            RplChannelModeIs324{ client, channel, modestring, mode_args } => { Ok(()) }
+            RplCreationTime329{ client, channel, creation_time } => { Ok(()) }
+            RplWhoIsAccount330{ client, nick, account } => { Ok(()) }
+            RplNoTopic331{ client, nick } => { Ok(()) }
+            RplTopic332{ client, nick, topic } => { Ok(()) }
+            RplTopicWhoTime333{ client, nick, setat } => { Ok(()) }
+            RplWhoIsActually338P1{ client, nick } => { Ok(()) }
+            RplWhoIsActually338P2{ client, nick, host_ip } => { Ok(()) }
+            RplWhoIsActually338P3{ client, nick, username, hostname } => { Ok(()) }
+            RplInviting341{ client, nick, channel } => { Ok(()) }
+            RplInviteList346{ client, channel, mask } => { Ok(()) }
+            RplEndOfInviteList347{ client, channel } => { Ok(()) }
+            RplExceptList348{ client, channel, mask } => { Ok(()) }
+            RplEndOfExceptList349{ client, channel } => { Ok(()) }
+            RplVersion351{ client, version, server, comments } => { Ok(()) }
+            RplNameReply353{ client, symbol, channel, replies } => { Ok(()) }
+            RplEndOfNames366{ client, channel } => { Ok(()) }
+            RplBanList367{ client, channel, mask, who, set_ts } => { Ok(()) }
+            RplEndOfBanList368{ client, channel } => { Ok(()) }
+            RplEndOfWhoWas369{ client, nick } => { Ok(()) }
+            RplInfo371{ client, info } => { Ok(()) }
+            RplEndOfInfo374{ client } => { Ok(()) }
+            RplMotdStart375{ client, server } => { Ok(()) }
+            RplMotd372{ client, motd } => { Ok(()) }
+            RplEndOfMotd376{ client } => { Ok(()) }
+            RplWhoIsHost378{ client, nick, host_info } => { Ok(()) }
+            RplWhoIsModes379{ client, nick, modes } => { Ok(()) }
+            RplYouReoper381{ client } => { Ok(()) }
+            RplRehashing382{ client, config_file } => { Ok(()) }
+            RplTime391{ client, server, timestamp, ts_offset, human_readable } => { Ok(()) }
+            ErrUnknownError400{ client, command, subcommand, info } => { Ok(()) }
+            ErrNoSuchNick401{ client, nick } => { Ok(()) }
+            ErrNoSuchServer402{ client, server } => { Ok(()) }
+            ErrNoSuchChannel403{ client, channel } => { Ok(()) }
+            ErrCannotSendToChain404{ client, channel } => { Ok(()) }
+            ErrTooManyChannels405{ client, channel } => { Ok(()) }
+            ErrNoOrigin409{ client } => { Ok(()) }
+            ErrInputTooLong417{ client } => { Ok(()) }
+            ErrNoMotd422{ client } => { Ok(()) }
+            ErrErroneusNickname432{ client, nick } => { Ok(()) }
+            ErrNicknameInUse433{ client, nick } => { Ok(()) }
+            ErrUserNotInChannel441{ client, nick, channel } => { Ok(()) }
+            ErrNotOnChannel442{ client, channel } => { Ok(()) }
+            ErrUserOnChannel443{ client, nick, channel } => { Ok(()) }
+            ErrNotRegistered451{ client } => { Ok(()) }
+            ErrNeedMoreParams461{ client, command } => { Ok(()) }
+            ErrAlreadyRegistered462{ client } => { Ok(()) }
+            ErrPasswdMismatch464{ client } => { Ok(()) }
+            ErrYoureBannedCreep465{ client } => { Ok(()) }
+            ErrChannelIsFull471{ client, channel } => { Ok(()) }
+            ErrUnknownMode472{ client, modechar } => { Ok(()) }
+            ErrBannedFromChan474{ client, channel } => { Ok(()) }
+            ErrBadChannelKey475{ client, channel } => { Ok(()) }
+            ErrBadChanMask476{ channel } => { Ok(()) }
+            ErrNoPrivileges481{ client } => { Ok(()) }
+            ErrChanOpPrivsNeeded482{ client, channel } => { Ok(()) }
+            ErrCantKillServer483{ client } => { Ok(()) }
+            ErrNoOperhost482{ client } => { Ok(()) }
+            ErrUmodeUnknownFlag501{ client } => { Ok(()) }
+            ErrUsersDontMatch502{ client } => { Ok(()) }
+            ErrHelpNotFound524{ client, subject } => { Ok(()) }
+            ErrInvalidKey525{ client, target_chan } => { Ok(()) }
+            RplStartTls670{ client } => { Ok(()) }
+            RplWhoIsSecure671{ client, nick } => { Ok(()) }
+            ErrStartTls691{ client } => { Ok(()) }
+            ErrInvalidModeParam696{ client, target } => { Ok(()) }
+            RplHelpStart704{ client, subject, line } => { Ok(()) }
+            RplHelpTxt705{ client, subject, line } => { Ok(()) }
+            RplEndOfHelp706{ client, subject, line } => { Ok(()) }
+            ErrNoPrivs723{ client, privil } => { Ok(()) }
+            RplLoggedIn900{ client, nick, user, host, account, username } => { Ok(()) }
+            RplLoggedOut901{ client, nick, host } => { Ok(()) }
+            ErrNickLocked902{ client } => { Ok(()) }
+            RplSaslSuccess903{ client } => { Ok(()) }
+            ErrSaslFail904{ client } => { Ok(()) }
+            ErrSaslTooLong905{ client } => { Ok(()) }
+            ErrSaslAborted906{ client } => { Ok(()) }
+            ErrSaslAlready907{ client } => { Ok(()) }
+            RplSaslMechs908{ client, mechasnisms } => { Ok(()) }
         }
     }
 }
