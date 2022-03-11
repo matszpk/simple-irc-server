@@ -241,10 +241,10 @@ enum Reply<'a> {
     RplTryAgain263{ client: &'a str, command: &'a str },
     RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplGlobalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
-    RplWhoIsCertFP276{ client: &'a str, nick: &'a str },
+    RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
     RplNone300{ },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
-    RplUserHost302{ client: &'a str, replies: Option<&'a [&'a str]> },
+    RplUserHost302{ client: &'a str, replies: &'a [&'a str] },
     RplUnAway305{ client: &'a str },
     RplNoAway306{ client: &'a str },
     RplWhoReply352{ client: &'a str, channel: &'a str, username: &'a str, host: &'a str,
@@ -369,26 +369,52 @@ impl<'a> fmt::Display for Reply<'a> {
             RplCreated003{ client, datetime } => {
                 write!(f, "{} :This server was created {}", client, datetime) }
             RplMyInfo004{ client, servername, avail_user_modes,
-                    avail_channel_modes } => { Ok(()) }
-            RplISupport005{ client, tokens } => { Ok(()) }
-            RplBounce010{ client, hostname, port, info } => { Ok(()) }
-            RplUModeIs221{ client, user_modes } => { Ok(()) }
-            RplLUserClient251{ client, users_num, inv_users_num, servers_num } => { Ok(()) }
-            RplLUserOp252{ client, ops_num } => { Ok(()) }
-            RplLUserUnknown253{ client, conns } => { Ok(()) }
-            RplLUserChannels254{ client, channels } => { Ok(()) }
-            RplLUserMe255{ client, clients_num, servers_num } => { Ok(()) }
-            RplAdminMe256{ client, server } => { Ok(()) }
-            RplAdminLoc1257{ client, info } => { Ok(()) }
-            RplAdminLoc2258{ client, info } => { Ok(()) }
-            RplAdminEmail259{ client, email } => { Ok(()) }
-            RplTryAgain263{ client, command } => { Ok(()) }
-            RplLocalUsers265{ client, clients_num, max_clients_num } => { Ok(()) }
-            RplGlobalUsers265{ client, clients_num, max_clients_num } => { Ok(()) }
-            RplWhoIsCertFP276{ client, nick } => { Ok(()) }
-            RplNone300{ } => { Ok(()) }
-            RplAway301{ client, nick, message } => { Ok(()) }
-            RplUserHost302{ client, replies } => { Ok(()) }
+                    avail_channel_modes } => {
+                write!(f, "{} {} {} {}", client, servername, avail_user_modes,
+                    avail_channel_modes) }
+            RplISupport005{ client, tokens } => {
+                write!(f, "{} {} :are supported by this server", client, tokens) }
+            RplBounce010{ client, hostname, port, info } => {
+                write!(f, "{} {} {} :{}", client, hostname, port, info) }
+            RplUModeIs221{ client, user_modes } => {
+                write!(f, "{} {}", client, user_modes) }
+            RplLUserClient251{ client, users_num, inv_users_num, servers_num } => {
+                write!(f, "{} :There are {} users and {} invisible on {} servers",
+                    client, users_num, inv_users_num, servers_num) }
+            RplLUserOp252{ client, ops_num } => {
+                write!(f, "{} {} :operator(s) online", client, ops_num) }
+            RplLUserUnknown253{ client, conns } => {
+                write!(f, "{} {} :unknown connection(s)", client, conns) }
+            RplLUserChannels254{ client, channels } => {
+                write!(f, "{} {} :channels formed", client, channels) }
+            RplLUserMe255{ client, clients_num, servers_num } => {
+                write!(f, "{} :I have {} clients and {} servers", client, clients_num,
+                    servers_num) }
+            RplAdminMe256{ client, server } => {
+                write!(f, "{} {} :Administrative info", client, server) }
+            RplAdminLoc1257{ client, info } => {
+                write!(f, "{} :{}", client, info) }
+            RplAdminLoc2258{ client, info } => {
+                write!(f, "{} :{}", client, info) }
+            RplAdminEmail259{ client, email } => {
+                write!(f, "{} :{}", client, email) }
+            RplTryAgain263{ client, command } => {
+                write!(f, "{} {} :Please wait a while and try again.", client, command) }
+            RplLocalUsers265{ client, clients_num, max_clients_num } => {
+                write!(f, "{} {} {} :Current local users {}, max {}", client,
+                    clients_num, max_clients_num, clients_num, max_clients_num) }
+            RplGlobalUsers265{ client, clients_num, max_clients_num } => {
+                write!(f, "{} {} {} :Current global users {}, max {}", client,
+                    clients_num, max_clients_num, clients_num, max_clients_num) }
+            RplWhoIsCertFP276{ client, nick, fingerprint } => {
+                write!(f, "{} {} :has client certificate fingerprint {}", client, nick,
+                    fingerprint) }
+            RplNone300{ } => { write!(f, "Is it none") }
+            RplAway301{ client, nick, message } => {
+                write!(f, "{} {} :{}", client, nick, message) }
+            RplUserHost302{ client, replies } => {
+                write!(f, "{} :{}", client, replies.iter()
+                    .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
             RplUnAway305{ client } => { Ok(()) }
             RplNoAway306{ client } => { Ok(()) }
             RplWhoReply352{ client, channel, username, host, server, nick, flags,
