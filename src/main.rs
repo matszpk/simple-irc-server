@@ -224,7 +224,7 @@ enum Reply<'a> {
     RplYourHost002{ client: &'a str, servername: &'a str, version: &'a str },
     RplCreated003{ client: &'a str, datetime: &'a str },
     RplMyInfo004{ client: &'a str, servername: &'a str, avail_user_modes: &'a str,
-            avail_channel_modes: &'a str },
+            avail_chmodes: &'a str, avail_chmodes_with_params: Option<&'a str> },
     RplISupport005{ client: &'a str, tokens: &'a str },
     RplBounce010{ client: &'a str, hostname: &'a str, port: u16, info: &'a str },
     RplUModeIs221{ client: &'a str, user_modes: &'a str },
@@ -252,7 +252,8 @@ enum Reply<'a> {
             hopcount: usize, realname: &'a str },
     RplEndOfWho315{ client: &'a str, mask: &'a str },
     RplWhoIsRegNick307{ client: &'a str, nick: &'a str },
-    RplWhoIsUser311{ client: &'a str, nick: &'a str, host: &'a str, realname: &'a str },
+    RplWhoIsUser311{ client: &'a str, nick: &'a str, username: &'a str, host: &'a str,
+            realname: &'a str },
     RplWhoIsServer312{ client: &'a str, nick: &'a str, server: &'a str,
             server_info: &'a str },
     RplWhoIsOperator313{ client: &'a str, nick: &'a str },
@@ -272,11 +273,11 @@ enum Reply<'a> {
     RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
     RplNoTopic331{ client: &'a str, nick: &'a str },
     RplTopic332{ client: &'a str, nick: &'a str, topic: &'a str },
-    RplTopicWhoTime333{ client: &'a str, nick: &'a str, setat: u64 },
+    RplTopicWhoTime333{ client: &'a str, channel: &'a str, nick: &'a str, setat: u64 },
     RplWhoIsActually338P1{ client: &'a str, nick: &'a str },
     RplWhoIsActually338P2{ client: &'a str, nick: &'a str, host_ip: &'a str },
     RplWhoIsActually338P3{ client: &'a str, nick: &'a str,
-            username: &'a str, hostname: &'a str },
+            username: &'a str, hostname: &'a str, ip: &'a str },
     RplInviting341{ client: &'a str, nick: &'a str, channel: &'a str },
     RplInviteList346{ client: &'a str, channel: &'a str, mask: &'a str },
     RplEndOfInviteList347{ client: &'a str, channel: &'a str },
@@ -311,6 +312,7 @@ enum Reply<'a> {
     ErrTooManyChannels405{ client: &'a str, channel: &'a str },
     ErrNoOrigin409{ client: &'a str },
     ErrInputTooLong417{ client: &'a str },
+    ErrUnknownCommand421{ client: &'a str, command: &'a str },
     ErrNoMotd422{ client: &'a str },
     ErrErroneusNickname432{ client: &'a str, nick: &'a str },
     ErrNicknameInUse433{ client: &'a str, nick: &'a str },
@@ -324,6 +326,7 @@ enum Reply<'a> {
     ErrYoureBannedCreep465{ client: &'a str },
     ErrChannelIsFull471{ client: &'a str, channel: &'a str },
     ErrUnknownMode472{ client: &'a str, modechar: char },
+    ErrInviteOnlyChan473{ client: &'a str, channel: &'a str },
     ErrBannedFromChan474{ client: &'a str, channel: &'a str },
     ErrBadChannelKey475{ client: &'a str, channel: &'a str },
     ErrBadChanMask476{ channel: &'a str },
@@ -338,21 +341,22 @@ enum Reply<'a> {
     RplStartTls670{ client: &'a str },
     RplWhoIsSecure671{ client: &'a str, nick: &'a str },
     ErrStartTls691{ client: &'a str },
-    ErrInvalidModeParam696{ client: &'a str, target: &'a str },
+    ErrInvalidModeParam696{ client: &'a str, target: &'a str, modechar: char,
+        param: &'a str, description: &'a str },
     RplHelpStart704{ client: &'a str, subject: &'a str, line: &'a str },
     RplHelpTxt705{ client: &'a str, subject: &'a str, line: &'a str },
     RplEndOfHelp706{ client: &'a str, subject: &'a str, line: &'a str },
     ErrNoPrivs723{ client: &'a str, privil: &'a str },
     RplLoggedIn900{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str,
             account: &'a str, username: &'a str },
-    RplLoggedOut901{ client: &'a str, nick: &'a str, host: &'a str },
+    RplLoggedOut901{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str },
     ErrNickLocked902{ client: &'a str },
     RplSaslSuccess903{ client: &'a str },
     ErrSaslFail904{ client: &'a str },
     ErrSaslTooLong905{ client: &'a str },
     ErrSaslAborted906{ client: &'a str },
     ErrSaslAlready907{ client: &'a str },
-    RplSaslMechs908{ client: &'a str, mechasnisms: &'a str },
+    RplSaslMechs908{ client: &'a str, mechanisms: &'a str },
 }
 
 use Reply::*;
@@ -369,9 +373,13 @@ impl<'a> fmt::Display for Reply<'a> {
             RplCreated003{ client, datetime } => {
                 write!(f, "{} :This server was created {}", client, datetime) }
             RplMyInfo004{ client, servername, avail_user_modes,
-                    avail_channel_modes } => {
-                write!(f, "{} {} {} {}", client, servername, avail_user_modes,
-                    avail_channel_modes) }
+                    avail_chmodes, avail_chmodes_with_params } => {
+                if let Some(p) = avail_chmodes_with_params {
+                    write!(f, "{} {} {} {} {}", client, servername, avail_user_modes,
+                        avail_chmodes, p)
+                } else {
+                    write!(f, "{} {} {} {}", client, servername, avail_user_modes,
+                        avail_chmodes) } }
             RplISupport005{ client, tokens } => {
                 write!(f, "{} {} :are supported by this server", client, tokens) }
             RplBounce010{ client, hostname, port, info } => {
@@ -415,102 +423,220 @@ impl<'a> fmt::Display for Reply<'a> {
             RplUserHost302{ client, replies } => {
                 write!(f, "{} :{}", client, replies.iter()
                     .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
-            RplUnAway305{ client } => { Ok(()) }
-            RplNoAway306{ client } => { Ok(()) }
+            RplUnAway305{ client } => {
+                write!(f, "{} :You are no longer marked as being away", client) }
+            RplNoAway306{ client } => {
+                write!(f, "{} :You have been marked as being away", client) }
             RplWhoReply352{ client, channel, username, host, server, nick, flags,
-                    hopcount, realname } => { Ok(()) }
-            RplEndOfWho315{ client, mask } => { Ok(()) }
-            RplWhoIsRegNick307{ client, nick } => { Ok(()) }
-            RplWhoIsUser311{ client, nick, host, realname } => { Ok(()) }
-            RplWhoIsServer312{ client, nick, server, server_info } => { Ok(()) }
-            RplWhoIsOperator313{ client, nick } => { Ok(()) }
-            RplWhoWasUser314{ client, nick, username, host, realname } => { Ok(()) }
-            RplwhoIsIdle317{ client, nick, secs, signon } => { Ok(()) }
-            RplEndOfWhoIs318{ client, nick } => { Ok(()) }
-            RplWhoIsChannels319{ client, nick, channels } => { Ok(()) }
-            RplWhoIsSpecial320{ client, nick, special_info } => { Ok(()) }
-            RplListStart321{ client } => { Ok(()) }
-            RplList322{ client, channel, client_count, topic } => { Ok(()) }
-            RplListEnd323{ client } => { Ok(()) }
-            RplChannelModeIs324{ client, channel, modestring, mode_args } => { Ok(()) }
-            RplCreationTime329{ client, channel, creation_time } => { Ok(()) }
-            RplWhoIsAccount330{ client, nick, account } => { Ok(()) }
-            RplNoTopic331{ client, nick } => { Ok(()) }
-            RplTopic332{ client, nick, topic } => { Ok(()) }
-            RplTopicWhoTime333{ client, nick, setat } => { Ok(()) }
-            RplWhoIsActually338P1{ client, nick } => { Ok(()) }
-            RplWhoIsActually338P2{ client, nick, host_ip } => { Ok(()) }
-            RplWhoIsActually338P3{ client, nick, username, hostname } => { Ok(()) }
-            RplInviting341{ client, nick, channel } => { Ok(()) }
-            RplInviteList346{ client, channel, mask } => { Ok(()) }
-            RplEndOfInviteList347{ client, channel } => { Ok(()) }
-            RplExceptList348{ client, channel, mask } => { Ok(()) }
-            RplEndOfExceptList349{ client, channel } => { Ok(()) }
-            RplVersion351{ client, version, server, comments } => { Ok(()) }
-            RplNameReply353{ client, symbol, channel, replies } => { Ok(()) }
-            RplEndOfNames366{ client, channel } => { Ok(()) }
-            RplBanList367{ client, channel, mask, who, set_ts } => { Ok(()) }
-            RplEndOfBanList368{ client, channel } => { Ok(()) }
-            RplEndOfWhoWas369{ client, nick } => { Ok(()) }
-            RplInfo371{ client, info } => { Ok(()) }
-            RplEndOfInfo374{ client } => { Ok(()) }
-            RplMotdStart375{ client, server } => { Ok(()) }
-            RplMotd372{ client, motd } => { Ok(()) }
-            RplEndOfMotd376{ client } => { Ok(()) }
-            RplWhoIsHost378{ client, nick, host_info } => { Ok(()) }
-            RplWhoIsModes379{ client, nick, modes } => { Ok(()) }
-            RplYouReoper381{ client } => { Ok(()) }
-            RplRehashing382{ client, config_file } => { Ok(()) }
-            RplTime391{ client, server, timestamp, ts_offset, human_readable } => { Ok(()) }
-            ErrUnknownError400{ client, command, subcommand, info } => { Ok(()) }
-            ErrNoSuchNick401{ client, nick } => { Ok(()) }
-            ErrNoSuchServer402{ client, server } => { Ok(()) }
-            ErrNoSuchChannel403{ client, channel } => { Ok(()) }
-            ErrCannotSendToChain404{ client, channel } => { Ok(()) }
-            ErrTooManyChannels405{ client, channel } => { Ok(()) }
-            ErrNoOrigin409{ client } => { Ok(()) }
-            ErrInputTooLong417{ client } => { Ok(()) }
-            ErrNoMotd422{ client } => { Ok(()) }
-            ErrErroneusNickname432{ client, nick } => { Ok(()) }
-            ErrNicknameInUse433{ client, nick } => { Ok(()) }
-            ErrUserNotInChannel441{ client, nick, channel } => { Ok(()) }
-            ErrNotOnChannel442{ client, channel } => { Ok(()) }
-            ErrUserOnChannel443{ client, nick, channel } => { Ok(()) }
-            ErrNotRegistered451{ client } => { Ok(()) }
-            ErrNeedMoreParams461{ client, command } => { Ok(()) }
-            ErrAlreadyRegistered462{ client } => { Ok(()) }
-            ErrPasswdMismatch464{ client } => { Ok(()) }
-            ErrYoureBannedCreep465{ client } => { Ok(()) }
-            ErrChannelIsFull471{ client, channel } => { Ok(()) }
-            ErrUnknownMode472{ client, modechar } => { Ok(()) }
-            ErrBannedFromChan474{ client, channel } => { Ok(()) }
-            ErrBadChannelKey475{ client, channel } => { Ok(()) }
-            ErrBadChanMask476{ channel } => { Ok(()) }
-            ErrNoPrivileges481{ client } => { Ok(()) }
-            ErrChanOpPrivsNeeded482{ client, channel } => { Ok(()) }
-            ErrCantKillServer483{ client } => { Ok(()) }
-            ErrNoOperhost482{ client } => { Ok(()) }
-            ErrUmodeUnknownFlag501{ client } => { Ok(()) }
-            ErrUsersDontMatch502{ client } => { Ok(()) }
-            ErrHelpNotFound524{ client, subject } => { Ok(()) }
-            ErrInvalidKey525{ client, target_chan } => { Ok(()) }
-            RplStartTls670{ client } => { Ok(()) }
-            RplWhoIsSecure671{ client, nick } => { Ok(()) }
-            ErrStartTls691{ client } => { Ok(()) }
-            ErrInvalidModeParam696{ client, target } => { Ok(()) }
-            RplHelpStart704{ client, subject, line } => { Ok(()) }
-            RplHelpTxt705{ client, subject, line } => { Ok(()) }
-            RplEndOfHelp706{ client, subject, line } => { Ok(()) }
-            ErrNoPrivs723{ client, privil } => { Ok(()) }
-            RplLoggedIn900{ client, nick, user, host, account, username } => { Ok(()) }
-            RplLoggedOut901{ client, nick, host } => { Ok(()) }
-            ErrNickLocked902{ client } => { Ok(()) }
-            RplSaslSuccess903{ client } => { Ok(()) }
-            ErrSaslFail904{ client } => { Ok(()) }
-            ErrSaslTooLong905{ client } => { Ok(()) }
-            ErrSaslAborted906{ client } => { Ok(()) }
-            ErrSaslAlready907{ client } => { Ok(()) }
-            RplSaslMechs908{ client, mechasnisms } => { Ok(()) }
+                    hopcount, realname } => {
+                write!(f, "{} {} {} {} {} {} {} :{} {}", client, channel, username, host,
+                    server, nick, flags, hopcount, realname) }
+            RplEndOfWho315{ client, mask } => {
+                write!(f, "{} {} :End of WHO list", client, mask) }
+            RplWhoIsRegNick307{ client, nick } => {
+                write!(f, "{} {} :has identified for this nick", client, nick) }
+            RplWhoIsUser311{ client, nick, username, host, realname } => {
+                write!(f, "{} {} {} {} * :{}", client, nick, username, host, realname) }
+            RplWhoIsServer312{ client, nick, server, server_info } => {
+                write!(f, "{} {} {} :{}", client, nick, server, server_info) }
+            RplWhoIsOperator313{ client, nick } => {
+                write!(f, "{} {} :is an IRC operator", client, nick) }
+            RplWhoWasUser314{ client, nick, username, host, realname } => {
+                write!(f, "{} {} {} {} * :{}", client, nick, username, host, realname) }
+            RplwhoIsIdle317{ client, nick, secs, signon } => {
+                write!(f, "{} {} {} {} :seconds idle, signon time",
+                    client, nick, secs, signon) }
+            RplEndOfWhoIs318{ client, nick } => {
+                write!(f, "{} {} :End of /WHOIS list", client, nick) }
+            RplWhoIsChannels319{ client, nick, channels } => {
+                write!(f, "{} {} :{}", client, nick, channels.iter().map(|c| {
+                    if let Some(prefix) = c.prefix {
+                        prefix.to_string() + c.channel
+                    } else { c.channel.to_string() }
+                }).collect::<Vec<_>>().join(" ")) }
+            RplWhoIsSpecial320{ client, nick, special_info } => {
+                write!(f, "{} {} :{}", client, nick, special_info) }
+            RplListStart321{ client } => {
+                write!(f, "{} Channel :Users  Name", client) }
+            RplList322{ client, channel, client_count, topic } => {
+                write!(f, "{} {} {} :{}", client, channel, client_count, topic) }
+            RplListEnd323{ client } => {
+                write!(f, "{} :End of /LIST", client) }
+            RplChannelModeIs324{ client, channel, modestring, mode_args } => {
+                write!(f, "{} {} {} {}", client, channel, modestring, mode_args.iter()
+                    .map(|a| a.to_string()).collect::<Vec<_>>().join(" ")) }
+            RplCreationTime329{ client, channel, creation_time } => {
+                write!(f, "{} {} {}", client, channel, creation_time) }
+            RplWhoIsAccount330{ client, nick, account } => {
+                write!(f, "{} {} {} :is logged in as", client, nick, account) }
+            RplNoTopic331{ client, nick } => {
+                write!(f, "{} {} : No topic is set", client, nick) }
+            RplTopic332{ client, nick, topic } => {
+                write!(f, "{} {} :{}", client, nick, topic) }
+            RplTopicWhoTime333{ client, channel, nick, setat } => {
+                write!(f, "{} {} {} {}", client, channel, nick, setat) }
+            RplWhoIsActually338P1{ client, nick } => {
+                write!(f, "{} {} :is actually ...", client, nick) }
+            RplWhoIsActually338P2{ client, nick, host_ip } => {
+                write!(f, "{} {} {} :Is actually using host", client, nick, host_ip) }
+            RplWhoIsActually338P3{ client, nick, username, hostname, ip } => {
+                write!(f, "{} {} {}@{} {} :Is actually using host", client, nick,
+                    username, hostname, ip) }
+            RplInviting341{ client, nick, channel } => {
+                write!(f, "{} {} {}", client, nick, channel) }
+            RplInviteList346{ client, channel, mask } => {
+                write!(f, "{} {} {}", client, channel, mask) }
+            RplEndOfInviteList347{ client, channel } => {
+                write!(f, "{} {} :End of channel invite list", client, channel) }
+            RplExceptList348{ client, channel, mask } => {
+                write!(f, "{} {} {}", client, channel, mask) }
+            RplEndOfExceptList349{ client, channel } => {
+                write!(f, "{} {} :End of channel exception list", client, channel) }
+            RplVersion351{ client, version, server, comments } => {
+                write!(f, "{} {} {} :{}", client, version, server, comments) }
+            RplNameReply353{ client, symbol, channel, replies } => {
+                write!(f, "{} {} {} :{}", client, symbol, channel,
+                    replies.iter().map(|r| {
+                        if let Some(prefix) = r.prefix {
+                            prefix.to_string() + r.nick
+                        } else { r.nick.to_string() }
+                    }).collect::<Vec<_>>().join(" ")) }
+            RplEndOfNames366{ client, channel } => {
+                write!(f, "{} {} :End of /NAMES list", client, channel) }
+            RplBanList367{ client, channel, mask, who, set_ts } => {
+                write!(f, "{} {} {} {} {}", client, channel, mask, who, set_ts) }
+            RplEndOfBanList368{ client, channel } => {
+                write!(f, "{} {} :End of channel ban list", client, channel) }
+            RplEndOfWhoWas369{ client, nick } => {
+                write!(f, "{} {} : End of WHOWAS", client, nick) }
+            RplInfo371{ client, info } => {
+                write!(f, "{} :{}", client, info) }
+            RplEndOfInfo374{ client } => {
+                write!(f, "{} :End of INFO list", client) }
+            RplMotdStart375{ client, server } => {
+                write!(f, "{} :- {} Message of the day - ", client, server) }
+            RplMotd372{ client, motd } => {
+                write!(f, "{} :{}", client, motd) }
+            RplEndOfMotd376{ client } => {
+                write!(f, "{} :End of /MOTD command" , client) }
+            RplWhoIsHost378{ client, nick, host_info } => {
+                write!(f, "{} {} :is connecting from {}", client, nick, host_info) }
+            RplWhoIsModes379{ client, nick, modes } => {
+                write!(f, "{} {} :is using modes {}", client, nick, modes) }
+            RplYouReoper381{ client } => {
+                write!(f, "{} :You are now an IRC operator", client) }
+            RplRehashing382{ client, config_file } => {
+                write!(f, "{} {} :Rehashing", client, config_file) }
+            RplTime391{ client, server, timestamp, ts_offset, human_readable } => {
+                write!(f, "{} {} {} {} :{}", client, server, timestamp, ts_offset,
+                    human_readable) }
+            ErrUnknownError400{ client, command, subcommand, info } => {
+                if let Some(sc) = subcommand {
+                    write!(f, "{} {} {} :{}", client, command, sc, info)
+                } else {
+                    write!(f, "{} {} :{}", client, command, info)
+                } }
+            ErrNoSuchNick401{ client, nick } => {
+                write!(f, "{} {} :No such nick/channel", client, nick) }
+            ErrNoSuchServer402{ client, server } => {
+                write!(f, "{} {} :No such server", client, server) }
+            ErrNoSuchChannel403{ client, channel } => {
+                write!(f, "{} {} :No such channel", client, channel) }
+            ErrCannotSendToChain404{ client, channel } => {
+                write!(f, "{} {} :Cannot send to channel", client, channel) }
+            ErrTooManyChannels405{ client, channel } => {
+                write!(f, "{} {} :You have joined too many channels", client, channel) }
+            ErrNoOrigin409{ client } => {
+                write!(f, "{} :No origin specified", client) }
+            ErrInputTooLong417{ client } => {
+                write!(f, "{} :Input line was too long", client) }
+            ErrUnknownCommand421{ client, command } => {
+                write!(f, "{} {} :Unknown command", client, command) }
+            ErrNoMotd422{ client } => {
+                write!(f, "{} :MOTD File is missing", client) }
+            ErrErroneusNickname432{ client, nick } => {
+                write!(f, "{} {} :Erroneus nickname", client, nick) }
+            ErrNicknameInUse433{ client, nick } => {
+                write!(f, "{} {} :Nickname is already in use", client, nick) }
+            ErrUserNotInChannel441{ client, nick, channel } => {
+                write!(f, "{} {} {} :They aren't on that channel", client, nick, channel) }
+            ErrNotOnChannel442{ client, channel } => {
+                write!(f, "{} {} :You're not on that channel", client, channel) }
+            ErrUserOnChannel443{ client, nick, channel } => {
+                write!(f, "{} {} {} :is already on channel", client, nick, channel) }
+            ErrNotRegistered451{ client } => {
+                write!(f, "{} :You have not registered", client) }
+            ErrNeedMoreParams461{ client, command } => {
+                write!(f, "{} {} :Not enough parameters", client, command) }
+            ErrAlreadyRegistered462{ client } => {
+                write!(f, "{} :You may not reregister", client) }
+            ErrPasswdMismatch464{ client } => {
+                write!(f, "{} :Password incorrect", client) }
+            ErrYoureBannedCreep465{ client } => {
+                write!(f, "{} :You are banned from this server.", client) }
+            ErrChannelIsFull471{ client, channel } => {
+                write!(f, "{} {} :Cannot join channel (+l)", client, channel) }
+            ErrUnknownMode472{ client, modechar } => {
+                write!(f, "{} {} :is unknown mode char to me", client, modechar) }
+            ErrInviteOnlyChan473{ client, channel } => {
+                write!(f, "{} {} :Cannot join channel (+i)", client, channel) }
+            ErrBannedFromChan474{ client, channel } => {
+                write!(f, "{} {} :Cannot join channel (+b)", client, channel) }
+            ErrBadChannelKey475{ client, channel } => {
+                write!(f, "{} {} :Cannot join channel (+k)", client, channel) }
+            ErrBadChanMask476{ channel } => {
+                write!(f, "{} :Bad Channel Mask", channel) }
+            ErrNoPrivileges481{ client } => {
+                write!(f, "{} :Permission Denied- You're not an IRC operator", client) }
+            ErrChanOpPrivsNeeded482{ client, channel } => {
+                write!(f, "{} {} :You're not channel operator", client, channel) }
+            ErrCantKillServer483{ client } => {
+                write!(f, "{} :You cant kill a server!", client) }
+            ErrNoOperhost482{ client } => {
+                write!(f, "{} :No O-lines for your host", client) }
+            ErrUmodeUnknownFlag501{ client } => {
+                write!(f, "{} :Unknown MODE flag", client) }
+            ErrUsersDontMatch502{ client } => {
+                write!(f, "{} :Cant change mode for other users", client) }
+            ErrHelpNotFound524{ client, subject } => {
+                write!(f, "{} {} :No help available on this topic", client, subject) }
+            ErrInvalidKey525{ client, target_chan } => {
+                write!(f, "{} {} :Key is not well-formed", client, target_chan) }
+            RplStartTls670{ client } => {
+                write!(f, "{} :STARTTLS successful, proceed with TLS handshake", client) }
+            RplWhoIsSecure671{ client, nick } => {
+                write!(f, "{} {} :is using a secure connection", client, nick) }
+            ErrStartTls691{ client } => {
+                write!(f, "{} :STARTTLS failed (Wrong moon phase)", client) }
+            ErrInvalidModeParam696{ client, target, modechar, param, description } => {
+                write!(f, "{} {} {} {} :{}", client, target, modechar, param, description) }
+            RplHelpStart704{ client, subject, line } => {
+                write!(f, "{} {} :{}", client, subject, line) }
+            RplHelpTxt705{ client, subject, line } => {
+                write!(f, "{} {} :{}", client, subject, line) }
+            RplEndOfHelp706{ client, subject, line } => {
+                write!(f, "{} {} :{}", client, subject, line) }
+            ErrNoPrivs723{ client, privil } => {
+                write!(f, "{} {} :Insufficient oper privileges.", client, privil) }
+            RplLoggedIn900{ client, nick, user, host, account, username } => {
+                write!(f, "{} {}!{}@{} {}: You are now logged in as {}", client, nick,
+                    user, host, account, username) }
+            RplLoggedOut901{ client, nick, user, host } => {
+                write!(f, "{} {}!{}@{} :You are now logged out", client, nick, user, host) }
+            ErrNickLocked902{ client } => {
+                write!(f, "{} :You must use a nick assigned to you", client) }
+            RplSaslSuccess903{ client } => {
+                write!(f, "{} :SASL authentication successful", client) }
+            ErrSaslFail904{ client } => {
+                write!(f, "{} :SASL authentication failed", client) }
+            ErrSaslTooLong905{ client } => {
+                write!(f, "{} :SASL message too long", client) }
+            ErrSaslAborted906{ client } => {
+                write!(f, "{} :SASL authentication aborted", client) }
+            ErrSaslAlready907{ client } => {
+                write!(f, "{} :You have already authenticated using SASL", client) }
+            RplSaslMechs908{ client, mechanisms } => {
+                write!(f, "{} {} :are available SASL mechanisms", client, mechanisms) }
         }
     }
 }
