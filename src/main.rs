@@ -21,12 +21,13 @@ use std::fmt;
 use std::rc::Rc;
 use std::fs::File;
 use std::io::Read;
-use std::net::IpAddr;
+use std::net::{IpAddr, TcpStream};
 use std::error::Error;
 use clap;
 use clap::Parser;
 use toml;
 use tokio;
+use tokio_util::codec::{Framed, LinesCodec};
 use serde_derive::{Serialize, Deserialize};
 use dashmap::DashMap;
 
@@ -223,8 +224,9 @@ enum Reply<'a> {
             user: &'a str, host: &'a str },
     RplYourHost002{ client: &'a str, servername: &'a str, version: &'a str },
     RplCreated003{ client: &'a str, datetime: &'a str },
-    RplMyInfo004{ client: &'a str, servername: &'a str, avail_user_modes: &'a str,
-            avail_chmodes: &'a str, avail_chmodes_with_params: Option<&'a str> },
+    RplMyInfo004{ client: &'a str, servername: &'a str, version: &'a str,
+            avail_user_modes: &'a str, avail_chmodes: &'a str,
+            avail_chmodes_with_params: Option<&'a str> },
     RplISupport005{ client: &'a str, tokens: &'a str },
     RplBounce010{ client: &'a str, hostname: &'a str, port: u16, info: &'a str },
     RplUModeIs221{ client: &'a str, user_modes: &'a str },
@@ -372,14 +374,14 @@ impl<'a> fmt::Display for Reply<'a> {
                     client, servername, version) }
             RplCreated003{ client, datetime } => {
                 write!(f, "{} :This server was created {}", client, datetime) }
-            RplMyInfo004{ client, servername, avail_user_modes,
+            RplMyInfo004{ client, servername, version, avail_user_modes,
                     avail_chmodes, avail_chmodes_with_params } => {
                 if let Some(p) = avail_chmodes_with_params {
-                    write!(f, "{} {} {} {} {}", client, servername, avail_user_modes,
-                        avail_chmodes, p)
+                    write!(f, "{} {} {} {} {} {}", client, servername, version,
+                        avail_user_modes, avail_chmodes, p)
                 } else {
-                    write!(f, "{} {} {} {}", client, servername, avail_user_modes,
-                        avail_chmodes) } }
+                    write!(f, "{} {} {} {} {}", client, servername, version,
+                        avail_user_modes, avail_chmodes) } }
             RplISupport005{ client, tokens } => {
                 write!(f, "{} {} :are supported by this server", client, tokens) }
             RplBounce010{ client, hostname, port, info } => {
@@ -647,6 +649,7 @@ struct User {
     modes: UserModes,
     ip_addr: IpAddr,
     hostname: String,
+    output: Framed<TcpStream, LinesCodec>,
 }
 
 enum OperatorType {
@@ -688,7 +691,7 @@ impl Error for MainStateError {
 
 struct MainState {
     config: MainConfig,
-    users: DashMap<String, User>,
+    users: DashMap<String, Rc<User>>,
     channels: DashMap<String, Channel>,
 }
 
@@ -712,6 +715,35 @@ impl MainState {
     pub fn join_to_channel(username: &str, channels: Vec<(&str, &str)>) ->
                 Result<bool, MainStateError> {
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    #[test]
+    fn test_replies() {
+        assert_eq!("<client> :Welcome to the <networkname> Network, <nick>!<user>@<host>",
+            format!("{}", RplWelcome001{ client: "<client>", networkname: "<networkname>",
+                nick: "<nick>", user: "<user>", host: "<host>" }));
+        assert_eq!("<client> :Your host is <servername>, running version <version>",
+            format!("{}", RplYourHost002{ client: "<client>", servername: "<servername>",
+                version: "<version>" }));
+        assert_eq!("<client> :This server was created <datetime>",
+            format!("{}", RplCreated003{ client: "<client>", datetime: "<datetime>" }));
+        assert_eq!("<client> <servername> <version> <available user modes> \
+                    <available channel modes> <channel modes with a parameter>",
+            format!("{}", RplMyInfo004{ client: "<client>", servername: "<servername>",
+            version: "<version>", avail_user_modes: "<available user modes>",
+            avail_chmodes: "<available channel modes>",
+            avail_chmodes_with_params: Some("<channel modes with a parameter>") }));
+        assert_eq!("<client> <servername> <version> <available user modes> \
+                    <available channel modes>",
+            format!("{}", RplMyInfo004{ client: "<client>", servername: "<servername>",
+            version: "<version>", avail_user_modes: "<available user modes>",
+            avail_chmodes: "<available channel modes>",
+            avail_chmodes_with_params: None }));
     }
 }
 
