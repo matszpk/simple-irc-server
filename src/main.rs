@@ -242,7 +242,7 @@ enum Reply<'a> {
     RplAdminEmail259{ client: &'a str, email: &'a str },
     RplTryAgain263{ client: &'a str, command: &'a str },
     RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
-    RplGlobalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
+    RplGlobalUsers266{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
     RplNone300{ },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
@@ -335,7 +335,7 @@ enum Reply<'a> {
     ErrNoPrivileges481{ client: &'a str },
     ErrChanOpPrivsNeeded482{ client: &'a str, channel: &'a str },
     ErrCantKillServer483{ client: &'a str },
-    ErrNoOperhost482{ client: &'a str },
+    ErrNoOperhost491{ client: &'a str },
     ErrUmodeUnknownFlag501{ client: &'a str },
     ErrUsersDontMatch502{ client: &'a str },
     ErrHelpNotFound524{ client: &'a str, subject: &'a str },
@@ -367,278 +367,279 @@ impl<'a> fmt::Display for Reply<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RplWelcome001{ client, networkname, nick, user, host } => {
-                write!(f, "{} :Welcome to the {} Network, {}!{}@{}",
+                write!(f, "001 {} :Welcome to the {} Network, {}!{}@{}",
                     client, networkname, nick, user, host) }
             RplYourHost002{ client, servername, version } => {
-                write!(f, "{} :Your host is {}, running version {}",
+                write!(f, "002 {} :Your host is {}, running version {}",
                     client, servername, version) }
             RplCreated003{ client, datetime } => {
-                write!(f, "{} :This server was created {}", client, datetime) }
+                write!(f, "003 {} :This server was created {}", client, datetime) }
             RplMyInfo004{ client, servername, version, avail_user_modes,
                     avail_chmodes, avail_chmodes_with_params } => {
                 if let Some(p) = avail_chmodes_with_params {
-                    write!(f, "{} {} {} {} {} {}", client, servername, version,
+                    write!(f, "004 {} {} {} {} {} {}", client, servername, version,
                         avail_user_modes, avail_chmodes, p)
                 } else {
-                    write!(f, "{} {} {} {} {}", client, servername, version,
+                    write!(f, "004 {} {} {} {} {}", client, servername, version,
                         avail_user_modes, avail_chmodes) } }
             RplISupport005{ client, tokens } => {
-                write!(f, "{} {} :are supported by this server", client, tokens) }
+                write!(f, "005 {} {} :are supported by this server", client, tokens) }
             RplBounce010{ client, hostname, port, info } => {
-                write!(f, "{} {} {} :{}", client, hostname, port, info) }
+                write!(f, "010 {} {} {} :{}", client, hostname, port, info) }
             RplUModeIs221{ client, user_modes } => {
-                write!(f, "{} {}", client, user_modes) }
+                write!(f, "221 {} {}", client, user_modes) }
             RplLUserClient251{ client, users_num, inv_users_num, servers_num } => {
-                write!(f, "{} :There are {} users and {} invisible on {} servers",
+                write!(f, "251 {} :There are {} users and {} invisible on {} servers",
                     client, users_num, inv_users_num, servers_num) }
             RplLUserOp252{ client, ops_num } => {
-                write!(f, "{} {} :operator(s) online", client, ops_num) }
+                write!(f, "252 {} {} :operator(s) online", client, ops_num) }
             RplLUserUnknown253{ client, conns_num } => {
-                write!(f, "{} {} :unknown connection(s)", client, conns_num) }
+                write!(f, "253 {} {} :unknown connection(s)", client, conns_num) }
             RplLUserChannels254{ client, channels_num } => {
-                write!(f, "{} {} :channels formed", client, channels_num) }
+                write!(f, "254 {} {} :channels formed", client, channels_num) }
             RplLUserMe255{ client, clients_num, servers_num } => {
-                write!(f, "{} :I have {} clients and {} servers", client, clients_num,
+                write!(f, "255 {} :I have {} clients and {} servers", client, clients_num,
                     servers_num) }
             RplAdminMe256{ client, server } => {
-                write!(f, "{} {} :Administrative info", client, server) }
+                write!(f, "256 {} {} :Administrative info", client, server) }
             RplAdminLoc1257{ client, info } => {
-                write!(f, "{} :{}", client, info) }
+                write!(f, "257 {} :{}", client, info) }
             RplAdminLoc2258{ client, info } => {
-                write!(f, "{} :{}", client, info) }
+                write!(f, "258 {} :{}", client, info) }
             RplAdminEmail259{ client, email } => {
-                write!(f, "{} :{}", client, email) }
+                write!(f, "259 {} :{}", client, email) }
             RplTryAgain263{ client, command } => {
-                write!(f, "{} {} :Please wait a while and try again.", client, command) }
+                write!(f, "263 {} {} :Please wait a while and try again.", client, command) }
             RplLocalUsers265{ client, clients_num, max_clients_num } => {
-                write!(f, "{} {} {} :Current local users {}, max {}", client,
+                write!(f, "265 {} {} {} :Current local users {}, max {}", client,
                     clients_num, max_clients_num, clients_num, max_clients_num) }
-            RplGlobalUsers265{ client, clients_num, max_clients_num } => {
-                write!(f, "{} {} {} :Current global users {}, max {}", client,
+            RplGlobalUsers266{ client, clients_num, max_clients_num } => {
+                write!(f, "266 {} {} {} :Current global users {}, max {}", client,
                     clients_num, max_clients_num, clients_num, max_clients_num) }
             RplWhoIsCertFP276{ client, nick, fingerprint } => {
-                write!(f, "{} {} :has client certificate fingerprint {}", client, nick,
+                write!(f, "276 {} {} :has client certificate fingerprint {}", client, nick,
                     fingerprint) }
-            RplNone300{ } => { write!(f, "Is it none") }
+            RplNone300{ } => { write!(f, "300 It is none") }
             RplAway301{ client, nick, message } => {
-                write!(f, "{} {} :{}", client, nick, message) }
+                write!(f, "301 {} {} :{}", client, nick, message) }
             RplUserHost302{ client, replies } => {
-                write!(f, "{} :{}", client, replies.iter()
+                write!(f, "302 {} :{}", client, replies.iter()
                     .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
             RplUnAway305{ client } => {
-                write!(f, "{} :You are no longer marked as being away", client) }
+                write!(f, "305 {} :You are no longer marked as being away", client) }
             RplNoAway306{ client } => {
-                write!(f, "{} :You have been marked as being away", client) }
+                write!(f, "306 {} :You have been marked as being away", client) }
             RplWhoReply352{ client, channel, username, host, server, nick, flags,
                     hopcount, realname } => {
-                write!(f, "{} {} {} {} {} {} {} :{} {}", client, channel, username, host,
+                write!(f, "352 {} {} {} {} {} {} {} :{} {}", client, channel, username, host,
                     server, nick, flags, hopcount, realname) }
             RplEndOfWho315{ client, mask } => {
-                write!(f, "{} {} :End of WHO list", client, mask) }
+                write!(f, "315 {} {} :End of WHO list", client, mask) }
             RplWhoIsRegNick307{ client, nick } => {
-                write!(f, "{} {} :has identified for this nick", client, nick) }
+                write!(f, "307 {} {} :has identified for this nick", client, nick) }
             RplWhoIsUser311{ client, nick, username, host, realname } => {
-                write!(f, "{} {} {} {} * :{}", client, nick, username, host, realname) }
+                write!(f, "311 {} {} {} {} * :{}", client, nick, username, host, realname) }
             RplWhoIsServer312{ client, nick, server, server_info } => {
-                write!(f, "{} {} {} :{}", client, nick, server, server_info) }
+                write!(f, "312 {} {} {} :{}", client, nick, server, server_info) }
             RplWhoIsOperator313{ client, nick } => {
-                write!(f, "{} {} :is an IRC operator", client, nick) }
+                write!(f, "313 {} {} :is an IRC operator", client, nick) }
             RplWhoWasUser314{ client, nick, username, host, realname } => {
-                write!(f, "{} {} {} {} * :{}", client, nick, username, host, realname) }
+                write!(f, "314 {} {} {} {} * :{}", client, nick, username, host, realname) }
             RplwhoIsIdle317{ client, nick, secs, signon } => {
-                write!(f, "{} {} {} {} :seconds idle, signon time",
+                write!(f, "317 {} {} {} {} :seconds idle, signon time",
                     client, nick, secs, signon) }
             RplEndOfWhoIs318{ client, nick } => {
-                write!(f, "{} {} :End of /WHOIS list", client, nick) }
+                write!(f, "318 {} {} :End of /WHOIS list", client, nick) }
             RplWhoIsChannels319{ client, nick, channels } => {
-                write!(f, "{} {} :{}", client, nick, channels.iter().map(|c| {
+                write!(f, "319 {} {} :{}", client, nick, channels.iter().map(|c| {
                     if let Some(prefix) = c.prefix {
                         prefix.to_string() + c.channel
                     } else { c.channel.to_string() }
                 }).collect::<Vec<_>>().join(" ")) }
             RplWhoIsSpecial320{ client, nick, special_info } => {
-                write!(f, "{} {} :{}", client, nick, special_info) }
+                write!(f, "320 {} {} :{}", client, nick, special_info) }
             RplListStart321{ client } => {
-                write!(f, "{} Channel :Users  Name", client) }
+                write!(f, "321 {} Channel :Users  Name", client) }
             RplList322{ client, channel, client_count, topic } => {
-                write!(f, "{} {} {} :{}", client, channel, client_count, topic) }
+                write!(f, "322 {} {} {} :{}", client, channel, client_count, topic) }
             RplListEnd323{ client } => {
-                write!(f, "{} :End of /LIST", client) }
+                write!(f, "323 {} :End of /LIST", client) }
             RplChannelModeIs324{ client, channel, modestring, mode_args } => {
-                write!(f, "{} {} {} {}", client, channel, modestring, mode_args.iter()
+                write!(f, "324 {} {} {} {}", client, channel, modestring, mode_args.iter()
                     .map(|a| a.to_string()).collect::<Vec<_>>().join(" ")) }
             RplCreationTime329{ client, channel, creation_time } => {
-                write!(f, "{} {} {}", client, channel, creation_time) }
+                write!(f, "329 {} {} {}", client, channel, creation_time) }
             RplWhoIsAccount330{ client, nick, account } => {
-                write!(f, "{} {} {} :is logged in as", client, nick, account) }
+                write!(f, "330 {} {} {} :is logged in as", client, nick, account) }
             RplNoTopic331{ client, nick } => {
-                write!(f, "{} {} : No topic is set", client, nick) }
+                write!(f, "331 {} {} : No topic is set", client, nick) }
             RplTopic332{ client, nick, topic } => {
-                write!(f, "{} {} :{}", client, nick, topic) }
+                write!(f, "332 {} {} :{}", client, nick, topic) }
             RplTopicWhoTime333{ client, channel, nick, setat } => {
-                write!(f, "{} {} {} {}", client, channel, nick, setat) }
+                write!(f, "333 {} {} {} {}", client, channel, nick, setat) }
             RplWhoIsActually338P1{ client, nick } => {
-                write!(f, "{} {} :is actually ...", client, nick) }
+                write!(f, "338 {} {} :is actually ...", client, nick) }
             RplWhoIsActually338P2{ client, nick, host_ip } => {
-                write!(f, "{} {} {} :Is actually using host", client, nick, host_ip) }
+                write!(f, "338 {} {} {} :Is actually using host", client, nick, host_ip) }
             RplWhoIsActually338P3{ client, nick, username, hostname, ip } => {
-                write!(f, "{} {} {}@{} {} :Is actually using host", client, nick,
+                write!(f, "338 {} {} {}@{} {} :Is actually using host", client, nick,
                     username, hostname, ip) }
             RplInviting341{ client, nick, channel } => {
-                write!(f, "{} {} {}", client, nick, channel) }
+                write!(f, "341 {} {} {}", client, nick, channel) }
             RplInviteList346{ client, channel, mask } => {
-                write!(f, "{} {} {}", client, channel, mask) }
+                write!(f, "346 {} {} {}", client, channel, mask) }
             RplEndOfInviteList347{ client, channel } => {
-                write!(f, "{} {} :End of channel invite list", client, channel) }
+                write!(f, "347 {} {} :End of channel invite list", client, channel) }
             RplExceptList348{ client, channel, mask } => {
-                write!(f, "{} {} {}", client, channel, mask) }
+                write!(f, "348 {} {} {}", client, channel, mask) }
             RplEndOfExceptList349{ client, channel } => {
-                write!(f, "{} {} :End of channel exception list", client, channel) }
+                write!(f, "349 {} {} :End of channel exception list", client, channel) }
             RplVersion351{ client, version, server, comments } => {
-                write!(f, "{} {} {} :{}", client, version, server, comments) }
+                write!(f, "351 {} {} {} :{}", client, version, server, comments) }
             RplNameReply353{ client, symbol, channel, replies } => {
-                write!(f, "{} {} {} :{}", client, symbol, channel,
+                write!(f, "353 {} {} {} :{}", client, symbol, channel,
                     replies.iter().map(|r| {
                         if let Some(prefix) = r.prefix {
                             prefix.to_string() + r.nick
                         } else { r.nick.to_string() }
                     }).collect::<Vec<_>>().join(" ")) }
             RplEndOfNames366{ client, channel } => {
-                write!(f, "{} {} :End of /NAMES list", client, channel) }
+                write!(f, "366 {} {} :End of /NAMES list", client, channel) }
             RplBanList367{ client, channel, mask, who, set_ts } => {
-                write!(f, "{} {} {} {} {}", client, channel, mask, who, set_ts) }
+                write!(f, "367 {} {} {} {} {}", client, channel, mask, who, set_ts) }
             RplEndOfBanList368{ client, channel } => {
-                write!(f, "{} {} :End of channel ban list", client, channel) }
+                write!(f, "368 {} {} :End of channel ban list", client, channel) }
             RplEndOfWhoWas369{ client, nick } => {
-                write!(f, "{} {} : End of WHOWAS", client, nick) }
+                write!(f, "369 {} {} : End of WHOWAS", client, nick) }
             RplInfo371{ client, info } => {
-                write!(f, "{} :{}", client, info) }
+                write!(f, "371 {} :{}", client, info) }
             RplEndOfInfo374{ client } => {
-                write!(f, "{} :End of INFO list", client) }
+                write!(f, "374 {} :End of INFO list", client) }
             RplMotdStart375{ client, server } => {
-                write!(f, "{} :- {} Message of the day - ", client, server) }
+                write!(f, "375 {} :- {} Message of the day - ", client, server) }
             RplMotd372{ client, motd } => {
-                write!(f, "{} :{}", client, motd) }
+                write!(f, "372 {} :{}", client, motd) }
             RplEndOfMotd376{ client } => {
-                write!(f, "{} :End of /MOTD command" , client) }
+                write!(f, "376 {} :End of /MOTD command" , client) }
             RplWhoIsHost378{ client, nick, host_info } => {
-                write!(f, "{} {} :is connecting from {}", client, nick, host_info) }
+                write!(f, "378 {} {} :is connecting from {}", client, nick, host_info) }
             RplWhoIsModes379{ client, nick, modes } => {
-                write!(f, "{} {} :is using modes {}", client, nick, modes) }
+                write!(f, "379 {} {} :is using modes {}", client, nick, modes) }
             RplYouReoper381{ client } => {
-                write!(f, "{} :You are now an IRC operator", client) }
+                write!(f, "381 {} :You are now an IRC operator", client) }
             RplRehashing382{ client, config_file } => {
-                write!(f, "{} {} :Rehashing", client, config_file) }
+                write!(f, "382 {} {} :Rehashing", client, config_file) }
             RplTime391{ client, server, timestamp, ts_offset, human_readable } => {
-                write!(f, "{} {} {} {} :{}", client, server, timestamp, ts_offset,
+                write!(f, "391 {} {} {} {} :{}", client, server, timestamp, ts_offset,
                     human_readable) }
             ErrUnknownError400{ client, command, subcommand, info } => {
                 if let Some(sc) = subcommand {
-                    write!(f, "{} {} {} :{}", client, command, sc, info)
+                    write!(f, "400 {} {} {} :{}", client, command, sc, info)
                 } else {
-                    write!(f, "{} {} :{}", client, command, info)
+                    write!(f, "400 {} {} :{}", client, command, info)
                 } }
             ErrNoSuchNick401{ client, nick } => {
-                write!(f, "{} {} :No such nick/channel", client, nick) }
+                write!(f, "401 {} {} :No such nick/channel", client, nick) }
             ErrNoSuchServer402{ client, server } => {
-                write!(f, "{} {} :No such server", client, server) }
+                write!(f, "402 {} {} :No such server", client, server) }
             ErrNoSuchChannel403{ client, channel } => {
-                write!(f, "{} {} :No such channel", client, channel) }
+                write!(f, "403 {} {} :No such channel", client, channel) }
             ErrCannotSendToChain404{ client, channel } => {
-                write!(f, "{} {} :Cannot send to channel", client, channel) }
+                write!(f, "404 {} {} :Cannot send to channel", client, channel) }
             ErrTooManyChannels405{ client, channel } => {
-                write!(f, "{} {} :You have joined too many channels", client, channel) }
+                write!(f, "405 {} {} :You have joined too many channels", client, channel) }
             ErrNoOrigin409{ client } => {
-                write!(f, "{} :No origin specified", client) }
+                write!(f, "409 {} :No origin specified", client) }
             ErrInputTooLong417{ client } => {
-                write!(f, "{} :Input line was too long", client) }
+                write!(f, "417 {} :Input line was too long", client) }
             ErrUnknownCommand421{ client, command } => {
-                write!(f, "{} {} :Unknown command", client, command) }
+                write!(f, "421 {} {} :Unknown command", client, command) }
             ErrNoMotd422{ client } => {
-                write!(f, "{} :MOTD File is missing", client) }
+                write!(f, "422 {} :MOTD File is missing", client) }
             ErrErroneusNickname432{ client, nick } => {
-                write!(f, "{} {} :Erroneus nickname", client, nick) }
+                write!(f, "432 {} {} :Erroneus nickname", client, nick) }
             ErrNicknameInUse433{ client, nick } => {
-                write!(f, "{} {} :Nickname is already in use", client, nick) }
+                write!(f, "433 {} {} :Nickname is already in use", client, nick) }
             ErrUserNotInChannel441{ client, nick, channel } => {
-                write!(f, "{} {} {} :They aren't on that channel", client, nick, channel) }
+                write!(f, "441 {} {} {} :They aren't on that channel", client, nick, channel) }
             ErrNotOnChannel442{ client, channel } => {
-                write!(f, "{} {} :You're not on that channel", client, channel) }
+                write!(f, "442 {} {} :You're not on that channel", client, channel) }
             ErrUserOnChannel443{ client, nick, channel } => {
-                write!(f, "{} {} {} :is already on channel", client, nick, channel) }
+                write!(f, "443 {} {} {} :is already on channel", client, nick, channel) }
             ErrNotRegistered451{ client } => {
-                write!(f, "{} :You have not registered", client) }
+                write!(f, "451 {} :You have not registered", client) }
             ErrNeedMoreParams461{ client, command } => {
-                write!(f, "{} {} :Not enough parameters", client, command) }
+                write!(f, "461 {} {} :Not enough parameters", client, command) }
             ErrAlreadyRegistered462{ client } => {
-                write!(f, "{} :You may not reregister", client) }
+                write!(f, "462 {} :You may not reregister", client) }
             ErrPasswdMismatch464{ client } => {
-                write!(f, "{} :Password incorrect", client) }
+                write!(f, "464 {} :Password incorrect", client) }
             ErrYoureBannedCreep465{ client } => {
-                write!(f, "{} :You are banned from this server.", client) }
+                write!(f, "465 {} :You are banned from this server.", client) }
             ErrChannelIsFull471{ client, channel } => {
-                write!(f, "{} {} :Cannot join channel (+l)", client, channel) }
+                write!(f, "471 {} {} :Cannot join channel (+l)", client, channel) }
             ErrUnknownMode472{ client, modechar } => {
-                write!(f, "{} {} :is unknown mode char to me", client, modechar) }
+                write!(f, "472 {} {} :is unknown mode char to me", client, modechar) }
             ErrInviteOnlyChan473{ client, channel } => {
-                write!(f, "{} {} :Cannot join channel (+i)", client, channel) }
+                write!(f, "473 {} {} :Cannot join channel (+i)", client, channel) }
             ErrBannedFromChan474{ client, channel } => {
-                write!(f, "{} {} :Cannot join channel (+b)", client, channel) }
+                write!(f, "474 {} {} :Cannot join channel (+b)", client, channel) }
             ErrBadChannelKey475{ client, channel } => {
-                write!(f, "{} {} :Cannot join channel (+k)", client, channel) }
+                write!(f, "475 {} {} :Cannot join channel (+k)", client, channel) }
             ErrBadChanMask476{ channel } => {
-                write!(f, "{} :Bad Channel Mask", channel) }
+                write!(f, "476 {} :Bad Channel Mask", channel) }
             ErrNoPrivileges481{ client } => {
-                write!(f, "{} :Permission Denied- You're not an IRC operator", client) }
+                write!(f, "481 {} :Permission Denied- You're not an IRC operator", client) }
             ErrChanOpPrivsNeeded482{ client, channel } => {
-                write!(f, "{} {} :You're not channel operator", client, channel) }
+                write!(f, "482 {} {} :You're not channel operator", client, channel) }
             ErrCantKillServer483{ client } => {
-                write!(f, "{} :You cant kill a server!", client) }
-            ErrNoOperhost482{ client } => {
-                write!(f, "{} :No O-lines for your host", client) }
+                write!(f, "483 {} :You cant kill a server!", client) }
+            ErrNoOperhost491{ client } => {
+                write!(f, "491 {} :No O-lines for your host", client) }
             ErrUmodeUnknownFlag501{ client } => {
-                write!(f, "{} :Unknown MODE flag", client) }
+                write!(f, "501 {} :Unknown MODE flag", client) }
             ErrUsersDontMatch502{ client } => {
-                write!(f, "{} :Cant change mode for other users", client) }
+                write!(f, "502 {} :Cant change mode for other users", client) }
             ErrHelpNotFound524{ client, subject } => {
-                write!(f, "{} {} :No help available on this topic", client, subject) }
+                write!(f, "524 {} {} :No help available on this topic", client, subject) }
             ErrInvalidKey525{ client, target_chan } => {
-                write!(f, "{} {} :Key is not well-formed", client, target_chan) }
+                write!(f, "525 {} {} :Key is not well-formed", client, target_chan) }
             RplStartTls670{ client } => {
-                write!(f, "{} :STARTTLS successful, proceed with TLS handshake", client) }
+                write!(f, "670 {} :STARTTLS successful, proceed with TLS handshake", client) }
             RplWhoIsSecure671{ client, nick } => {
-                write!(f, "{} {} :is using a secure connection", client, nick) }
+                write!(f, "671 {} {} :is using a secure connection", client, nick) }
             ErrStartTls691{ client } => {
-                write!(f, "{} :STARTTLS failed (Wrong moon phase)", client) }
+                write!(f, "691 {} :STARTTLS failed (Wrong moon phase)", client) }
             ErrInvalidModeParam696{ client, target, modechar, param, description } => {
-                write!(f, "{} {} {} {} :{}", client, target, modechar, param, description) }
+                write!(f, "696 {} {} {} {} :{}", client, target, modechar, param, description) }
             RplHelpStart704{ client, subject, line } => {
-                write!(f, "{} {} :{}", client, subject, line) }
+                write!(f, "704 {} {} :{}", client, subject, line) }
             RplHelpTxt705{ client, subject, line } => {
-                write!(f, "{} {} :{}", client, subject, line) }
+                write!(f, "705 {} {} :{}", client, subject, line) }
             RplEndOfHelp706{ client, subject, line } => {
-                write!(f, "{} {} :{}", client, subject, line) }
+                write!(f, "706 {} {} :{}", client, subject, line) }
             ErrNoPrivs723{ client, privil } => {
-                write!(f, "{} {} :Insufficient oper privileges.", client, privil) }
+                write!(f, "723 {} {} :Insufficient oper privileges.", client, privil) }
             RplLoggedIn900{ client, nick, user, host, account, username } => {
-                write!(f, "{} {}!{}@{} {}: You are now logged in as {}", client, nick,
+                write!(f, "900 {} {}!{}@{} {}: You are now logged in as {}", client, nick,
                     user, host, account, username) }
             RplLoggedOut901{ client, nick, user, host } => {
-                write!(f, "{} {}!{}@{} :You are now logged out", client, nick, user, host) }
+                write!(f, "901 {} {}!{}@{} :You are now logged out", client, nick,
+                    user, host) }
             ErrNickLocked902{ client } => {
-                write!(f, "{} :You must use a nick assigned to you", client) }
+                write!(f, "902 {} :You must use a nick assigned to you", client) }
             RplSaslSuccess903{ client } => {
-                write!(f, "{} :SASL authentication successful", client) }
+                write!(f, "903 {} :SASL authentication successful", client) }
             ErrSaslFail904{ client } => {
-                write!(f, "{} :SASL authentication failed", client) }
+                write!(f, "904 {} :SASL authentication failed", client) }
             ErrSaslTooLong905{ client } => {
-                write!(f, "{} :SASL message too long", client) }
+                write!(f, "905 {} :SASL message too long", client) }
             ErrSaslAborted906{ client } => {
-                write!(f, "{} :SASL authentication aborted", client) }
+                write!(f, "906 {} :SASL authentication aborted", client) }
             ErrSaslAlready907{ client } => {
-                write!(f, "{} :You have already authenticated using SASL", client) }
+                write!(f, "907 {} :You have already authenticated using SASL", client) }
             RplSaslMechs908{ client, mechanisms } => {
-                write!(f, "{} {} :are available SASL mechanisms", client, mechanisms) }
+                write!(f, "908 {} {} :are available SASL mechanisms", client, mechanisms) }
         }
     }
 }
@@ -724,52 +725,52 @@ mod test {
     
     #[test]
     fn test_replies() {
-        assert_eq!("<client> :Welcome to the <networkname> Network, <nick>!<user>@<host>",
+        assert_eq!("001 <client> :Welcome to the <networkname> Network, <nick>!<user>@<host>",
             format!("{}", RplWelcome001{ client: "<client>", networkname: "<networkname>",
                 nick: "<nick>", user: "<user>", host: "<host>" }));
-        assert_eq!("<client> :Your host is <servername>, running version <version>",
+        assert_eq!("002 <client> :Your host is <servername>, running version <version>",
             format!("{}", RplYourHost002{ client: "<client>", servername: "<servername>",
                 version: "<version>" }));
-        assert_eq!("<client> :This server was created <datetime>",
+        assert_eq!("003 <client> :This server was created <datetime>",
             format!("{}", RplCreated003{ client: "<client>", datetime: "<datetime>" }));
-        assert_eq!("<client> <servername> <version> <available user modes> \
+        assert_eq!("004 <client> <servername> <version> <available user modes> \
                     <available channel modes> <channel modes with a parameter>",
             format!("{}", RplMyInfo004{ client: "<client>", servername: "<servername>",
             version: "<version>", avail_user_modes: "<available user modes>",
             avail_chmodes: "<available channel modes>",
             avail_chmodes_with_params: Some("<channel modes with a parameter>") }));
-        assert_eq!("<client> <servername> <version> <available user modes> \
+        assert_eq!("004 <client> <servername> <version> <available user modes> \
                     <available channel modes>",
             format!("{}", RplMyInfo004{ client: "<client>", servername: "<servername>",
             version: "<version>", avail_user_modes: "<available user modes>",
             avail_chmodes: "<available channel modes>",
             avail_chmodes_with_params: None }));
-        assert_eq!("<client> <1-13 tokens> :are supported by this server",
+        assert_eq!("005 <client> <1-13 tokens> :are supported by this server",
             format!("{}", RplISupport005{ client: "<client>", tokens: "<1-13 tokens>" }));
-        assert_eq!("<client> <hostname> 6667 :<info>",
+        assert_eq!("010 <client> <hostname> 6667 :<info>",
             format!("{}", RplBounce010{ client: "<client>", hostname: "<hostname>",
                 port: 6667, info: "<info>" }));
-        assert_eq!("<client> <user modes>",
+        assert_eq!("221 <client> <user modes>",
             format!("{}", RplUModeIs221{ client: "<client>", user_modes: "<user modes>" }));
-        assert_eq!("<client> :There are 3 users and 4 invisible on 5 servers",
+        assert_eq!("251 <client> :There are 3 users and 4 invisible on 5 servers",
             format!("{}", RplLUserClient251{ client: "<client>", users_num: 3,
                 inv_users_num: 4, servers_num: 5 }));
-        assert_eq!("<client> 6 :operator(s) online",
+        assert_eq!("252 <client> 6 :operator(s) online",
             format!("{}", RplLUserOp252{ client: "<client>", ops_num: 6 }));
-        assert_eq!("<client> 7 :unknown connection(s)",
+        assert_eq!("253 <client> 7 :unknown connection(s)",
             format!("{}", RplLUserUnknown253{ client: "<client>", conns_num: 7 }));
-        assert_eq!("<client> 8 :channels formed",
+        assert_eq!("254 <client> 8 :channels formed",
             format!("{}", RplLUserChannels254{ client: "<client>", channels_num: 8 }));
-        assert_eq!("<client> :I have 3 clients and 6 servers",
+        assert_eq!("255 <client> :I have 3 clients and 6 servers",
             format!("{}", RplLUserMe255{ client: "<client>", clients_num: 3,
                 servers_num: 6 }));
-        assert_eq!("<client> <server> :Administrative info",
+        assert_eq!("256 <client> <server> :Administrative info",
             format!("{}", RplAdminMe256{ client: "<client>", server: "<server>" }));
-        assert_eq!("<client> :<info>",
+        assert_eq!("257 <client> :<info>",
             format!("{}", RplAdminLoc1257{ client: "<client>", info: "<info>" }));
-        assert_eq!("<client> :<info>",
+        assert_eq!("258 <client> :<info>",
             format!("{}", RplAdminLoc2258{ client: "<client>", info: "<info>" }));
-        assert_eq!("<client> :<info>",
+        assert_eq!("259 <client> :<info>",
             format!("{}", RplAdminEmail259{ client: "<client>", email: "<info>" }));
     }
 }
