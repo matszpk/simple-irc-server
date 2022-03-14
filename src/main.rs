@@ -233,8 +233,8 @@ enum Reply<'a> {
     RplLUserClient251{ client: &'a str, users_num: usize, inv_users_num: usize,
             servers_num: usize },
     RplLUserOp252{ client: &'a str, ops_num: usize },
-    RplLUserUnknown253{ client: &'a str, conns: &'a str },
-    RplLUserChannels254{ client: &'a str, channels: &'a str },
+    RplLUserUnknown253{ client: &'a str, conns_num: usize },
+    RplLUserChannels254{ client: &'a str, channels_num: usize },
     RplLUserMe255{ client: &'a str, clients_num: usize, servers_num: usize },
     RplAdminMe256{ client: &'a str, server: &'a str },
     RplAdminLoc1257{ client: &'a str, info: &'a str },
@@ -393,10 +393,10 @@ impl<'a> fmt::Display for Reply<'a> {
                     client, users_num, inv_users_num, servers_num) }
             RplLUserOp252{ client, ops_num } => {
                 write!(f, "{} {} :operator(s) online", client, ops_num) }
-            RplLUserUnknown253{ client, conns } => {
-                write!(f, "{} {} :unknown connection(s)", client, conns) }
-            RplLUserChannels254{ client, channels } => {
-                write!(f, "{} {} :channels formed", client, channels) }
+            RplLUserUnknown253{ client, conns_num } => {
+                write!(f, "{} {} :unknown connection(s)", client, conns_num) }
+            RplLUserChannels254{ client, channels_num } => {
+                write!(f, "{} {} :channels formed", client, channels_num) }
             RplLUserMe255{ client, clients_num, servers_num } => {
                 write!(f, "{} :I have {} clients and {} servers", client, clients_num,
                     servers_num) }
@@ -744,6 +744,33 @@ mod test {
             version: "<version>", avail_user_modes: "<available user modes>",
             avail_chmodes: "<available channel modes>",
             avail_chmodes_with_params: None }));
+        assert_eq!("<client> <1-13 tokens> :are supported by this server",
+            format!("{}", RplISupport005{ client: "<client>", tokens: "<1-13 tokens>" }));
+        assert_eq!("<client> <hostname> 6667 :<info>",
+            format!("{}", RplBounce010{ client: "<client>", hostname: "<hostname>",
+                port: 6667, info: "<info>" }));
+        assert_eq!("<client> <user modes>",
+            format!("{}", RplUModeIs221{ client: "<client>", user_modes: "<user modes>" }));
+        assert_eq!("<client> :There are 3 users and 4 invisible on 5 servers",
+            format!("{}", RplLUserClient251{ client: "<client>", users_num: 3,
+                inv_users_num: 4, servers_num: 5 }));
+        assert_eq!("<client> 6 :operator(s) online",
+            format!("{}", RplLUserOp252{ client: "<client>", ops_num: 6 }));
+        assert_eq!("<client> 7 :unknown connection(s)",
+            format!("{}", RplLUserUnknown253{ client: "<client>", conns_num: 7 }));
+        assert_eq!("<client> 8 :channels formed",
+            format!("{}", RplLUserChannels254{ client: "<client>", channels_num: 8 }));
+        assert_eq!("<client> :I have 3 clients and 6 servers",
+            format!("{}", RplLUserMe255{ client: "<client>", clients_num: 3,
+                servers_num: 6 }));
+        assert_eq!("<client> <server> :Administrative info",
+            format!("{}", RplAdminMe256{ client: "<client>", server: "<server>" }));
+        assert_eq!("<client> :<info>",
+            format!("{}", RplAdminLoc1257{ client: "<client>", info: "<info>" }));
+        assert_eq!("<client> :<info>",
+            format!("{}", RplAdminLoc2258{ client: "<client>", info: "<info>" }));
+        assert_eq!("<client> :<info>",
+            format!("{}", RplAdminEmail259{ client: "<client>", email: "<info>" }));
     }
 }
 
