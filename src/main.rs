@@ -273,8 +273,8 @@ enum Reply<'a> {
             mode_args: &'a [&'a str] },
     RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: &'a str },
     RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
-    RplNoTopic331{ client: &'a str, nick: &'a str },
-    RplTopic332{ client: &'a str, nick: &'a str, topic: &'a str },
+    RplNoTopic331{ client: &'a str, channel: &'a str },
+    RplTopic332{ client: &'a str, channel: &'a str, topic: &'a str },
     RplTopicWhoTime333{ client: &'a str, channel: &'a str, nick: &'a str, setat: u64 },
     RplWhoIsActually338P1{ client: &'a str, nick: &'a str },
     RplWhoIsActually338P2{ client: &'a str, nick: &'a str, host_ip: &'a str },
@@ -471,10 +471,10 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "329 {} {} {}", client, channel, creation_time) }
             RplWhoIsAccount330{ client, nick, account } => {
                 write!(f, "330 {} {} {} :is logged in as", client, nick, account) }
-            RplNoTopic331{ client, nick } => {
-                write!(f, "331 {} {} : No topic is set", client, nick) }
-            RplTopic332{ client, nick, topic } => {
-                write!(f, "332 {} {} :{}", client, nick, topic) }
+            RplNoTopic331{ client, channel } => {
+                write!(f, "331 {} {} :No topic is set", client, channel) }
+            RplTopic332{ client, channel, topic } => {
+                write!(f, "332 {} {} :{}", client, channel, topic) }
             RplTopicWhoTime333{ client, channel, nick, setat } => {
                 write!(f, "333 {} {} {} {}", client, channel, nick, setat) }
             RplWhoIsActually338P1{ client, nick } => {
@@ -510,7 +510,7 @@ impl<'a> fmt::Display for Reply<'a> {
             RplEndOfBanList368{ client, channel } => {
                 write!(f, "368 {} {} :End of channel ban list", client, channel) }
             RplEndOfWhoWas369{ client, nick } => {
-                write!(f, "369 {} {} : End of WHOWAS", client, nick) }
+                write!(f, "369 {} {} :End of WHOWAS", client, nick) }
             RplInfo371{ client, info } => {
                 write!(f, "371 {} :{}", client, info) }
             RplEndOfInfo374{ client } => {
@@ -520,7 +520,7 @@ impl<'a> fmt::Display for Reply<'a> {
             RplMotd372{ client, motd } => {
                 write!(f, "372 {} :{}", client, motd) }
             RplEndOfMotd376{ client } => {
-                write!(f, "376 {} :End of /MOTD command" , client) }
+                write!(f, "376 {} :End of /MOTD command." , client) }
             RplWhoIsHost378{ client, nick, host_info } => {
                 write!(f, "378 {} {} :is connecting from {}", client, nick, host_info) }
             RplWhoIsModes379{ client, nick, modes } => {
@@ -772,6 +772,210 @@ mod test {
             format!("{}", RplAdminLoc2258{ client: "<client>", info: "<info>" }));
         assert_eq!("259 <client> :<info>",
             format!("{}", RplAdminEmail259{ client: "<client>", email: "<info>" }));
+        assert_eq!("263 <client> <command> :Please wait a while and try again.",
+            format!("{}", RplTryAgain263{ client: "<client>", command: "<command>" }));
+        assert_eq!("265 <client> 4 7 :Current local users 4, max 7",
+            format!("{}", RplLocalUsers265{ client: "<client>", clients_num: 4,
+                max_clients_num: 7 }));
+        assert_eq!("266 <client> 7 10 :Current global users 7, max 10",
+            format!("{}", RplGlobalUsers266{ client: "<client>", clients_num: 7,
+                max_clients_num: 10 }));
+        assert_eq!("276 <client> <nick> :has client certificate fingerprint <fingerprint>",
+            format!("{}", RplWhoIsCertFP276{ client: "<client>", nick: "<nick>",
+                fingerprint: "<fingerprint>" }));
+        assert_eq!("300 It is none", format!("{}", RplNone300{}));
+        assert_eq!("301 <client> <nick> :<message>",
+            format!("{}", RplAway301{ client: "<client>", nick: "<nick>",
+                message: "<message>" }));
+        assert_eq!("302 <client> :",
+            format!("{}", RplUserHost302{ client: "<client>", replies: &vec![] }));
+        assert_eq!("302 <client> :<reply1> <reply2> <reply3>",
+            format!("{}", RplUserHost302{ client: "<client>",
+                replies: &vec![ "<reply1>", "<reply2>", "<reply3>"] }));
+        assert_eq!("305 <client> :You are no longer marked as being away",
+            format!("{}", RplUnAway305{ client: "<client>" }));
+        assert_eq!("306 <client> :You have been marked as being away",
+            format!("{}", RplNoAway306{ client: "<client>" }));
+        assert_eq!("352 <client> <channel> <username> <host> <server> <nick> \
+                <flags> :2 <realname>",
+            format!("{}", RplWhoReply352{ client: "<client>", channel: "<channel>",
+                username: "<username>", host: "<host>", server: "<server>", nick: "<nick>",
+                flags: "<flags>", hopcount: 2, realname: "<realname>" }));
+        assert_eq!("315 <client> <mask> :End of WHO list",
+            format!("{}", RplEndOfWho315{ client: "<client>", mask: "<mask>" }));
+        assert_eq!("307 <client> <nick> :has identified for this nick",
+            format!("{}", RplWhoIsRegNick307{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("311 <client> <nick> <username> <host> * :<realname>",
+            format!("{}", RplWhoIsUser311{ client: "<client>", nick: "<nick>",
+                host: "<host>", username: "<username>", realname: "<realname>" }));
+        assert_eq!("312 <client> <nick> <server> :<server info>",
+            format!("{}", RplWhoIsServer312{ client: "<client>", nick: "<nick>",
+                server: "<server>", server_info: "<server info>" }));
+        assert_eq!("313 <client> <nick> :is an IRC operator",
+            format!("{}", RplWhoIsOperator313{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("314 <client> <nick> <username> <host> * :<realname>",
+            format!("{}", RplWhoWasUser314{ client: "<client>", nick: "<nick>",
+                username: "<username>", host: "<host>", realname: "<realname>" }));
+        assert_eq!("317 <client> <nick> 134 548989343 :seconds idle, signon time",
+            format!("{}", RplwhoIsIdle317{ client: "<client>", nick: "<nick>",
+                secs: 134, signon: 548989343 }));
+        assert_eq!("318 <client> <nick> :End of /WHOIS list",
+            format!("{}", RplEndOfWhoIs318{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("319 <client> <nick> :prefix1<channel1> <channel2> prefix3<channel3>",
+            format!("{}", RplWhoIsChannels319{ client: "<client>", nick: "<nick>",
+                channels: &vec![
+                    WhoIsChannelStruct{ prefix: Some("prefix1"), channel: "<channel1>" },
+                    WhoIsChannelStruct{ prefix: None, channel: "<channel2>" },
+                    WhoIsChannelStruct{ prefix: Some("prefix3"), channel: "<channel3>" }]}));
+        assert_eq!("320 <client> <nick> :special info",
+            format!("{}", RplWhoIsSpecial320{ client: "<client>", nick: "<nick>",
+                special_info: "special info" }));
+        assert_eq!("321 <client> Channel :Users  Name",
+            format!("{}", RplListStart321{ client: "<client>" }));
+        assert_eq!("322 <client> <channel> 47 :<topic>",
+            format!("{}", RplList322{ client: "<client>", channel: "<channel>",
+                client_count: 47, topic: "<topic>" }));
+        assert_eq!("323 <client> :End of /LIST",
+            format!("{}", RplListEnd323{ client: "<client>" }));
+        assert_eq!("324 <client> <channel> <modestring> <modearg1> <modearg2>",
+            format!("{}", RplChannelModeIs324{ client: "<client>", channel: "<channel>",
+                modestring: "<modestring>",
+                mode_args: &vec![ "<modearg1>", "<modearg2>" ] }));
+        assert_eq!("329 <client> <channel> <creationtime>",
+            format!("{}", RplCreationTime329{ client: "<client>", channel: "<channel>",
+                creation_time: "<creationtime>" }));
+        assert_eq!("330 <client> <nick> <account> :is logged in as",
+            format!("{}", RplWhoIsAccount330{ client: "<client>", nick: "<nick>",
+                account: "<account>" }));
+        assert_eq!("331 <client> <channel> :No topic is set",
+            format!("{}", RplNoTopic331{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("332 <client> <channel> :<topic>",
+            format!("{}", RplTopic332{ client: "<client>", channel: "<channel>",
+                topic: "<topic>" }));
+        assert_eq!("333 <client> <channel> <nick> 38329311",
+            format!("{}", RplTopicWhoTime333{ client: "<client>", channel: "<channel>",
+                nick: "<nick>", setat: 38329311 }));
+        assert_eq!("338 <client> <nick> :is actually ...",
+            format!("{}", RplWhoIsActually338P1{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("338 <client> <nick> <host|ip> :Is actually using host",
+            format!("{}", RplWhoIsActually338P2{ client: "<client>", nick: "<nick>",
+                host_ip: "<host|ip>" }));
+        assert_eq!("338 <client> <nick> <username>@<hostname> <ip> :Is actually using host",
+            format!("{}", RplWhoIsActually338P3{ client: "<client>", nick: "<nick>",
+                username: "<username>", hostname: "<hostname>", ip: "<ip>" }));
+        assert_eq!("341 <client> <nick> <channel>",
+            format!("{}", RplInviting341{ client: "<client>", nick: "<nick>",
+                channel: "<channel>" }));
+        assert_eq!("346 <client> <channel> <mask>",
+            format!("{}", RplInviteList346{ client: "<client>", channel: "<channel>",
+                mask: "<mask>" }));
+        assert_eq!("347 <client> <channel> :End of channel invite list",
+            format!("{}", RplEndOfInviteList347{ client: "<client>",
+                channel: "<channel>" }));
+        assert_eq!("348 <client> <channel> <mask>",
+            format!("{}", RplExceptList348{ client: "<client>", channel: "<channel>",
+                mask: "<mask>" }));
+        assert_eq!("349 <client> <channel> :End of channel exception list",
+            format!("{}", RplEndOfExceptList349{ client: "<client>",
+                channel: "<channel>" }));
+        assert_eq!("351 <client> <version> <server> :<comments>",
+            format!("{}", RplVersion351{ client: "<client>", version: "<version>",
+                server: "<server>", comments: "<comments>" }));
+        assert_eq!("353 <client> <symbol> <channel> :<prefix1><nick1> <nick2>",
+            format!("{}", RplNameReply353{ client: "<client>", symbol: "<symbol>",
+                channel: "<channel>", replies: &vec![
+                    NameReplyStruct{ prefix: Some("<prefix1>"), nick: "<nick1>" },
+                    NameReplyStruct{ prefix: None, nick: "<nick2>" }] }));
+        assert_eq!("366 <client> <channel> :End of /NAMES list",
+            format!("{}", RplEndOfNames366{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("367 <client> <channel> <mask> <who> 3894211355",
+            format!("{}", RplBanList367{ client: "<client>", channel: "<channel>",
+                mask: "<mask>", who: "<who>", set_ts: 3894211355 }));
+        assert_eq!("368 <client> <channel> :End of channel ban list",
+            format!("{}", RplEndOfBanList368{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("369 <client> <nick> :End of WHOWAS",
+            format!("{}", RplEndOfWhoWas369{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("371 <client> :<info>",
+            format!("{}", RplInfo371{ client: "<client>", info: "<info>" }));
+        assert_eq!("374 <client> :End of INFO list",
+            format!("{}", RplEndOfInfo374{ client: "<client>" }));
+        assert_eq!("375 <client> :- <server> Message of the day - ",
+            format!("{}", RplMotdStart375{ client: "<client>", server: "<server>" }));
+        assert_eq!("372 <client> :<motd>",
+            format!("{}", RplMotd372{ client: "<client>", motd: "<motd>" }));
+        assert_eq!("376 <client> :End of /MOTD command.",
+            format!("{}", RplEndOfMotd376{ client: "<client>" }));
+        assert_eq!("378 <client> <nick> :is connecting from *@localhost 127.0.0.1",
+            format!("{}", RplWhoIsHost378{ client: "<client>", nick: "<nick>",
+                host_info: "*@localhost 127.0.0.1" }));
+        assert_eq!("379 <client> <nick> :is using modes +ailosw",
+            format!("{}", RplWhoIsModes379{ client: "<client>", nick: "<nick>",
+                modes: "+ailosw" }));
+        assert_eq!("381 <client> :You are now an IRC operator",
+            format!("{}", RplYouReoper381{ client: "<client>" }));
+        assert_eq!("382 <client> <config file> :Rehashing",
+            format!("{}", RplRehashing382{ client: "<client>",
+                config_file: "<config file>" }));
+        assert_eq!("391 <client> <server> 485829211 <TS offset> :<human-readable time>",
+            format!("{}", RplTime391{ client: "<client>", server: "<server>",
+                timestamp: 485829211, ts_offset: "<TS offset>",
+                human_readable: "<human-readable time>" }));
+        assert_eq!("400 <client> <command> :<info>",
+            format!("{}", ErrUnknownError400{ client: "<client>", command: "<command>",
+                subcommand: None, info: "<info>" }));
+        assert_eq!("400 <client> <command> <subcommand> :<info>",
+            format!("{}", ErrUnknownError400{ client: "<client>", command: "<command>",
+                subcommand: Some("<subcommand>"), info: "<info>" }));
+        assert_eq!("401 <client> <nickname> :No such nick/channel",
+            format!("{}", ErrNoSuchNick401{ client: "<client>", nick: "<nickname>" }));
+        assert_eq!("402 <client> <server name> :No such server",
+            format!("{}", ErrNoSuchServer402{ client: "<client>",
+                server: "<server name>" }));
+        assert_eq!("403 <client> <channel> :No such channel",
+            format!("{}", ErrNoSuchChannel403{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("404 <client> <channel> :Cannot send to channel",
+            format!("{}", ErrCannotSendToChain404{ client: "<client>",
+                channel: "<channel>" }));
+        assert_eq!("405 <client> <channel> :You have joined too many channels",
+            format!("{}", ErrTooManyChannels405{ client: "<client>",
+                channel: "<channel>" }));
+        assert_eq!("409 <client> :No origin specified",
+            format!("{}", ErrNoOrigin409{ client: "<client>" }));
+        assert_eq!("417 <client> :Input line was too long",
+            format!("{}", ErrInputTooLong417{ client: "<client>" }));
+        assert_eq!("421 <client> <command> :Unknown command",
+            format!("{}", ErrUnknownCommand421{ client: "<client>",
+                command: "<command>" }));
+        assert_eq!("422 <client> :MOTD File is missing",
+            format!("{}", ErrNoMotd422{ client: "<client>" }));
+        assert_eq!("432 <client> <nick> :Erroneus nickname",
+            format!("{}", ErrErroneusNickname432{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("433 <client> <nick> :Nickname is already in use",
+            format!("{}", ErrNicknameInUse433{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("441 <client> <nick> <channel> :They aren't on that channel",
+            format!("{}", ErrUserNotInChannel441{ client: "<client>", nick: "<nick>",
+                channel: "<channel>" }));
+        assert_eq!("442 <client> <channel> :You're not on that channel",
+            format!("{}", ErrNotOnChannel442{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("443 <client> <nick> <channel> :is already on channel",
+            format!("{}", ErrUserOnChannel443{ client: "<client>", nick: "<nick>",
+                channel: "<channel>" }));
+        assert_eq!("451 <client> :You have not registered",
+            format!("{}", ErrNotRegistered451{ client: "<client>" }));
+        assert_eq!("461 <client> <command> :Not enough parameters",
+            format!("{}", ErrNeedMoreParams461{ client: "<client>",command: "<command>" }));
+        assert_eq!("462 <client> :You may not reregister",
+            format!("{}", ErrAlreadyRegistered462{ client: "<client>" }));
+        assert_eq!("464 <client> :Password incorrect",
+            format!("{}", ErrPasswdMismatch464{ client: "<client>" }));
+        assert_eq!("465 <client> :You are banned from this server.",
+            format!("{}", ErrYoureBannedCreep465{ client: "<client>" }));
+        assert_eq!("471 <client> <channel> :Cannot join channel (+l)",
+            format!("{}", ErrChannelIsFull471{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("472 <client> x :is unknown mode char to me",
+            format!("{}", ErrUnknownMode472{ client: "<client>", modechar: 'x' }));
+        assert_eq!("473 <client> <channel> :Cannot join channel (+i)",
+            format!("{}", ErrInviteOnlyChan473{ client: "<client>", channel: "<channel>" }));
     }
 }
 
