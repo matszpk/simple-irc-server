@@ -621,7 +621,7 @@ impl<'a> fmt::Display for Reply<'a> {
             ErrNoPrivs723{ client, privil } => {
                 write!(f, "723 {} {} :Insufficient oper privileges.", client, privil) }
             RplLoggedIn900{ client, nick, user, host, account, username } => {
-                write!(f, "900 {} {}!{}@{} {}: You are now logged in as {}", client, nick,
+                write!(f, "900 {} {}!{}@{} {} :You are now logged in as {}", client, nick,
                     user, host, account, username) }
             RplLoggedOut901{ client, nick, user, host } => {
                 write!(f, "901 {} {}!{}@{} :You are now logged out", client, nick,
@@ -976,6 +976,74 @@ mod test {
             format!("{}", ErrUnknownMode472{ client: "<client>", modechar: 'x' }));
         assert_eq!("473 <client> <channel> :Cannot join channel (+i)",
             format!("{}", ErrInviteOnlyChan473{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("474 <client> <channel> :Cannot join channel (+b)",
+            format!("{}", ErrBannedFromChan474{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("475 <client> <channel> :Cannot join channel (+k)",
+            format!("{}", ErrBadChannelKey475{ client: "<client>", channel: "<channel>" }));
+        assert_eq!("476 <channel> :Bad Channel Mask",
+            format!("{}", ErrBadChanMask476{ channel: "<channel>" }));
+        assert_eq!("481 <client> :Permission Denied- You're not an IRC operator",
+            format!("{}", ErrNoPrivileges481{ client: "<client>" }));
+        assert_eq!("482 <client> <channel> :You're not channel operator",
+            format!("{}", ErrChanOpPrivsNeeded482{ client: "<client>",
+                channel: "<channel>" }));
+        assert_eq!("483 <client> :You cant kill a server!",
+            format!("{}", ErrCantKillServer483{ client: "<client>" }));
+        assert_eq!("491 <client> :No O-lines for your host",
+            format!("{}", ErrNoOperhost491{ client: "<client>" }));
+        assert_eq!("501 <client> :Unknown MODE flag",
+            format!("{}", ErrUmodeUnknownFlag501{ client: "<client>" }));
+        assert_eq!("502 <client> :Cant change mode for other users",
+            format!("{}", ErrUsersDontMatch502{ client: "<client>" }));
+        assert_eq!("524 <client> <subject> :No help available on this topic",
+            format!("{}", ErrHelpNotFound524{ client: "<client>", subject: "<subject>" }));
+        assert_eq!("525 <client> <target chan> :Key is not well-formed",
+            format!("{}", ErrInvalidKey525{ client: "<client>",
+                target_chan: "<target chan>" }));
+        assert_eq!("670 <client> :STARTTLS successful, proceed with TLS handshake",
+            format!("{}", RplStartTls670{ client: "<client>" }));
+        assert_eq!("671 <client> <nick> :is using a secure connection",
+            format!("{}", RplWhoIsSecure671{ client: "<client>", nick: "<nick>" }));
+        assert_eq!("691 <client> :STARTTLS failed (Wrong moon phase)",
+            format!("{}", ErrStartTls691{ client: "<client>" }));
+        assert_eq!("696 <client> <target chan/user> x <parameter> :<description>",
+            format!("{}", ErrInvalidModeParam696{ client: "<client>",
+                target: "<target chan/user>", modechar: 'x', param: "<parameter>",
+                description: "<description>" }));
+        assert_eq!("704 <client> <subject> :<first line of help section>",
+            format!("{}", RplHelpStart704{ client: "<client>", subject: "<subject>",
+                line: "<first line of help section>" }));
+        assert_eq!("705 <client> <subject> :<line of help text>",
+            format!("{}", RplHelpTxt705{ client: "<client>", subject: "<subject>",
+                line: "<line of help text>" }));
+        assert_eq!("706 <client> <subject> :<last line of help text>",
+            format!("{}", RplEndOfHelp706{ client: "<client>", subject: "<subject>",
+                line: "<last line of help text>" }));
+        assert_eq!("723 <client> <priv> :Insufficient oper privileges.",
+            format!("{}", ErrNoPrivs723{ client: "<client>", privil: "<priv>" }));
+        assert_eq!("900 <client> <nick>!<user>@<host> <account> \
+            :You are now logged in as <username>",
+            format!("{}", RplLoggedIn900{ client: "<client>", nick: "<nick>",
+                user: "<user>", host: "<host>", account: "<account>",
+                username: "<username>" }));
+        assert_eq!("901 <client> <nick>!<user>@<host> :You are now logged out",
+            format!("{}", RplLoggedOut901{ client: "<client>", nick: "<nick>",
+                user: "<user>", host: "<host>" }));
+        assert_eq!("902 <client> :You must use a nick assigned to you",
+            format!("{}", ErrNickLocked902{ client: "<client>" }));
+        assert_eq!("903 <client> :SASL authentication successful",
+            format!("{}", RplSaslSuccess903{ client: "<client>" }));
+        assert_eq!("904 <client> :SASL authentication failed",
+            format!("{}", ErrSaslFail904{ client: "<client>" }));
+        assert_eq!("905 <client> :SASL message too long",
+            format!("{}", ErrSaslTooLong905{ client: "<client>" }));
+        assert_eq!("906 <client> :SASL authentication aborted",
+            format!("{}", ErrSaslAborted906{ client: "<client>" }));
+        assert_eq!("907 <client> :You have already authenticated using SASL",
+            format!("{}", ErrSaslAlready907{ client: "<client>" }));
+        assert_eq!("908 <client> <mechanisms> :are available SASL mechanisms",
+            format!("{}", RplSaslMechs908{ client: "<client>",
+                mechanisms: "<mechanisms>" }));
     }
 }
 
