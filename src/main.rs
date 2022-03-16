@@ -62,13 +62,13 @@ fn validate_username(username: &str) -> Result<(), ValidationError> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 struct TLSConfig {
     cert_file: String,
     cert_key_file: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct OperatorConfig {
     #[validate(custom = "validate_username")]
     name: String,
@@ -77,7 +77,7 @@ struct OperatorConfig {
     mask: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 struct UserModes {
     invisible: bool,
     oper: bool,
@@ -93,7 +93,7 @@ impl Default for UserModes {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
 struct ChannelModes {
     ban: Option<Vec<String>>,
     exception: Option<Vec<String>>,
@@ -106,14 +106,14 @@ struct ChannelModes {
     no_external_messages: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct ChannelConfig {
     name: String,
     topic: String,
     modes: ChannelModes,
 }
 
-#[derive(Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct UserConfig {
     #[validate(custom = "validate_username")]
     name: String,
@@ -124,7 +124,7 @@ struct UserConfig {
 }
 
 /// Main configuration structure.
-#[derive(Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct MainConfig {
     #[validate(contains = ".")]
     name: String,
@@ -743,6 +743,38 @@ impl MainState {
 #[cfg(test)]
 mod test {
     use super::*;
+    
+    use std::env::temp_dir;
+    use std::fs;
+    use std::path::Path;
+    
+    struct TempFileHandle {
+        path: String
+    }
+    
+    impl TempFileHandle {
+        fn new(path: &str) -> TempFileHandle {
+            TempFileHandle{ path: temp_dir().join(path)
+                    .to_string_lossy().to_string() }
+        }
+    }
+    
+    impl Drop for TempFileHandle {
+        fn drop(&mut self) {
+            fs::remove_file(self.path.as_str()).unwrap();
+        }
+    }
+    
+    #[test]
+    fn test_mainconfig_new() {
+        let file_handle = TempFileHandle::new("temp_config.toml");
+        let cli = Cli{ config: Some(file_handle.path.clone()),
+            listen: None, port: None, name: None, network: None,
+            dns_lookup: false, tls_cert_file: None, tls_cert_key_file: None };
+        
+        fs::write(file_handle.path.as_str(), "aaaa");
+        //let config = MainConfig::new_config(cli);
+    }
     
     #[test]
     fn test_replies() {
