@@ -844,7 +844,7 @@ protected_topic = true
 no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
-        assert_eq!(Ok(MainConfig{ 
+        assert_eq!(Ok(MainConfig{
             name: "irci.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
             admin_info2: Some("IRCI is good server".to_string()),
@@ -908,7 +908,7 @@ no_external_messages = false
             tls_cert_key_file: Some("some_key.crt".to_string()) };
             
         let result = MainConfig::new_config(cli2).map_err(|e| e.to_string());
-        assert_eq!(Ok(MainConfig{ 
+        assert_eq!(Ok(MainConfig{
             name: "ircer.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
             admin_info2: Some("IRCI is good server".to_string()),
@@ -1007,7 +1007,7 @@ protected_topic = true
 no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
-        assert_eq!(Ok(MainConfig{ 
+        assert_eq!(Ok(MainConfig{
             name: "irci.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
             admin_info2: Some("IRCI is good server".to_string()),
