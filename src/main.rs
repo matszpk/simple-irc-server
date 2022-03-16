@@ -55,11 +55,19 @@ struct Cli {
 
 fn validate_username(username: &str) -> Result<(), ValidationError> {
     if !username.contains('.') {
-        // the value of the username will automatically be added later
-        return Err(ValidationError::new("Username must not contains dot"));
+        Ok(())
+    } else {
+        Err(ValidationError::new("Username must not contains dot."))
     }
+}
 
-    Ok(())
+fn validate_channel(channel: &str) -> Result<(), ValidationError> {
+    if channel.len() != 0 && (channel.as_bytes()[0] == b'#' ||
+                channel.as_bytes()[0] == b'&') {
+        Ok(())
+    } else {
+        Err(ValidationError::new("Channel name must have '#' or '&' at start."))
+    }
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -93,7 +101,7 @@ impl Default for UserModes {
     }
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct ChannelModes {
     ban: Option<Vec<String>>,
     exception: Option<Vec<String>>,
@@ -108,8 +116,10 @@ struct ChannelModes {
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 struct ChannelConfig {
+    #[validate(custom = "validate_channel")]
     name: String,
     topic: String,
+    #[validate]
     modes: ChannelModes,
 }
 
@@ -134,20 +144,20 @@ struct MainConfig {
     listen: IpAddr,
     port: u16,
     network: String,
-    max_connections: usize,
-    max_joins: usize,
-    max_nickname: usize,
+    max_connections: Option<usize>,
+    max_joins: Option<usize>,
+    max_nickname_len: usize,
     ping_timeout: usize,
     pong_timeout: usize,
     dns_lookup: bool,
     default_user_modes: UserModes,
     tls: Option<TLSConfig>,
     #[validate]
-    operators: Vec<OperatorConfig>,
+    operators: Option<Vec<OperatorConfig>>,
     #[validate]
-    users: Vec<UserConfig>,
+    users: Option<Vec<UserConfig>>,
     #[validate]
-    channels: Vec<ChannelConfig>,
+    channels: Option<Vec<ChannelConfig>>,
 }
 
 impl MainConfig {
@@ -204,15 +214,15 @@ impl Default for MainConfig {
             listen: "127.0.0.1".parse().unwrap(),
             port: 6667,
             network: "IRCnetwork".to_string(),
-            max_connections: 0,
-            max_joins: 0,
-            max_nickname: 0,
-            ping_timeout: 180,
-            pong_timeout: 60,
+            max_connections: None,
+            max_joins: None,
+            max_nickname_len: 20,
+            ping_timeout: 120,
+            pong_timeout: 20,
             dns_lookup: false,
-            channels: vec![],
-            operators: vec![],
-            users: vec![],
+            channels: None,
+            operators: None,
+            users: None,
             default_user_modes: UserModes::default(),
             tls: None }
     }
@@ -772,8 +782,105 @@ mod test {
             listen: None, port: None, name: None, network: None,
             dns_lookup: false, tls_cert_file: None, tls_cert_key_file: None };
         
-        fs::write(file_handle.path.as_str(), "aaaa");
-        //let config = MainConfig::new_config(cli);
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "irci.localhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_connections = 4000
+max_joins = 10
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[[operators]]
+name = "matiszpaki"
+password = "fbg9rt0g5rtygh"
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = []
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[channels]]
+name = "#channel2"
+topic = "Some topic 2"
+[channels.modes]
+ban = []
+exception = []
+moderated = true
+secret = false
+protected_topic = true
+no_external_messages = false
+"##);
+        let result = MainConfig::new_config(cli).map_err(|e| e.to_string());
+        assert_eq!(Ok(MainConfig{ 
+            name: "irci.localhost".to_string(),
+            admin_info: "IRCI is local IRC server".to_string(),
+            admin_info2: Some("IRCI is good server".to_string()),
+            info: "This is IRCI server".to_string(),
+            listen: "127.0.0.1".parse().unwrap(),
+            port: 6667,
+            network: "IRCInetwork".to_string(),
+            max_connections: Some(4000),
+            max_joins: Some(10),
+            max_nickname_len: 20,
+            ping_timeout: 100,
+            pong_timeout: 30,
+            dns_lookup: false,
+            tls: None,
+            default_user_modes: UserModes {
+                invisible: false, oper: false, local_oper: false,
+                registered: true, wallops: false,
+            },
+            operators: Some(vec![
+                OperatorConfig{ name: "matiszpaki".to_string(),
+                    password: "fbg9rt0g5rtygh".to_string(), mask: None }
+            ]),
+            users: None,
+            channels: Some(vec![
+                ChannelConfig{
+                    name: "#channel1".to_string(),
+                    topic: "Some topic".to_string(),
+                    modes: ChannelModes{ key: None,
+                        ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
+                        exception: Some(vec![]),
+                        invite_exception: None,
+                        client_limit: None,
+                        moderated: false, secret: false, protected_topic: false,
+                        no_external_messages: false },
+                },
+                ChannelConfig{
+                    name: "#channel2".to_string(),
+                    topic: "Some topic 2".to_string(),
+                    modes: ChannelModes{ key: None,
+                        ban: Some(vec![]),
+                        exception: Some(vec![]),
+                        invite_exception: None,
+                        client_limit: None,
+                        moderated: true, secret: false, protected_topic: true,
+                        no_external_messages: false },
+                },
+            ]),
+        }), result);
     }
     
     #[test]
