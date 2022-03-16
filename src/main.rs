@@ -32,7 +32,7 @@ use serde_derive::{Serialize, Deserialize};
 use dashmap::DashMap;
 use validator::{Validate,ValidationError};
 
-#[derive(clap::Parser)]
+#[derive(clap::Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
     #[clap(short, long, help="Configuration file path")]
@@ -805,6 +805,10 @@ local_oper = false
 registered = true
 wallops = false
 
+[tls]
+cert_file = "cert.crt"
+cert_key_file = "cert_key.crt"
+
 [[operators]]
 name = "matiszpaki"
 password = "fbg9rt0g5rtygh"
@@ -832,13 +836,14 @@ topic = "Some topic 2"
 key = "hokus pokus"
 ban = []
 exception = []
+invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli).map_err(|e| e.to_string());
+        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{ 
             name: "irci.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
@@ -853,7 +858,8 @@ no_external_messages = false
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: false,
-            tls: None,
+            tls: Some(TLSConfig{ cert_file: "cert.crt".to_string(),
+                cert_key_file: "cert_key.crt".to_string() }),
             default_user_modes: UserModes {
                 invisible: false, oper: false, local_oper: false,
                 registered: true, wallops: false,
@@ -884,13 +890,304 @@ no_external_messages = false
                     modes: ChannelModes{ key: Some("hokus pokus".to_string()),
                         ban: Some(vec![]),
                         exception: Some(vec![]),
-                        invite_exception: None,
+                        invite_exception: Some(
+                            vec![ "nomi@buru.com".to_string(),
+                                "pampam@zerox.net".to_string() ]),
                         client_limit: Some(200),
                         moderated: true, secret: false, protected_topic: true,
                         no_external_messages: false },
                 },
             ]),
         }), result);
+        
+        // next testcase
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "irci.localhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = [ 'bobby@*', 'mati@*' ]
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[channels]]
+name = "#channel2"
+topic = "Some topic 2"
+[channels.modes]
+moderated = true
+secret = false
+protected_topic = true
+no_external_messages = false
+"##).unwrap();
+        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        assert_eq!(Ok(MainConfig{ 
+            name: "irci.localhost".to_string(),
+            admin_info: "IRCI is local IRC server".to_string(),
+            admin_info2: Some("IRCI is good server".to_string()),
+            info: "This is IRCI server".to_string(),
+            listen: "127.0.0.1".parse().unwrap(),
+            port: 6667,
+            network: "IRCInetwork".to_string(),
+            max_connections: None,
+            max_joins: None,
+            max_nickname_len: 20,
+            ping_timeout: 100,
+            pong_timeout: 30,
+            dns_lookup: false,
+            tls: None,
+            default_user_modes: UserModes {
+                invisible: false, oper: false, local_oper: false,
+                registered: true, wallops: false,
+            },
+            operators: None,
+            users: None,
+            channels: Some(vec![
+                ChannelConfig{
+                    name: "#channel1".to_string(),
+                    topic: "Some topic".to_string(),
+                    modes: ChannelModes{ key: None,
+                        ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
+                        exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
+                        invite_exception: None,
+                        client_limit: None,
+                        moderated: false, secret: false, protected_topic: false,
+                        no_external_messages: false },
+                },
+                ChannelConfig{
+                    name: "#channel2".to_string(),
+                    topic: "Some topic 2".to_string(),
+                    modes: ChannelModes{ key: None,
+                        ban: None,
+                        exception: None,
+                        invite_exception: None,
+                        client_limit: None,
+                        moderated: true, secret: false, protected_topic: true,
+                        no_external_messages: false },
+                },
+            ]),
+        }), result);
+        
+        // error
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "ircilocalhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_connections = 4000
+max_joins = 10
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[tls]
+cert_file = "cert.crt"
+cert_key_file = "cert_key.crt"
+
+[[operators]]
+name = "matiszpaki"
+password = "fbg9rt0g5rtygh"
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = [ 'bobby@*', 'mati@*' ]
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[users]]
+name = "lucas"
+nick = "luckboy"
+password = "luckyluke"
+
+[[channels]]
+name = "#channel2"
+topic = "Some topic 2"
+[channels.modes]
+key = "hokus pokus"
+ban = []
+exception = []
+invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
+moderated = true
+client_limit = 200
+secret = false
+protected_topic = true
+no_external_messages = false
+"##).unwrap();
+        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        // because sorting of ValidationErrors changes order we check to cases
+        assert!(Err("name: Validation error: contains [{\"value\": String(\"ircilocalhost\"), \
+\"needle\": String(\".\")}]".to_string()) == result ||
+                Err("name: Validation error: contains [{\"needle\": String(\".\"), \
+\"value\": String(\"ircilocalhost\")}]".to_string()) == result);
+
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "irci.localhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_connections = 4000
+max_joins = 10
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[tls]
+cert_file = "cert.crt"
+cert_key_file = "cert_key.crt"
+
+[[operators]]
+name = "matis.zpaki"
+password = "fbg9rt0g5rtygh"
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = [ 'bobby@*', 'mati@*' ]
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[users]]
+name = "lucas"
+nick = "luckboy"
+password = "luckyluke"
+
+[[channels]]
+name = "#channel2"
+topic = "Some topic 2"
+[channels.modes]
+key = "hokus pokus"
+ban = []
+exception = []
+invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
+moderated = true
+client_limit = 200
+secret = false
+protected_topic = true
+no_external_messages = false
+"##).unwrap();
+        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        assert_eq!(Err("operators[0].name: Validation error: Username must not \
+contains dot. [{\"value\": String(\"matis.zpaki\")}]".to_string()), result);
+
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "irci.localhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_connections = 4000
+max_joins = 10
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[tls]
+cert_file = "cert.crt"
+cert_key_file = "cert_key.crt"
+
+[[operators]]
+name = "matiszpaki"
+password = "fbg9rt0g5rtygh"
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = [ 'bobby@*', 'mati@*' ]
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[users]]
+name = "lucas"
+nick = "luckboy"
+password = "luckyluke"
+
+[[channels]]
+name = "^channel2"
+topic = "Some topic 2"
+[channels.modes]
+key = "hokus pokus"
+ban = []
+exception = []
+invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
+moderated = true
+client_limit = 200
+secret = false
+protected_topic = true
+no_external_messages = false
+"##).unwrap();
+        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
+'&' at start. [{\"value\": String(\"^channel2\")}]".to_string()), result);
     }
     
     #[test]
