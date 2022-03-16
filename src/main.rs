@@ -195,7 +195,7 @@ impl MainConfig {
             }
             // both config are required
             if !config.tls.is_some() && (have_cert ^ have_cert_key) {
-                panic!("TLS certifcate file and certificate
+                panic!("TLS certifcate file and certificate \
                         key file together are required");
             }
             if let Err(e) = config.validate() {
