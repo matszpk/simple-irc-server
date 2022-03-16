@@ -30,6 +30,7 @@ use tokio;
 use tokio_util::codec::{Framed, LinesCodec};
 use serde_derive::{Serialize, Deserialize};
 use dashmap::DashMap;
+use validator::{Validate,ValidationError};
 
 #[derive(clap::Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -52,15 +53,26 @@ struct Cli {
     tls_cert_key_file: Option<String>,
 }
 
+fn validate_username(username: &str) -> Result<(), ValidationError> {
+    if !username.contains('.') {
+        // the value of the username will automatically be added later
+        return Err(ValidationError::new("Username must not contains dot"));
+    }
+
+    Ok(())
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct TLSConfig {
     cert_file: String,
     cert_key_file: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 struct OperatorConfig {
+    #[validate(custom = "validate_username")]
     name: String,
+    #[validate(length(min = 6))]
     password: String,
     mask: Option<String>,
 }
@@ -94,23 +106,27 @@ struct ChannelModes {
     no_external_messages: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 struct ChannelConfig {
     name: String,
     topic: String,
     modes: ChannelModes,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 struct UserConfig {
+    #[validate(custom = "validate_username")]
     name: String,
+    #[validate(custom = "validate_username")]
     nick: String,
+    #[validate(length(min = 6))]
     password: String,
 }
 
 /// Main configuration structure.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Validate)]
 struct MainConfig {
+    #[validate(contains = ".")]
     name: String,
     admin_info: String,
     admin_info2: Option<String>,
@@ -126,8 +142,11 @@ struct MainConfig {
     dns_lookup: bool,
     default_user_modes: UserModes,
     tls: Option<TLSConfig>,
+    #[validate]
     operators: Vec<OperatorConfig>,
+    #[validate]
     users: Vec<UserConfig>,
+    #[validate]
     channels: Vec<ChannelConfig>,
 }
 
@@ -169,7 +188,9 @@ impl MainConfig {
                 panic!("TLS certifcate file and certificate
                         key file together are required");
             }
-            Ok(config)
+            if let Err(e) = config.validate() {
+                Err(Box::new(e))
+            } else { Ok(config) }
         }
     }
 }
@@ -198,14 +219,14 @@ impl Default for MainConfig {
 }
 
 struct Message<'a> {
-    source: &'a str,
+    source: Option<&'a str>,
     command: &'a str,
     params: Vec<&'a str>,
 }
 
 impl<'a> Message<'a> {
     fn from_shared_str(s: &'a str) -> Result<Self, String> {
-        Ok(Message{ source: &s[..], command: &s[..], params: vec![] })
+        Ok(Message{ source: None, command: &s[..], params: vec![] })
     }
 }
 
