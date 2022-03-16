@@ -181,7 +181,7 @@ impl MainConfig {
             if let Some(network) = cli.network {
                 config.network = network;
             }
-            config.dns_lookup |= config.dns_lookup;
+            config.dns_lookup |= cli.dns_lookup;
             
             // get indicator to check later
             let (have_cert, have_cert_key) = (cli.tls_cert_file.is_some(),
@@ -860,6 +860,70 @@ no_external_messages = false
             dns_lookup: false,
             tls: Some(TLSConfig{ cert_file: "cert.crt".to_string(),
                 cert_key_file: "cert_key.crt".to_string() }),
+            default_user_modes: UserModes {
+                invisible: false, oper: false, local_oper: false,
+                registered: true, wallops: false,
+            },
+            operators: Some(vec![
+                OperatorConfig{ name: "matiszpaki".to_string(),
+                    password: "fbg9rt0g5rtygh".to_string(), mask: None }
+            ]),
+            users: Some(vec![
+                UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
+                    password: "luckyluke".to_string() }
+            ]),
+            channels: Some(vec![
+                ChannelConfig{
+                    name: "#channel1".to_string(),
+                    topic: "Some topic".to_string(),
+                    modes: ChannelModes{ key: None,
+                        ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
+                        exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
+                        invite_exception: None,
+                        client_limit: None,
+                        moderated: false, secret: false, protected_topic: false,
+                        no_external_messages: false },
+                },
+                ChannelConfig{
+                    name: "#channel2".to_string(),
+                    topic: "Some topic 2".to_string(),
+                    modes: ChannelModes{ key: Some("hokus pokus".to_string()),
+                        ban: Some(vec![]),
+                        exception: Some(vec![]),
+                        invite_exception: Some(
+                            vec![ "nomi@buru.com".to_string(),
+                                "pampam@zerox.net".to_string() ]),
+                        client_limit: Some(200),
+                        moderated: true, secret: false, protected_topic: true,
+                        no_external_messages: false },
+                },
+            ]),
+        }), result);
+        
+        let cli2 = Cli{ config: Some(file_handle.path.clone()),
+            listen: Some("192.168.1.4".parse().unwrap()), port: Some(6668),
+            name: Some("ircer.localhost".to_string()),
+            network: Some("SomeNetwork".to_string()),
+            dns_lookup: true, tls_cert_file: Some("some_cert.crt".to_string()),
+            tls_cert_key_file: Some("some_key.crt".to_string()) };
+            
+        let result = MainConfig::new_config(cli2).map_err(|e| e.to_string());
+        assert_eq!(Ok(MainConfig{ 
+            name: "ircer.localhost".to_string(),
+            admin_info: "IRCI is local IRC server".to_string(),
+            admin_info2: Some("IRCI is good server".to_string()),
+            info: "This is IRCI server".to_string(),
+            listen: "192.168.1.4".parse().unwrap(),
+            port: 6668,
+            network: "SomeNetwork".to_string(),
+            max_connections: Some(4000),
+            max_joins: Some(10),
+            max_nickname_len: 20,
+            ping_timeout: 100,
+            pong_timeout: 30,
+            dns_lookup: true,
+            tls: Some(TLSConfig{ cert_file: "some_cert.crt".to_string(),
+                cert_key_file: "some_key.crt".to_string() }),
             default_user_modes: UserModes {
                 invisible: false, oper: false, local_oper: false,
                 registered: true, wallops: false,
