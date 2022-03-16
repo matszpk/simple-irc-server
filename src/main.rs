@@ -814,23 +814,30 @@ name = "#channel1"
 topic = "Some topic"
 [channels.modes]
 ban = [ 'baddi@*', 'baddi2@*' ]
-exception = []
+exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
 protected_topic = false
 no_external_messages = false
 
+[[users]]
+name = "lucas"
+nick = "luckboy"
+password = "luckyluke"
+
 [[channels]]
 name = "#channel2"
 topic = "Some topic 2"
 [channels.modes]
+key = "hokus pokus"
 ban = []
 exception = []
 moderated = true
+client_limit = 200
 secret = false
 protected_topic = true
 no_external_messages = false
-"##);
+"##).unwrap();
         let result = MainConfig::new_config(cli).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{ 
             name: "irci.localhost".to_string(),
@@ -855,14 +862,17 @@ no_external_messages = false
                 OperatorConfig{ name: "matiszpaki".to_string(),
                     password: "fbg9rt0g5rtygh".to_string(), mask: None }
             ]),
-            users: None,
+            users: Some(vec![
+                UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
+                    password: "luckyluke".to_string() }
+            ]),
             channels: Some(vec![
                 ChannelConfig{
                     name: "#channel1".to_string(),
                     topic: "Some topic".to_string(),
                     modes: ChannelModes{ key: None,
                         ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
-                        exception: Some(vec![]),
+                        exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
                         invite_exception: None,
                         client_limit: None,
                         moderated: false, secret: false, protected_topic: false,
@@ -871,11 +881,11 @@ no_external_messages = false
                 ChannelConfig{
                     name: "#channel2".to_string(),
                     topic: "Some topic 2".to_string(),
-                    modes: ChannelModes{ key: None,
+                    modes: ChannelModes{ key: Some("hokus pokus".to_string()),
                         ban: Some(vec![]),
                         exception: Some(vec![]),
                         invite_exception: None,
-                        client_limit: None,
+                        client_limit: Some(200),
                         moderated: true, secret: false, protected_topic: true,
                         no_external_messages: false },
                 },
