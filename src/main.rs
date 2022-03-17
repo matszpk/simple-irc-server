@@ -266,6 +266,26 @@ impl Decoder for IRCLinesCodec {
 
 //
 
+#[derive(Clone, Copy, Debug)]
+enum MessageError {
+    Empty,
+    WrongSource,
+    NoCommand,
+}
+
+impl fmt::Display for MessageError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MessageError::Empty => write!(f, "Message is empty"),
+            MessageError::WrongSource => write!(f, "Wrong source syntax"),
+            MessageError::NoCommand => write!(f, "No command"),
+        }
+    }
+}
+
+impl Error for MessageError {
+}
+
 struct Message<'a> {
     source: Option<&'a str>,
     command: &'a str,
@@ -273,8 +293,39 @@ struct Message<'a> {
 }
 
 impl<'a> Message<'a> {
-    fn from_shared_str(s: &'a str) -> Result<Self, String> {
-        Ok(Message{ source: None, command: &s[..], params: vec![] })
+    fn from_shared_str(s: &'a str) -> Result<Self, MessageError> {
+        let trimmed = s.trim_start();
+        if trimmed.len() != 0 {
+            let (rest, last_param) = if let Some((rest, lp)) = trimmed.rsplit_once(':') {
+                if rest.len() != 0 {
+                    (rest, Some(lp))
+                } else {
+                    // if source first
+                    (trimmed, None)
+                }
+            } else {
+                (trimmed, None)
+            };
+            
+            let mut rest_words = trimmed.split_ascii_whitespace();
+            // find source
+            let source = if rest.chars().nth(0) == Some(':') {
+                let mut it = rest_words.next().unwrap().chars();
+                it.next();  // skip ':'
+                Some(it.as_str())
+            } else { None };
+            let command = if let Some(cmd) = rest_words.next() { cmd }
+            else { return Err(MessageError::NoCommand); };
+            
+            let mut params = rest_words.collect::<Vec<_>>();
+            if let Some(lp) = last_param {
+                params.push(lp);    // add last parameter
+            }
+            
+            Ok(Message{ source, command, params })
+        } else {
+            Err(MessageError::Empty)
+        }
     }
 }
 
