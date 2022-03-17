@@ -194,7 +194,7 @@ impl MainConfig {
                 }
             }
             // both config are required
-            if !config.tls.is_some() && (have_cert ^ have_cert_key) {
+            if (have_cert && !have_cert_key) || (!have_cert && have_cert_key) {
                 panic!("TLS certifcate file and certificate \
                         key file together are required");
             }
@@ -1252,6 +1252,62 @@ no_external_messages = false
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
 '&' at start. [{\"value\": String(\"^channel2\")}]".to_string()), result);
+    }
+    
+    #[test]
+    #[should_panic(expected = "TLS certifcate file and certificate \
+                        key file together are required")]
+    fn test_mainconfig_new_tls_cli_mismatch() {
+        let file_handle = TempFileHandle::new("temp_config.toml");
+        let cli = Cli{ config: Some(file_handle.path.clone()),
+            listen: Some("192.168.1.4".parse().unwrap()), port: Some(6668),
+            name: Some("ircer.localhost".to_string()),
+            network: Some("SomeNetwork".to_string()),
+            dns_lookup: true, tls_cert_file: Some("some_cert.crt".to_string()),
+            tls_cert_key_file: None };
+        // next testcase
+        fs::write(file_handle.path.as_str(), 
+            r##"
+name = "irci.localhost"
+admin_info = "IRCI is local IRC server"
+admin_info2 = "IRCI is good server"
+info = "This is IRCI server"
+listen = "127.0.0.1"
+port = 6667
+network = "IRCInetwork"
+max_nickname_len = 20
+ping_timeout = 100
+pong_timeout = 30
+dns_lookup = false
+
+[default_user_modes]
+invisible = false
+oper = false
+local_oper = false
+registered = true
+wallops = false
+
+[[channels]]
+name = "#channel1"
+topic = "Some topic"
+[channels.modes]
+ban = [ 'baddi@*', 'baddi2@*' ]
+exception = [ 'bobby@*', 'mati@*' ]
+moderated = false
+secret = false
+protected_topic = false
+no_external_messages = false
+
+[[channels]]
+name = "#channel2"
+topic = "Some topic 2"
+[channels.modes]
+moderated = true
+secret = false
+protected_topic = true
+no_external_messages = false
+"##).unwrap();
+        MainConfig::new(cli).unwrap();
     }
     
     #[test]
