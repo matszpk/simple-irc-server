@@ -294,10 +294,24 @@ struct Message<'a> {
     params: Vec<&'a str>,
 }
 
+fn validate_source(s: &str) -> bool {
+    if s.contains(':') {
+        false
+    } else {
+        let excl = s.find('!');
+        let atchar = s.find('@');
+        if let Some(excl_pos) = excl {
+            if let Some(atchar_pos) = atchar {
+                return excl_pos < atchar_pos;
+            }
+        }
+        true
+    }
+}
+
 impl<'a> Message<'a> {
-    fn from_shared_str(s: &'a str) -> Result<Self, MessageError> {
-        let trimmed = s.trim_start();
-        
+    fn from_shared_str(input: &'a str) -> Result<Self, MessageError> {
+        let trimmed = input.trim_start();
         
         if trimmed.len() != 0 {
             // start_pos after ':' if exists - to skip ':' before source
@@ -312,10 +326,12 @@ impl<'a> Message<'a> {
             
             let mut rest_words = rest.split_ascii_whitespace();
             // find source
-            let source = if rest.chars().nth(0) == Some(':') {
-                let mut it = rest_words.next().unwrap().chars();
-                it.next();  // skip ':'
-                Some(it.as_str())
+            let source = if rest.bytes().next() == Some(b':') {
+                let s = &rest_words.next().unwrap()[1..];
+                if !validate_source(s) {
+                    return Err(MessageError::WrongSource);
+                }
+                Some(s)
             } else { None };
             let command = if let Some(cmd) = rest_words.next() { cmd }
             else { return Err(MessageError::NoCommand); };
@@ -1508,6 +1524,8 @@ no_external_messages = false
     fn test_message_from_shared_str() {
         assert_eq!(Ok(Message{ source: None, command: "QUIT", params: vec![] }),
                 Message::from_shared_str("QUIT").map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: None, command: "QUIT", params: vec![] }),
+                Message::from_shared_str("   QUIT").map_err(|e| e.to_string()));
         assert_eq!(Ok(Message{ source: Some("source"), command: "QUIT", params: vec![] }),
                 Message::from_shared_str(":source QUIT").map_err(|e| e.to_string()));
         assert_eq!(Ok(Message{ source: None, command: "USER",
@@ -1522,6 +1540,13 @@ no_external_messages = false
             params: vec!["bobby", ":-). Hello guy!"] }),
                 Message::from_shared_str("PRIVMSG bobby ::-). Hello guy!")
                     .map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: Some("mati!mat@gg.com"),
+                command: "QUIT", params: vec![] }),
+                Message::from_shared_str(":mati!mat@gg.com QUIT")
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong source syntax".to_string()),
+                Message::from_shared_str(":mati@mat!gg.com QUIT")
+                        .map_err(|e| e.to_string()));
     }
     
     #[test]
