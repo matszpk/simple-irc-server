@@ -286,6 +286,7 @@ impl fmt::Display for MessageError {
 impl Error for MessageError {
 }
 
+#[derive(PartialEq, Eq, Debug)]
 struct Message<'a> {
     source: Option<&'a str>,
     command: &'a str,
@@ -298,18 +299,17 @@ impl<'a> Message<'a> {
         
         
         if trimmed.len() != 0 {
-            let mut trimmed_it = trimmed.chars();
-            trimmed_it.next();
-            
+            // start_pos after ':' if exists - to skip ':' before source
+            let start_pos = if trimmed.bytes().next() == Some(b':') { 1 } else { 0 };
             let (rest, last_param) =
-            if let Some((rest, lp)) = trimmed_it.as_str().split_once(':') {
+            if let Some((rest, lp)) = trimmed[start_pos..].split_once(':') {
                 // get rest. add first character length to rest length.
-                (&trimmed[0..rest.len() + trimmed.len()-trimmed_it.as_str().len()], Some(lp))
+                (&trimmed[0..rest.len() + start_pos], Some(lp))
             } else {
                 (trimmed, None)
             };
             
-            let mut rest_words = trimmed.split_ascii_whitespace();
+            let mut rest_words = rest.split_ascii_whitespace();
             // find source
             let source = if rest.chars().nth(0) == Some(':') {
                 let mut it = rest_words.next().unwrap().chars();
@@ -1359,7 +1359,7 @@ no_external_messages = false
     fn test_irc_lines_codec() {
         let mut codec = IRCLinesCodec::new();
         let mut buf = BytesMut::new();
-        codec.encode("my line", &mut buf);
+        codec.encode("my line", &mut buf).unwrap();
         assert_eq!("my line\r\n".as_bytes(), buf);
         let mut buf = BytesMut::from("my line 2\n");
         assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
@@ -1369,6 +1369,22 @@ no_external_messages = false
         assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
                 Ok(Some("my line 2".to_string())));
         assert_eq!(buf, BytesMut::new());
+    }
+    
+    #[test]
+    fn test_message_from_shared_str() {
+        assert_eq!(Ok(Message{ source: None, command: "QUIT", params: vec![] }),
+                Message::from_shared_str("QUIT").map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: Some("source"), command: "QUIT", params: vec![] }),
+                Message::from_shared_str(":source QUIT").map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: None, command: "USER",
+            params: vec!["guest", "0", "*", "Ronnie Reagan"] }),
+                Message::from_shared_str("USER guest 0 * :Ronnie Reagan")
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: None, command: "USER",
+            params: vec!["guest", "0", "*", "Benny"] }),
+                Message::from_shared_str("USER guest 0 * Benny")
+                    .map_err(|e| e.to_string()));
     }
     
     #[test]
