@@ -24,10 +24,11 @@ use std::io::Read;
 use std::net::{IpAddr, TcpStream};
 use std::error::Error;
 use clap;
+use bytes::{BufMut, BytesMut};
 use clap::Parser;
 use toml;
 use tokio;
-use tokio_util::codec::{Framed, LinesCodec};
+use tokio_util::codec::{Framed, LinesCodec, Decoder, Encoder};
 use serde_derive::{Serialize, Deserialize};
 use dashmap::DashMap;
 use validator::{Validate,ValidationError};
@@ -231,6 +232,37 @@ impl Default for MainConfig {
 }
 
 // special LinesCodec for IRC - encode with "\r\n".
+
+struct IRCLinesCodec(LinesCodec);
+
+impl IRCLinesCodec {
+    pub fn new() -> IRCLinesCodec {
+        IRCLinesCodec(LinesCodec::new())
+    }
+}
+
+impl<T: AsRef<str>> Encoder<T> for IRCLinesCodec {
+    type Error = <LinesCodec as Encoder<T>>::Error;
+
+    fn encode(&mut self, line: T, buf: &mut BytesMut) -> Result<(), Self::Error> {
+        let line = line.as_ref();
+        buf.reserve(line.len() + 1);
+        buf.put(line.as_bytes());
+        // put "\r\n"
+        buf.put_u8(b'\r');
+        buf.put_u8(b'\n');
+        Ok(())
+    }
+}
+
+impl Decoder for IRCLinesCodec {
+    type Item = <LinesCodec as Decoder>::Item;
+    type Error = <LinesCodec as Decoder>::Error;
+    
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, Self::Error> {
+        self.0.decode(buf)
+    }
+}
 
 //
 
@@ -1268,6 +1300,14 @@ no_external_messages = false
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
 '&' at start. [{\"value\": String(\"^channel2\")}]".to_string()), result);
+    }
+    
+    #[test]
+    fn test_irc_lines_codec() {
+        let mut codec = IRCLinesCodec::new();
+        let mut buf = BytesMut::new();
+        codec.encode("my line", &mut buf);
+        assert_eq!("my line\r\n".as_bytes(), buf);
     }
     
     #[test]
