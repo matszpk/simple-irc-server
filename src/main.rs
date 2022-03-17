@@ -295,14 +295,16 @@ struct Message<'a> {
 impl<'a> Message<'a> {
     fn from_shared_str(s: &'a str) -> Result<Self, MessageError> {
         let trimmed = s.trim_start();
+        
+        
         if trimmed.len() != 0 {
-            let (rest, last_param) = if let Some((rest, lp)) = trimmed.rsplit_once(':') {
-                if rest.len() != 0 {
-                    (rest, Some(lp))
-                } else {
-                    // if source first
-                    (trimmed, None)
-                }
+            let mut trimmed_it = trimmed.chars();
+            trimmed_it.next();
+            
+            let (rest, last_param) =
+            if let Some((rest, lp)) = trimmed_it.as_str().split_once(':') {
+                // get rest. add first character length to rest length.
+                (&trimmed[0..rest.len() + trimmed.len()-trimmed_it.as_str().len()], Some(lp))
             } else {
                 (trimmed, None)
             };
