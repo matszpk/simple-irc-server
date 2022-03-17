@@ -1385,6 +1385,10 @@ no_external_messages = false
             params: vec!["guest", "0", "*", "Benny"] }),
                 Message::from_shared_str("USER guest 0 * Benny")
                     .map_err(|e| e.to_string()));
+        assert_eq!(Ok(Message{ source: None, command: "PRIVMSG",
+            params: vec!["bobby", ":-). Hello guy!"] }),
+                Message::from_shared_str("PRIVMSG bobby ::-). Hello guy!")
+                    .map_err(|e| e.to_string()));
     }
     
     #[test]
