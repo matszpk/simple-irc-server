@@ -161,7 +161,7 @@ struct MainConfig {
 }
 
 impl MainConfig {
-    fn new_config(cli: Cli) -> Result<MainConfig, Box<dyn Error>> {
+    fn new(cli: Cli) -> Result<MainConfig, Box<dyn Error>> {
         let config_path = cli.config.as_deref().unwrap_or("simple-irc-server.toml");
         let mut config_file = File::open(config_path)?;
         let mut config_str = String::new();
@@ -843,7 +843,7 @@ secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{
             name: "irci.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
@@ -907,7 +907,7 @@ no_external_messages = false
             dns_lookup: true, tls_cert_file: Some("some_cert.crt".to_string()),
             tls_cert_key_file: Some("some_key.crt".to_string()) };
             
-        let result = MainConfig::new_config(cli2).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli2).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{
             name: "ircer.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
@@ -1006,7 +1006,7 @@ secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{
             name: "irci.localhost".to_string(),
             admin_info: "IRCI is local IRC server".to_string(),
@@ -1116,7 +1116,7 @@ secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         // because sorting of ValidationErrors changes order we check to cases
         assert!(Err("name: Validation error: contains [{\"value\": String(\"ircilocalhost\"), \
 \"needle\": String(\".\")}]".to_string()) == result ||
@@ -1184,7 +1184,7 @@ secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("operators[0].name: Validation error: Username must not \
 contains dot. [{\"value\": String(\"matis.zpaki\")}]".to_string()), result);
 
@@ -1249,7 +1249,7 @@ secret = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
-        let result = MainConfig::new_config(cli.clone()).map_err(|e| e.to_string());
+        let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
 '&' at start. [{\"value\": String(\"^channel2\")}]".to_string()), result);
     }
@@ -1581,7 +1581,7 @@ no_external_messages = false
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let config = MainConfig::new_config(cli)?;
+    let config = MainConfig::new(cli)?;
     println!("Hello, world!");
     Ok(())
 }
