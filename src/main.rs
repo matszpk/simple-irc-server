@@ -55,20 +55,20 @@ struct Cli {
 }
 
 fn validate_username(username: &str) -> Result<(), ValidationError> {
-    if !username.contains('.') && !username.contains(':') {
+    if !username.contains('.') && !username.contains(':') && !username.contains(',') {
         Ok(())
     } else {
-        Err(ValidationError::new("Username must not contains dot or colon."))
+        Err(ValidationError::new("Username must not contains '.', ',' or ':'."))
     }
 }
 
 fn validate_channel(channel: &str) -> Result<(), ValidationError> {
-    if channel.len() != 0 && !channel.contains(':') &&
+    if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') &&
         (channel.as_bytes()[0] == b'#' || channel.as_bytes()[0] == b'&') {
         Ok(())
     } else {
-        Err(ValidationError::new(
-            "Channel name must have '#' or '&' at start and must not contains colon."))
+        Err(ValidationError::new("Channel name must have '#' or '&' at start and \
+                must not contains ',' or ':'."))
     }
 }
 
@@ -424,8 +424,20 @@ enum Command<'a> {
 
 use Command::*;
 
+fn check_nickname(nick: &str) -> bool {
+    false
+}
+
+fn check_channel(nick: &str) -> bool {
+    false
+}
+
+fn check_server(nick: &str) -> bool {
+    false
+}
+
 impl<'a> Command<'a> {
-    fn from_shared_str(message: &Message<'a>) -> Result<Self, CommandError> {
+    fn parse_from_message(message: &Message<'a>) -> Result<Self, CommandError> {
         match message.command {
             "CAP" => {
                 if message.params.len() >= 1 {
@@ -665,6 +677,52 @@ impl<'a> Command<'a> {
                     Err(CommandError::NeedMoreParams(message.command.to_string())) }
             }
             s => Err(CommandError::UnknownCommand(s.to_string())),
+        }
+    }
+    
+    fn from_message(message: &Message<'a>) -> Result<Self, CommandError> {
+        match Self::parse_from_message(message) {
+            Ok(x) => {
+                match x.validate() {
+                    Ok(()) => Ok(x),
+                    Err(e) => Err(e)
+                }
+            }
+            Err(e) => Err(e)
+        }
+    }
+    
+    fn validate(&self) -> Result<(), CommandError> {
+        match self {
+            CAP { subcommand, capabilities } => { Ok(()) }
+            NICK{ nickname } => { Ok(()) }
+            USER{ username, hostname, servername, realname } => { Ok(()) }
+            OPER{ name, password } => { Ok(()) }
+            JOIN{ channels, keys } => { Ok(()) }
+            PART{ channels, reason } => { Ok(()) }
+            TOPIC{ channel, topic } => { Ok(()) }
+            NAMES{ channels } => { Ok(()) }
+            LIST{ channels, server } => { Ok(()) }
+            INVITE{ nickname, channel } => { Ok(()) }
+            KICK{ channel, user, comment } => { Ok(()) }
+            MOTD{ target } => { Ok(()) }
+            VERSION{ target } => { Ok(()) }
+            ADMIN{ target } => { Ok(()) }
+            CONNECT{ target_server, port, remote_server } => { Ok(()) }
+            TIME{ server } => { Ok(()) }
+            STATS{ query, server } => { Ok(()) }
+            HELP{ subject } => { Ok(()) }
+            MODE{ target, modestring, mode_args } => { Ok(()) }
+            PRIVMSG{ targets, text } => { Ok(()) }
+            NOTICE{ targets, text } => { Ok(()) }
+            WHO{ mask } => { Ok(()) }
+            WHOIS{ target, nickmask } => { Ok(()) }
+            KILL{ nickname, comment } => { Ok(()) }
+            SQUIT{ server, comment } => { Ok(()) }
+            AWAY{ text }  => { Ok(()) }
+            USERHOST{ nicknames } => { Ok(()) }
+            WALLOPS{ text } => { Ok(()) }
+            _ => Ok(())
         }
     }
 }
@@ -1627,7 +1685,7 @@ no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("operators[0].name: Validation error: Username must not \
-contains dot or colon. [{\"value\": String(\"matis.zpaki\")}]".to_string()), result);
+contains '.', ',' or ':'. [{\"value\": String(\"matis.zpaki\")}]".to_string()), result);
 
         fs::write(file_handle.path.as_str(), 
             r##"
@@ -1692,7 +1750,7 @@ no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("operators[0].name: Validation error: Username must not \
-contains dot or colon. [{\"value\": String(\"matis:zpaki\")}]".to_string()), result);
+contains '.', ',' or ':'. [{\"value\": String(\"matis:zpaki\")}]".to_string()), result);
 
         fs::write(file_handle.path.as_str(), 
             r##"
@@ -1757,8 +1815,8 @@ no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
-'&' at start and must not contains colon. [{\"value\": String(\"^channel2\")}]".to_string()),
-        result);
+'&' at start and must not contains ',' or ':'. [{\"value\": String(\"^channel2\")}]"
+        .to_string()), result);
         
         fs::write(file_handle.path.as_str(), 
             r##"
@@ -1823,8 +1881,8 @@ no_external_messages = false
 "##).unwrap();
         let result = MainConfig::new(cli.clone()).map_err(|e| e.to_string());
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
-'&' at start and must not contains colon. [{\"value\": String(\"#cha:nnel2\")}]".to_string()),
-        result);
+'&' at start and must not contains ',' or ':'. \
+[{\"value\": String(\"#cha:nnel2\")}]".to_string()), result);
     }
     
     #[test]
