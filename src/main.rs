@@ -348,6 +348,155 @@ impl<'a> Message<'a> {
     }
 }
 
+#[derive(Clone, Debug)]
+enum CommandError {
+    UnknownCommand(String),
+    NeedMoreParams(String),
+    ParameterDoesntMatch(String, usize)
+}
+
+impl fmt::Display for CommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CommandError::UnknownCommand(s) =>
+                write!(f, "Unknown command '{}'", s),
+            CommandError::NeedMoreParams(s) =>
+                write!(f, "Command '{}' need more params", s),
+            CommandError::ParameterDoesntMatch(s, i) =>
+                write!(f, "Parameter {} doesn't match for command '{}'", i, s),
+        }
+    }
+}
+
+impl Error for CommandError {
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum CapCommand {
+    LS, LIST, REQ,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum Command<'a> {
+    CAP { subcommand: CapCommand, capabilities: Option<Vec<&'a str>> },
+    AUTHENTICATE{ },
+    PASS{ password: &'a str },
+    NICK{ nickname: &'a str },
+    USER{ username: &'a str, hostname: &'a str, servername: &'a str, realname: &'a str },
+    PING{ },
+    OPER{ name: &'a str, password: &'a str },
+    QUIT{ },
+    JOIN{ channels: Vec<&'a str>, keys: Option<Vec<&'a str>> },
+    PART{ channels: Vec<&'a str>, reason: Option<&'a str> },
+    TOPIC{ channel: &'a str, topic: Option<&'a str> },
+    NAMES{ channels: Vec<&'a str> },
+    LIST{ channels: Vec<&'a str>, elistconds: Option<Vec<&'a str>> },
+    INVITE{ nickname: &'a str, channel: &'a str },
+    KICK{ channel: &'a str, user: &'a str, comment: Option<&'a str> },
+    MOTD{ target: Option<&'a str> },
+    VERSION{ target: Option<&'a str> },
+    ADMIN{ target: Option<&'a str> },
+    CONNECT{ target_server: &'a str, port: Option<u16>, remote_server: Option<&'a str> },
+    LUSERS{ },
+    TIME{ server: Option<&'a str> },
+    STATS{ query: char, server: Option<&'a str> },
+    HELP{ subject: &'a str },
+    INFO{ },
+    MODE{ target: &'a str, modestring: Option<&'a str>, mode_args: Option<Vec<&'a str>> },
+    PRIVMSG{ targets: Vec<&'a str>, text: &'a str },
+    NOTICE{ targets: Vec<&'a str>, text: &'a str },
+    WHO{ mask: &'a str },
+    WHOIS{ target: Option<&'a str>, nick: &'a str },
+    KILL{ nickname: &'a str, comment: &'a str },
+    REHASH{ },
+    RESTART{ },
+    SQUIT{ server: &'a str, comment: &'a str },
+    AWAY{ text: Option<&'a str> },
+    USERHOST{ nicknames: Vec<&'a str> }, 
+    WALLOPS{ text: &'a str },
+}
+
+use Command::*;
+
+impl<'a> Command<'a> {
+    fn from_shared_str(message: &Message<'a>) -> Result<Self, CommandError> {
+        match message.command {
+            "CAP" => Ok(REHASH{}),
+            "AUTHENTICATE" => Ok(AUTHENTICATE{}),
+            "PASS" => {
+                if message.params.len() >= 1 {
+                    Ok(PASS{ password: message.params[0] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "NICK" => {
+                if message.params.len() >= 1 {
+                    Ok(NICK{ nickname: message.params[0] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "USER" => {
+                if message.params.len() >= 4 {
+                    Ok(USER{ username: message.params[0],
+                        hostname: message.params[1],
+                        servername: message.params[2],
+                        realname: message.params[3] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "PING" => Ok(PING{}),
+            "OPER" => {
+                if message.params.len() >= 2 {
+                    Ok(OPER{ name: message.params[0],
+                        password: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "QUIT" => Ok(QUIT{}),
+            "JOIN" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
+                    let keys_opt = param_it.next().map(|x|
+                        x.split(',').collect::<Vec<_>>());
+                    if let Some(ref keys) = keys_opt {
+                        if keys.len() != channels.len() {
+                            return Err(CommandError::ParameterDoesntMatch(
+                                    message.command.to_string(), 1)); }
+                    }
+                    Ok(JOIN{ channels, keys: keys_opt })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "PART" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
+                    let reason = param_it.next().map(|x| *x);
+                    Ok(PART{ channels, reason })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "TOPIC" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let channel = param_it.next().unwrap();
+                    let topic = param_it.next().map(|x| *x);
+                    Ok(TOPIC{ channel, topic })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "LUSERS" => Ok(LUSERS{}),
+            "INFO" => Ok(INFO{}),
+            "REHASH" => Ok(REHASH{}),
+            "RESTART" => Ok(RESTART{}),
+            s => Err(CommandError::UnknownCommand(s.to_string())),
+        }
+    }
+}
+
+// replies
+
 struct WhoIsChannelStruct<'a> {
     prefix: Option<&'a str>,
     channel: &'a str,
