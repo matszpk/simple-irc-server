@@ -690,7 +690,16 @@ impl<'a> Command<'a> {
     
     fn validate(&self) -> Result<(), CommandError> {
         match self {
-            CAP { subcommand, capabilities } => { Ok(()) }
+            CAP { subcommand, capabilities } => {
+                if let Some(caps) = capabilities {
+                    caps.iter().try_for_each(|x| {
+                        match *x {
+                            "multi-prefix"|"tls"|"sasl" => Ok(()),
+                            _ => Err(CommandError::WrongParameter("CAP".to_string(), 0))
+                        }
+                    })
+                } else { Ok(()) }
+            }
             NICK{ nickname } => {
                 validate_username(nickname)
                     .map_err(|_| CommandError::WrongParameter("NICK".to_string(), 0)) }
@@ -722,7 +731,7 @@ impl<'a> Command<'a> {
                 validate_channel(channel)
                     .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 0))?;
                 validate_username(user)
-                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 1)) }
             MOTD{ target } => {
                 if let Some(t) = target {
                     if !validate_server_mask(t) {
@@ -753,7 +762,7 @@ impl<'a> Command<'a> {
                 }
                 if let Some(s) = remote_server {
                     if !validate_server(s) {
-                        return Err(CommandError::WrongParameter("CONNECT".to_string(), 0));
+                        return Err(CommandError::WrongParameter("CONNECT".to_string(), 1));
                     }
                 }
                 Ok(())
@@ -774,11 +783,30 @@ impl<'a> Command<'a> {
                 }
                 Ok(())
             }
-            MODE{ target, modestring, mode_args } => { Ok(()) }
-            PRIVMSG{ targets, text } => { Ok(()) }
-            NOTICE{ targets, text } => { Ok(()) }
-            WHO{ mask } => { Ok(()) }
-            WHOIS{ target, nickmask } => { Ok(()) }
+            MODE{ target, modestring, mode_args } => {
+                // TODO: validate modestring and mode_args
+                validate_username(target).or(validate_username(target))
+                    .map_err(|_| CommandError::WrongParameter("MODE".to_string(), 0)) }
+            PRIVMSG{ targets, text } => {
+                targets.iter().try_for_each(|n| validate_username(n).or(
+                    validate_channel(n)))
+                    .map_err(|_| CommandError::WrongParameter("PRIVMSG".to_string(), 0)) }
+            NOTICE{ targets, text } => {
+                targets.iter().try_for_each(|n| validate_username(n).or(
+                    validate_channel(n)))
+                    .map_err(|_| CommandError::WrongParameter("PRIVMSG".to_string(), 0)) }
+            //WHO{ mask } => { Ok(()) }
+            WHOIS{ target, nickmask } => {
+                let next_param_idx = if let Some(t) = target {
+                    if !validate_server(t) {
+                        return Err(CommandError::WrongParameter("WHOIS".to_string(), 0));
+                    }
+                    1
+                } else { 0 };
+                validate_username(nickmask)
+                    .map_err(|_| CommandError::WrongParameter("WHOIS".to_string(),
+                        next_param_idx))
+            }
             KILL{ nickname, comment } => {
                 validate_username(nickname)
                     .map_err(|_| CommandError::WrongParameter("KILL".to_string(), 0)) }
