@@ -351,6 +351,7 @@ impl<'a> Message<'a> {
 #[derive(Clone, Debug)]
 enum CommandError {
     UnknownCommand(String),
+    UnknownSubcommand(String, String),
     NeedMoreParams(String),
     ParameterDoesntMatch(String, usize),
     WrongParameter(String, usize),
@@ -361,6 +362,8 @@ impl fmt::Display for CommandError {
         match self {
             CommandError::UnknownCommand(s) =>
                 write!(f, "Unknown command '{}'", s),
+            CommandError::UnknownSubcommand(cmd, scmd) =>
+                write!(f, "Unknown subcommand '{}' in '{}'", scmd, cmd),
             CommandError::NeedMoreParams(s) =>
                 write!(f, "Command '{}' need more params", s),
             CommandError::ParameterDoesntMatch(s, i) =>
@@ -424,7 +427,23 @@ use Command::*;
 impl<'a> Command<'a> {
     fn from_shared_str(message: &Message<'a>) -> Result<Self, CommandError> {
         match message.command {
-            "CAP" => Ok(REHASH{}),
+            "CAP" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let subcommand = match *param_it.next().unwrap() {
+                        "LS" => CapCommand::LS,
+                        "LIST" => CapCommand::LIST,
+                        "REQ" => CapCommand::REQ,
+                        _ => return Err(CommandError::UnknownSubcommand(
+                                    message.command.to_string(),
+                                    message.params[0].to_string()))
+                    };
+                    let capabilities = param_it.next().map(|x|
+                            x.split_ascii_whitespace(). collect::<Vec<_>>());
+                    Ok(CAP{ subcommand, capabilities })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            },
             "AUTHENTICATE" => Ok(AUTHENTICATE{}),
             "PASS" => {
                 if message.params.len() >= 1 {
