@@ -486,10 +486,31 @@ impl<'a> Command<'a> {
                 } else {
                     Err(CommandError::NeedMoreParams(message.command.to_string())) }
             }
+            "NAMES" => {
+                if message.params.len() >= 1 {
+                    Ok(NAMES{ channels: message.params[0].split(',').collect::<Vec<_>>() })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "MOTD" => {
+                Ok(MOTD{ target: message.params.iter().next().map(|x| *x) })
+            }
+            "VERSION" => {
+                Ok(VERSION{ target: message.params.iter().next().map(|x| *x) })
+            }
+            "ADMIN" => {
+                Ok(ADMIN{ target: message.params.iter().next().map(|x| *x) })
+            }
             "LUSERS" => Ok(LUSERS{}),
+            "TIME" => {
+                Ok(TIME{ server: message.params.iter().next().map(|x| *x) })
+            }
             "INFO" => Ok(INFO{}),
             "REHASH" => Ok(REHASH{}),
             "RESTART" => Ok(RESTART{}),
+            "AWAY" => {
+                Ok(AWAY{ text: message.params.iter().next().map(|x| *x) })
+            }
             s => Err(CommandError::UnknownCommand(s.to_string())),
         }
     }
