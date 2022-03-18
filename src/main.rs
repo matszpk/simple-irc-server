@@ -776,11 +776,17 @@ impl<'a> Command<'a> {
                 Ok(())
             }
             STATS{ query, server } => {
-                if let Some(s) = server {
-                    if !validate_server(s) {
-                        return Err(CommandError::WrongParameter("STATS".to_string(), 0));
+                match query {
+                    'c'|'h'|'i'|'k'|'l'|'m'|'o'|'u'|'y' => {
+                        if let Some(s) = server {
+                            if !validate_server(s) {
+                                return Err(CommandError::WrongParameter(
+                                        "STATS".to_string(), 1));
+                            }
+                        }
                     }
-                }
+                    _ => return Err(CommandError::WrongParameter("STATS".to_string(), 0)),
+                };
                 Ok(())
             }
             MODE{ target, modestring, mode_args } => {
