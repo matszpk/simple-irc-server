@@ -352,7 +352,8 @@ impl<'a> Message<'a> {
 enum CommandError {
     UnknownCommand(String),
     NeedMoreParams(String),
-    ParameterDoesntMatch(String, usize)
+    ParameterDoesntMatch(String, usize),
+    WrongParameter(String, usize),
 }
 
 impl fmt::Display for CommandError {
@@ -364,6 +365,8 @@ impl fmt::Display for CommandError {
                 write!(f, "Command '{}' need more params", s),
             CommandError::ParameterDoesntMatch(s, i) =>
                 write!(f, "Parameter {} doesn't match for command '{}'", i, s),
+            CommandError::WrongParameter(s, i) =>
+                write!(f, "Wrong parameter {} in command '{}'", i, s),
         }
     }
 }
@@ -390,7 +393,7 @@ enum Command<'a> {
     PART{ channels: Vec<&'a str>, reason: Option<&'a str> },
     TOPIC{ channel: &'a str, topic: Option<&'a str> },
     NAMES{ channels: Vec<&'a str> },
-    LIST{ channels: Vec<&'a str>, elistconds: Option<Vec<&'a str>> },
+    LIST{ channels: Vec<&'a str>, server: Option<&'a str> },
     INVITE{ nickname: &'a str, channel: &'a str },
     KICK{ channel: &'a str, user: &'a str, comment: Option<&'a str> },
     MOTD{ target: Option<&'a str> },
@@ -406,7 +409,7 @@ enum Command<'a> {
     PRIVMSG{ targets: Vec<&'a str>, text: &'a str },
     NOTICE{ targets: Vec<&'a str>, text: &'a str },
     WHO{ mask: &'a str },
-    WHOIS{ target: Option<&'a str>, nick: &'a str },
+    WHOIS{ target: Option<&'a str>, nickmask: &'a str },
     KILL{ nickname: &'a str, comment: &'a str },
     REHASH{ },
     RESTART{ },
@@ -492,6 +495,32 @@ impl<'a> Command<'a> {
                 } else {
                     Err(CommandError::NeedMoreParams(message.command.to_string())) }
             }
+            "LIST" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
+                    let server = param_it.next().map(|x| *x);
+                    Ok(LIST{ channels, server })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "INVITE" => {
+                if message.params.len() >= 2 {
+                    Ok(INVITE{ nickname: message.params[0],
+                        channel: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "KICK" => {
+                if message.params.len() >= 2 {
+                    let mut param_it = message.params.iter();
+                    let channel = param_it.next().unwrap();
+                    let user = param_it.next().unwrap();
+                    let comment = param_it.next().map(|x| *x);
+                    Ok(KICK{ channel, user, comment })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
             "MOTD" => {
                 Ok(MOTD{ target: message.params.iter().next().map(|x| *x) })
             }
@@ -501,15 +530,120 @@ impl<'a> Command<'a> {
             "ADMIN" => {
                 Ok(ADMIN{ target: message.params.iter().next().map(|x| *x) })
             }
+            "CONNECT" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let target_server = param_it.next().unwrap();
+                    let port = param_it.next().map(|x| x.parse()).transpose();
+                    let remote_server = param_it.next().map(|x| *x);
+                    match port {
+                        Err(_) => {
+                            Err(CommandError::WrongParameter(message.command.to_string(), 1))
+                        }
+                        Ok(p) => Ok(CONNECT{ target_server, port: p, remote_server })
+                    }
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
             "LUSERS" => Ok(LUSERS{}),
             "TIME" => {
                 Ok(TIME{ server: message.params.iter().next().map(|x| *x) })
             }
+            "STATS" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let query_str = param_it.next().unwrap();
+                    let server = param_it.next().map(|x| *x);
+                    
+                    if query_str.len() == 1 {
+                        Ok(STATS{ query: query_str.chars().next().unwrap(), server })
+                    } else {
+                        Err(CommandError::WrongParameter(message.command.to_string(), 0))
+                    }
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "HELP" => {
+                if message.params.len() >= 1 {
+                    Ok(HELP{ subject: message.params[0] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
             "INFO" => Ok(INFO{}),
+            "MODE" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let target = param_it.next().unwrap();
+                    let modestring = param_it.next().map(|x| *x);
+                    let mode_args = if modestring.is_some() {
+                        Some(param_it.map(|x| *x).collect::<Vec<_>>())
+                    } else { None };
+                    Ok(MODE{ target, modestring, mode_args })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "PRIVMSG" => {
+                if message.params.len() >= 2 {
+                    Ok(PRIVMSG{ targets: message.params[0].split(',').collect::<Vec<_>>(),
+                        text: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "NOTICE" => {
+                if message.params.len() >= 2 {
+                    Ok(NOTICE{ targets: message.params[0].split(',').collect::<Vec<_>>(),
+                        text: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "WHO" => {
+                if message.params.len() >= 1 {
+                    Ok(WHO{ mask: message.params[0] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "WHOIS" => {
+                if message.params.len() >= 1 {
+                    if message.params.len() >= 2 {
+                       Ok(WHOIS{ target: Some(message.params[0]),
+                            nickmask: message.params[1] })
+                    } else {
+                        Ok(WHOIS{ target: None, nickmask: message.params[0] })
+                    }
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "KILL" => {
+                if message.params.len() >= 2 {
+                    Ok(KILL{ nickname: message.params[0],
+                        comment: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
             "REHASH" => Ok(REHASH{}),
             "RESTART" => Ok(RESTART{}),
+            "SQUIT" => {
+                if message.params.len() >= 2 {
+                    Ok(SQUIT{ server: message.params[0],
+                        comment: message.params[1] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
             "AWAY" => {
                 Ok(AWAY{ text: message.params.iter().next().map(|x| *x) })
+            }
+            "USERHOST" => {
+                if message.params.len() >= 1 {
+                    Ok(USERHOST{ nicknames: message.params[0]
+                            .split(',').collect::<Vec<_>>() })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+            }
+            "WALLOPS" => {
+                if message.params.len() >= 1 {
+                    Ok(WALLOPS{ text: message.params[0] })
+                } else {
+                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
             }
             s => Err(CommandError::UnknownCommand(s.to_string())),
         }
