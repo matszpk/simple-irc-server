@@ -424,16 +424,12 @@ enum Command<'a> {
 
 use Command::*;
 
-fn check_nickname(nick: &str) -> bool {
-    false
+fn validate_server(s: &str) -> bool {
+    s.contains('.')
 }
 
-fn check_channel(nick: &str) -> bool {
-    false
-}
-
-fn check_server(nick: &str) -> bool {
-    false
+fn validate_server_mask(s: &str) -> bool {
+    s.contains('.') | s.contains('*')
 }
 
 impl<'a> Command<'a> {
@@ -695,33 +691,106 @@ impl<'a> Command<'a> {
     fn validate(&self) -> Result<(), CommandError> {
         match self {
             CAP { subcommand, capabilities } => { Ok(()) }
-            NICK{ nickname } => { Ok(()) }
-            USER{ username, hostname, servername, realname } => { Ok(()) }
-            OPER{ name, password } => { Ok(()) }
-            JOIN{ channels, keys } => { Ok(()) }
-            PART{ channels, reason } => { Ok(()) }
-            TOPIC{ channel, topic } => { Ok(()) }
-            NAMES{ channels } => { Ok(()) }
-            LIST{ channels, server } => { Ok(()) }
-            INVITE{ nickname, channel } => { Ok(()) }
-            KICK{ channel, user, comment } => { Ok(()) }
-            MOTD{ target } => { Ok(()) }
-            VERSION{ target } => { Ok(()) }
-            ADMIN{ target } => { Ok(()) }
-            CONNECT{ target_server, port, remote_server } => { Ok(()) }
-            TIME{ server } => { Ok(()) }
-            STATS{ query, server } => { Ok(()) }
-            HELP{ subject } => { Ok(()) }
+            NICK{ nickname } => {
+                validate_username(nickname)
+                    .map_err(|_| CommandError::WrongParameter("NICK".to_string(), 0)) }
+            USER{ username, hostname, servername, realname } => {
+                validate_username(username)
+                    .map_err(|_| CommandError::WrongParameter("USER".to_string(), 0)) }
+            OPER{ name, password } => {
+                validate_username(name)
+                    .map_err(|_| CommandError::WrongParameter("OPER".to_string(), 0)) }
+            JOIN{ channels, keys } => {
+                channels.iter().try_for_each(|ch| validate_channel(ch))
+                    .map_err(|_| CommandError::WrongParameter("JOIN".to_string(), 0)) }
+            PART{ channels, reason } => {
+                channels.iter().try_for_each(|ch| validate_channel(ch))
+                    .map_err(|_| CommandError::WrongParameter("PART".to_string(), 0)) }
+            TOPIC{ channel, topic } => {
+                validate_channel(channel)
+                    .map_err(|_| CommandError::WrongParameter("TOPIC".to_string(), 0))}
+            NAMES{ channels } => {
+                channels.iter().try_for_each(|ch| validate_channel(ch))
+                    .map_err(|_| CommandError::WrongParameter("NAMES".to_string(), 0)) }
+            LIST{ channels, server } => {
+                channels.iter().try_for_each(|ch| validate_channel(ch))
+                    .map_err(|_| CommandError::WrongParameter("LIST".to_string(), 0))}
+            INVITE{ nickname, channel } => {
+                validate_username(nickname)
+                    .map_err(|_| CommandError::WrongParameter("INVITE".to_string(), 0)) }
+            KICK{ channel, user, comment } => {
+                validate_channel(channel)
+                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 0))?;
+                validate_username(user)
+                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 0)) }
+            MOTD{ target } => {
+                if let Some(t) = target {
+                    if !validate_server_mask(t) {
+                        return Err(CommandError::WrongParameter("MOTD".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
+            VERSION{ target } => {
+                if let Some(t) = target {
+                    if !validate_server_mask(t) {
+                        return Err(CommandError::WrongParameter("VERSION".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
+            ADMIN{ target } => {
+                if let Some(t) = target {
+                    if !validate_server_mask(t) {
+                        return Err(CommandError::WrongParameter("ADMIN".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
+            CONNECT{ target_server, port, remote_server } => {
+                if !validate_server(target_server) {
+                    return Err(CommandError::WrongParameter("CONNECT".to_string(), 0));
+                }
+                if let Some(s) = remote_server {
+                    if !validate_server(s) {
+                        return Err(CommandError::WrongParameter("CONNECT".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
+            TIME{ server } => {
+                if let Some(s) = server {
+                    if !validate_server(s) {
+                        return Err(CommandError::WrongParameter("TIME".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
+            STATS{ query, server } => {
+                if let Some(s) = server {
+                    if !validate_server(s) {
+                        return Err(CommandError::WrongParameter("STATS".to_string(), 0));
+                    }
+                }
+                Ok(())
+            }
             MODE{ target, modestring, mode_args } => { Ok(()) }
             PRIVMSG{ targets, text } => { Ok(()) }
             NOTICE{ targets, text } => { Ok(()) }
             WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmask } => { Ok(()) }
-            KILL{ nickname, comment } => { Ok(()) }
-            SQUIT{ server, comment } => { Ok(()) }
-            AWAY{ text }  => { Ok(()) }
-            USERHOST{ nicknames } => { Ok(()) }
-            WALLOPS{ text } => { Ok(()) }
+            KILL{ nickname, comment } => {
+                validate_username(nickname)
+                    .map_err(|_| CommandError::WrongParameter("KILL".to_string(), 0)) }
+            SQUIT{ server, comment } => {
+                if !validate_server(server) {
+                    return Err(CommandError::WrongParameter("SQUIT".to_string(), 0));
+                }
+                Ok(())
+            }
+            USERHOST{ nicknames } => {
+                nicknames.iter().try_for_each(|n| validate_username(n))
+                    .map_err(|_| CommandError::WrongParameter("USERHOST".to_string(), 0)) }
             _ => Ok(())
         }
     }
