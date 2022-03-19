@@ -409,7 +409,7 @@ impl fmt::Display for CommandError {
             UnknownCommand(s) =>
                 write!(f, "Unknown command '{}'", s),
             UnknownSubcommand(cmd, scmd) =>
-                write!(f, "Unknown subcommand '{}' in '{}'", scmd, cmd.name),
+                write!(f, "Unknown subcommand '{}' in command '{}'", scmd, cmd.name),
             NeedMoreParams(s) =>
                 write!(f, "Command '{}' need more params", s.name),
             ParameterDoesntMatch(s, i) =>
@@ -430,7 +430,7 @@ enum CapCommand {
 
 #[derive(PartialEq, Eq, Debug)]
 enum Command<'a> {
-    CAP{ subcommand: CapCommand, capabilities: Option<Vec<&'a str>> },
+    CAP{ subcommand: CapCommand, caps: Option<Vec<&'a str>>, version: Option<u32> },
     AUTHENTICATE{ },
     PASS{ password: &'a str },
     NICK{ nickname: &'a str },
@@ -554,9 +554,20 @@ impl<'a> Command<'a> {
                         _ => return Err(UnknownSubcommand(
                                     CAPId, message.params[0].to_string()))
                     };
-                    let capabilities = param_it.next().map(|x|
-                            x.split_ascii_whitespace(). collect::<Vec<_>>());
-                    Ok(CAP{ subcommand, capabilities })
+                    
+                    let (caps, version) = if subcommand == CapCommand::REQ {
+                        (param_it.next().map(|x| x.split_ascii_whitespace().
+                                    collect::<Vec<_>>()),
+                        None)
+                    } else if subcommand == CapCommand::LS {
+                        let v = if let Some(s) = param_it.next() {
+                            if let Ok(value) = s.parse() { Some(value) }
+                            else { return Err(WrongParameter(CAPId, 1)); }
+                        } else { None };
+                        (None, v)
+                    } else { (None, None) };
+                    
+                    Ok(CAP{ subcommand, caps, version })
                 } else {
                     Err(NeedMoreParams(CAPId)) }
             },
@@ -798,14 +809,17 @@ impl<'a> Command<'a> {
     
     fn validate(&self) -> Result<(), CommandError> {
         match self {
-            CAP { subcommand, capabilities } => {
-                if let Some(caps) = capabilities {
-                    caps.iter().try_for_each(|x| {
+            CAP { subcommand, caps, version } => {
+                if let Some(cs) = caps {
+                    cs.iter().try_for_each(|x| {
                         match *x {
                             "multi-prefix"|"tls"|"sasl" => Ok(()),
-                            _ => Err(WrongParameter(CAPId, 0))
+                            _ => Err(WrongParameter(CAPId, 1))
                         }
                     })
+                } else if let Some(v) = version {
+                    if *v < 302 { Err(WrongParameter(CAPId, 1)) }
+                    else { Ok(()) }
                 } else { Ok(()) }
             }
             NICK{ nickname } => {
@@ -2129,6 +2143,34 @@ no_external_messages = false
     
     #[test]
     fn test_command_from_message() {
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::LS, caps: None, version: None }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LS" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::LS, caps: None, version: Some(302) }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LS", "302" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::LS, caps: None, version: Some(303) }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LS", "303" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'CAP'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LS", "301" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'CAP'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LS", "xxx" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::LIST, caps: None, version: None }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LIST" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::REQ, version: None,
+            caps: Some(vec!["multi-prefix", "tls"]) }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "REQ", "multi-prefix tls" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'CAP'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "REQ", "multi-prefix tlsx" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Unknown subcommand 'LSS' in command 'CAP'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "LSS" ] }).map_err(|e| e.to_string()));
     }
     
     #[test]
