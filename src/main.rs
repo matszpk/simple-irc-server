@@ -411,7 +411,7 @@ impl fmt::Display for CommandError {
             UnknownSubcommand(cmd, scmd) =>
                 write!(f, "Unknown subcommand '{}' in command '{}'", scmd, cmd.name),
             NeedMoreParams(s) =>
-                write!(f, "Command '{}' need more params", s.name),
+                write!(f, "Command '{}' needs more parameters", s.name),
             ParameterDoesntMatch(s, i) =>
                 write!(f, "Parameter {} doesn't match for command '{}'", i, s.name),
             WrongParameter(s, i) =>
@@ -2171,6 +2171,67 @@ no_external_messages = false
         assert_eq!(Err("Unknown subcommand 'LSS' in command 'CAP'".to_string()),
             Command::from_message(&Message{ source: None, command: "CAP",
                 params: vec![ "LSS" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'CAP' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(AUTHENTICATE{}),
+            Command::from_message(&Message{ source: None, command: "AUTHENTICATE",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(PASS{ password: "secret" }),
+            Command::from_message(&Message{ source: None, command: "PASS",
+                params: vec![ "secret" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'PASS' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "PASS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(NICK{ nickname: "lucky" }),
+            Command::from_message(&Message{ source: None, command: "NICK",
+                params: vec![ "lucky" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'NICK'".to_string()),
+            Command::from_message(&Message{ source: None, command: "NICK",
+                params: vec![ "luc.ky" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'NICK'".to_string()),
+            Command::from_message(&Message{ source: None, command: "NICK",
+                params: vec![ "luc,ky" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'NICK'".to_string()),
+            Command::from_message(&Message{ source: None, command: "NICK",
+                params: vec![ "luc:ky" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'NICK' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "NICK",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(USER{ username: "chris", hostname: "0", servername: "*",
+                realname: "Chris Wood" }),
+            Command::from_message(&Message{ source: None, command: "USER",
+                params: vec![ "chris", "0", "*", "Chris Wood" ] })
+                .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'USER'".to_string()),
+            Command::from_message(&Message{ source: None, command: "USER",
+                params: vec![ "chr:is", "0", "*", "Chris Wood" ] })
+                .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'USER' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "USER",
+                params: vec![ "chris", "0", "*" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(PING{}),
+            Command::from_message(&Message{ source: None, command: "PING",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(OPER{ name: "guru", password: "mythebestday" }),
+            Command::from_message(&Message{ source: None, command: "OPER",
+                params: vec![ "guru", "mythebestday" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'OPER'".to_string()),
+            Command::from_message(&Message{ source: None, command: "OPER",
+                params: vec![ "gu:ru", "mythebestday" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'OPER' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "OPER",
+                params: vec![ "guru" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(QUIT{}),
+            Command::from_message(&Message{ source: None, command: "QUIT",
+                params: vec![] }).map_err(|e| e.to_string()));
     }
     
     #[test]
