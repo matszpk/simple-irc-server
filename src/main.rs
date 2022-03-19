@@ -845,7 +845,12 @@ impl<'a> Command<'a> {
                     .map_err(|_| WrongParameter(NAMESId, 0)) }
             LIST{ channels, server } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
-                    .map_err(|_| WrongParameter(LISTId, 0))}
+                    .map_err(|_| WrongParameter(LISTId, 0))?;
+                if let Some(srv) = server {
+                    validate_server(srv, WrongParameter(LISTId, 1))?;
+                }
+                Ok(())
+            }
             INVITE{ nickname, channel } => {
                 validate_username(nickname)
                     .map_err(|_| WrongParameter(INVITEId, 0)) }
@@ -2262,6 +2267,67 @@ no_external_messages = false
                     "mycat,apple,wesnoth,zizi" ] }) .map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'JOIN' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(PART{ channels: vec![ "#dogs", "&juices", "#hardware" ],
+                        reason: None }),
+            Command::from_message(&Message{ source: None, command: "PART",
+                params: vec![ "#dogs,&juices,#hardware" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(PART{ channels: vec![ "#dogs", "&juices", "#hardware" ],
+                        reason: Some("I don't like these channels") }),
+            Command::from_message(&Message{ source: None, command: "PART",
+                params: vec![ "#dogs,&juices,#hardware",
+                    "I don't like these channels" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'PART'".to_string()),
+            Command::from_message(&Message{ source: None, command: "PART",
+                params: vec![ "#dogs,&juices,#har:dware",
+                    "I don't like these channels" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'PART' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "PART",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(TOPIC{ channel: "#gizmo", topic: None }),
+            Command::from_message(&Message{ source: None, command: "TOPIC",
+                params: vec![ "#gizmo" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(TOPIC{ channel: "#gizmo", topic: Some("Some creatures") }),
+            Command::from_message(&Message{ source: None, command: "TOPIC",
+                params: vec![ "#gizmo", "Some creatures" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'TOPIC'".to_string()),
+            Command::from_message(&Message{ source: None, command: "TOPIC",
+                params: vec![ "#giz:mo" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'TOPIC' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "TOPIC",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(NAMES{ channels: vec![ "#dogs", "&juices", "#hardware" ] }),
+            Command::from_message(&Message{ source: None, command: "NAMES",
+                params: vec![ "#dogs,&juices,#hardware" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'NAMES'".to_string()),
+            Command::from_message(&Message{ source: None, command: "NAMES",
+                params: vec![ "#dogs,&juices,#hard:ware" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'NAMES' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "NAMES",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(LIST{ channels: vec![ "#dogs", "&juices", "#hardware" ],
+                        server: None }),
+            Command::from_message(&Message{ source: None, command: "LIST",
+                params: vec![ "#dogs,&juices,#hardware" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(LIST{ channels: vec![ "#dogs", "&juices", "#hardware" ],
+                        server: Some("funny.checkbox.org") }),
+            Command::from_message(&Message{ source: None, command: "LIST",
+                params: vec![ "#dogs,&juices,#hardware",
+                    "funny.checkbox.org" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'LIST'".to_string()),
+            Command::from_message(&Message{ source: None, command: "LIST",
+                params: vec![ "#dogs,&juices,#har:dware",
+                    "funny.checkbox.org" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'LIST'".to_string()),
+            Command::from_message(&Message{ source: None, command: "LIST",
+                params: vec![ "#dogs,&juices,#hardware",
+                    "fnny" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'LIST' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "LIST",
                 params: vec![] }).map_err(|e| e.to_string()));
     }
     
