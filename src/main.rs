@@ -468,12 +468,14 @@ enum Command<'a> {
 
 use Command::*;
 
-fn validate_server(s: &str) -> bool {
-    s.contains('.')
+fn validate_server<E: std::error::Error>(s: &str, e: E) -> Result<(), E> {
+    if s.contains('.') { Ok(()) }
+    else { Err(e) }
 }
 
-fn validate_server_mask(s: &str) -> bool {
-    s.contains('.') | s.contains('*')
+fn validate_server_mask<E: std::error::Error>(s: &str, e: E) -> Result<(), E>  {
+    if s.contains('.') | s.contains('*') { Ok(()) }
+    else { Err(e) }
 }
 
 impl<'a> Command<'a> {
@@ -778,44 +780,32 @@ impl<'a> Command<'a> {
                     .map_err(|_| CommandError::WrongParameter(KICKId, 1)) }
             MOTD{ target } => {
                 if let Some(t) = target {
-                    if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter(MOTDId, 0));
-                    }
+                    validate_server_mask(t, CommandError::WrongParameter(MOTDId, 0))?;
                 }
                 Ok(())
             }
             VERSION{ target } => {
                 if let Some(t) = target {
-                    if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter(VERSIONId, 0));
-                    }
+                    validate_server_mask(t, CommandError::WrongParameter(VERSIONId, 0))?;
                 }
                 Ok(())
             }
             ADMIN{ target } => {
                 if let Some(t) = target {
-                    if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter(ADMINId, 0));
-                    }
+                    validate_server_mask(t,CommandError::WrongParameter(ADMINId, 0))?;
                 }
                 Ok(())
             }
             CONNECT{ target_server, port, remote_server } => {
-                if !validate_server(target_server) {
-                    return Err(CommandError::WrongParameter(CONNECTId, 0));
-                }
+                validate_server(target_server, CommandError::WrongParameter(CONNECTId, 0))?;
                 if let Some(s) = remote_server {
-                    if !validate_server(s) {
-                        return Err(CommandError::WrongParameter(CONNECTId, 1));
-                    }
+                    validate_server(s, CommandError::WrongParameter(CONNECTId, 1))?;
                 }
                 Ok(())
             }
             TIME{ server } => {
                 if let Some(s) = server {
-                    if !validate_server(s) {
-                        return Err(CommandError::WrongParameter(TIMEId, 0));
-                    }
+                    validate_server(s, CommandError::WrongParameter(TIMEId, 0))?;
                 }
                 Ok(())
             }
@@ -823,10 +813,7 @@ impl<'a> Command<'a> {
                 match query {
                     'c'|'h'|'i'|'k'|'l'|'m'|'o'|'u'|'y' => {
                         if let Some(s) = server {
-                            if !validate_server(s) {
-                                return Err(CommandError::WrongParameter(
-                                        STATSId, 1));
-                            }
+                            validate_server(s, CommandError::WrongParameter(STATSId, 1))?;
                         }
                     }
                     _ => return Err(CommandError::WrongParameter(STATSId, 0)),
@@ -848,9 +835,7 @@ impl<'a> Command<'a> {
             //WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmask } => {
                 let next_param_idx = if let Some(t) = target {
-                    if !validate_server(t) {
-                        return Err(CommandError::WrongParameter(WHOISId, 0));
-                    }
+                    validate_server(t, CommandError::WrongParameter(WHOISId, 0))?;
                     1
                 } else { 0 };
                 validate_username(nickmask)
@@ -861,9 +846,7 @@ impl<'a> Command<'a> {
                 validate_username(nickname)
                     .map_err(|_| CommandError::WrongParameter(KILLId, 0)) }
             SQUIT{ server, comment } => {
-                if !validate_server(server) {
-                    return Err(CommandError::WrongParameter(SQUITId, 0));
-                }
+                validate_server(server, CommandError::WrongParameter(SQUITId, 0))?;
                 Ok(())
             }
             USERHOST{ nicknames } => {
