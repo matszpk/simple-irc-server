@@ -489,8 +489,7 @@ impl<'a> Command<'a> {
                         "LIST" => CapCommand::LIST,
                         "REQ" => CapCommand::REQ,
                         _ => return Err(CommandError::UnknownSubcommand(
-                                    CAPId,
-                                    message.params[0].to_string()))
+                                    CAPId, message.params[0].to_string()))
                     };
                     let capabilities = param_it.next().map(|x|
                             x.split_ascii_whitespace(). collect::<Vec<_>>());
