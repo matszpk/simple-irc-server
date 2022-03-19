@@ -32,6 +32,7 @@ use tokio_util::codec::{Framed, LinesCodec, Decoder, Encoder};
 use serde_derive::{Serialize, Deserialize};
 use dashmap::DashMap;
 use validator::{Validate,ValidationError};
+use const_table::const_table;
 
 #[derive(clap::Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
@@ -348,13 +349,56 @@ impl<'a> Message<'a> {
     }
 }
 
+#[const_table]
+pub enum CommandId {
+    CommandName{ name: &'static str },
+    CAPId = CommandName{ name: "CAP" },
+    AUTHENTICATEId = CommandName{ name: "AUTHENTICATE" },
+    PASSId = CommandName{ name: "PASS" },
+    NICKId = CommandName{ name: "NICK" },
+    USERId = CommandName{ name: "USER" },
+    PINGId = CommandName{ name: "PING" },
+    OPERId = CommandName{ name: "OPER" },
+    QUITId = CommandName{ name: "QUIT" },
+    JOINId = CommandName{ name: "JOIN" },
+    PARTId = CommandName{ name: "PART" },
+    TOPICId = CommandName{ name: "TOPIC" },
+    NAMESId = CommandName{ name: "NAMES" },
+    LISTId = CommandName{ name: "LIST" },
+    INVITEId = CommandName{ name: "INVITE" },
+    KICKId = CommandName{ name: "KICK" },
+    MOTDId = CommandName{ name: "MOTD" },
+    VERSIONId = CommandName{ name: "VERSION" },
+    ADMINId = CommandName{ name: "ADMIN" },
+    CONNECTId = CommandName{ name: "CONNECT" },
+    LUSERSId = CommandName{ name: "LUSERS" },
+    TIMEId = CommandName{ name: "TIME" },
+    STATSId = CommandName{ name: "STATS" },
+    HELPId = CommandName{ name: "HELP" },
+    INFOId = CommandName{ name: "INFO" },
+    MODEId = CommandName{ name: "MODE" },
+    PRIVMSGId = CommandName{ name: "PRIVMSG" },
+    NOTICEId = CommandName{ name: "NOTICE" },
+    WHOId = CommandName{ name: "WHO" },
+    WHOISId = CommandName{ name: "WHOIS" },
+    KILLId = CommandName{ name: "KILL" },
+    REHASHId = CommandName{ name: "REHASH" },
+    RESTARTId = CommandName{ name: "RESTART" },
+    SQUITId = CommandName{ name: "SQUIT" },
+    AWAYId = CommandName{ name: "AWAY" },
+    USERHOSTId = CommandName{ name: "USERHOST" }, 
+    WALLOPSId = CommandName{ name: "WALLOPS" },
+}
+
+use CommandId::*;
+
 #[derive(Clone, Debug)]
 enum CommandError {
     UnknownCommand(String),
-    UnknownSubcommand(String, String),
-    NeedMoreParams(String),
-    ParameterDoesntMatch(String, usize),
-    WrongParameter(String, usize),
+    UnknownSubcommand(CommandId, String),
+    NeedMoreParams(CommandId),
+    ParameterDoesntMatch(CommandId, usize),
+    WrongParameter(CommandId, usize),
 }
 
 impl fmt::Display for CommandError {
@@ -363,13 +407,13 @@ impl fmt::Display for CommandError {
             CommandError::UnknownCommand(s) =>
                 write!(f, "Unknown command '{}'", s),
             CommandError::UnknownSubcommand(cmd, scmd) =>
-                write!(f, "Unknown subcommand '{}' in '{}'", scmd, cmd),
+                write!(f, "Unknown subcommand '{}' in '{}'", scmd, cmd.name),
             CommandError::NeedMoreParams(s) =>
-                write!(f, "Command '{}' need more params", s),
+                write!(f, "Command '{}' need more params", s.name),
             CommandError::ParameterDoesntMatch(s, i) =>
-                write!(f, "Parameter {} doesn't match for command '{}'", i, s),
+                write!(f, "Parameter {} doesn't match for command '{}'", i, s.name),
             CommandError::WrongParameter(s, i) =>
-                write!(f, "Wrong parameter {} in command '{}'", i, s),
+                write!(f, "Wrong parameter {} in command '{}'", i, s.name),
         }
     }
 }
@@ -384,7 +428,7 @@ enum CapCommand {
 
 #[derive(PartialEq, Eq, Debug)]
 enum Command<'a> {
-    CAP { subcommand: CapCommand, capabilities: Option<Vec<&'a str>> },
+    CAP{ subcommand: CapCommand, capabilities: Option<Vec<&'a str>> },
     AUTHENTICATE{ },
     PASS{ password: &'a str },
     NICK{ nickname: &'a str },
@@ -443,27 +487,27 @@ impl<'a> Command<'a> {
                         "LIST" => CapCommand::LIST,
                         "REQ" => CapCommand::REQ,
                         _ => return Err(CommandError::UnknownSubcommand(
-                                    message.command.to_string(),
+                                    CAPId,
                                     message.params[0].to_string()))
                     };
                     let capabilities = param_it.next().map(|x|
                             x.split_ascii_whitespace(). collect::<Vec<_>>());
                     Ok(CAP{ subcommand, capabilities })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(CAPId)) }
             },
             "AUTHENTICATE" => Ok(AUTHENTICATE{}),
             "PASS" => {
                 if message.params.len() >= 1 {
                     Ok(PASS{ password: message.params[0] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(PASSId)) }
             }
             "NICK" => {
                 if message.params.len() >= 1 {
                     Ok(NICK{ nickname: message.params[0] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(NICKId)) }
             }
             "USER" => {
                 if message.params.len() >= 4 {
@@ -472,7 +516,7 @@ impl<'a> Command<'a> {
                         servername: message.params[2],
                         realname: message.params[3] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(USERId)) }
             }
             "PING" => Ok(PING{}),
             "OPER" => {
@@ -480,7 +524,7 @@ impl<'a> Command<'a> {
                     Ok(OPER{ name: message.params[0],
                         password: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(OPERId)) }
             }
             "QUIT" => Ok(QUIT{}),
             "JOIN" => {
@@ -492,11 +536,11 @@ impl<'a> Command<'a> {
                     if let Some(ref keys) = keys_opt {
                         if keys.len() != channels.len() {
                             return Err(CommandError::ParameterDoesntMatch(
-                                    message.command.to_string(), 1)); }
+                                    JOINId, 1)); }
                     }
                     Ok(JOIN{ channels, keys: keys_opt })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(JOINId)) }
             }
             "PART" => {
                 if message.params.len() >= 1 {
@@ -505,7 +549,7 @@ impl<'a> Command<'a> {
                     let reason = param_it.next().map(|x| *x);
                     Ok(PART{ channels, reason })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(PARTId)) }
             }
             "TOPIC" => {
                 if message.params.len() >= 1 {
@@ -514,13 +558,13 @@ impl<'a> Command<'a> {
                     let topic = param_it.next().map(|x| *x);
                     Ok(TOPIC{ channel, topic })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(TOPICId)) }
             }
             "NAMES" => {
                 if message.params.len() >= 1 {
                     Ok(NAMES{ channels: message.params[0].split(',').collect::<Vec<_>>() })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(NAMESId)) }
             }
             "LIST" => {
                 if message.params.len() >= 1 {
@@ -529,14 +573,14 @@ impl<'a> Command<'a> {
                     let server = param_it.next().map(|x| *x);
                     Ok(LIST{ channels, server })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(LISTId)) }
             }
             "INVITE" => {
                 if message.params.len() >= 2 {
                     Ok(INVITE{ nickname: message.params[0],
                         channel: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(INVITEId)) }
             }
             "KICK" => {
                 if message.params.len() >= 2 {
@@ -546,7 +590,7 @@ impl<'a> Command<'a> {
                     let comment = param_it.next().map(|x| *x);
                     Ok(KICK{ channel, user, comment })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(KICKId)) }
             }
             "MOTD" => {
                 Ok(MOTD{ target: message.params.iter().next().map(|x| *x) })
@@ -565,12 +609,12 @@ impl<'a> Command<'a> {
                     let remote_server = param_it.next().map(|x| *x);
                     match port {
                         Err(_) => {
-                            Err(CommandError::WrongParameter(message.command.to_string(), 1))
+                            Err(CommandError::WrongParameter(CONNECTId, 1))
                         }
                         Ok(p) => Ok(CONNECT{ target_server, port: p, remote_server })
                     }
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(CONNECTId)) }
             }
             "LUSERS" => Ok(LUSERS{}),
             "TIME" => {
@@ -585,16 +629,16 @@ impl<'a> Command<'a> {
                     if query_str.len() == 1 {
                         Ok(STATS{ query: query_str.chars().next().unwrap(), server })
                     } else {
-                        Err(CommandError::WrongParameter(message.command.to_string(), 0))
+                        Err(CommandError::WrongParameter(STATSId, 0))
                     }
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(STATSId)) }
             }
             "HELP" => {
                 if message.params.len() >= 1 {
                     Ok(HELP{ subject: message.params[0] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(HELPId)) }
             }
             "INFO" => Ok(INFO{}),
             "MODE" => {
@@ -607,27 +651,27 @@ impl<'a> Command<'a> {
                     } else { None };
                     Ok(MODE{ target, modestring, mode_args })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(MODEId)) }
             }
             "PRIVMSG" => {
                 if message.params.len() >= 2 {
                     Ok(PRIVMSG{ targets: message.params[0].split(',').collect::<Vec<_>>(),
                         text: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(PRIVMSGId)) }
             }
             "NOTICE" => {
                 if message.params.len() >= 2 {
                     Ok(NOTICE{ targets: message.params[0].split(',').collect::<Vec<_>>(),
                         text: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(NOTICEId)) }
             }
             "WHO" => {
                 if message.params.len() >= 1 {
                     Ok(WHO{ mask: message.params[0] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(WHOId)) }
             }
             "WHOIS" => {
                 if message.params.len() >= 1 {
@@ -638,14 +682,14 @@ impl<'a> Command<'a> {
                         Ok(WHOIS{ target: None, nickmask: message.params[0] })
                     }
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(WHOISId)) }
             }
             "KILL" => {
                 if message.params.len() >= 2 {
                     Ok(KILL{ nickname: message.params[0],
                         comment: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(KILLId)) }
             }
             "REHASH" => Ok(REHASH{}),
             "RESTART" => Ok(RESTART{}),
@@ -654,7 +698,7 @@ impl<'a> Command<'a> {
                     Ok(SQUIT{ server: message.params[0],
                         comment: message.params[1] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(SQUITId)) }
             }
             "AWAY" => {
                 Ok(AWAY{ text: message.params.iter().next().map(|x| *x) })
@@ -664,13 +708,13 @@ impl<'a> Command<'a> {
                     Ok(USERHOST{ nicknames: message.params[0]
                             .split(',').collect::<Vec<_>>() })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(USERHOSTId)) }
             }
             "WALLOPS" => {
                 if message.params.len() >= 1 {
                     Ok(WALLOPS{ text: message.params[0] })
                 } else {
-                    Err(CommandError::NeedMoreParams(message.command.to_string())) }
+                    Err(CommandError::NeedMoreParams(WALLOPSId)) }
             }
             s => Err(CommandError::UnknownCommand(s.to_string())),
         }
@@ -695,47 +739,47 @@ impl<'a> Command<'a> {
                     caps.iter().try_for_each(|x| {
                         match *x {
                             "multi-prefix"|"tls"|"sasl" => Ok(()),
-                            _ => Err(CommandError::WrongParameter("CAP".to_string(), 0))
+                            _ => Err(CommandError::WrongParameter(CAPId, 0))
                         }
                     })
                 } else { Ok(()) }
             }
             NICK{ nickname } => {
                 validate_username(nickname)
-                    .map_err(|_| CommandError::WrongParameter("NICK".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(NICKId, 0)) }
             USER{ username, hostname, servername, realname } => {
                 validate_username(username)
-                    .map_err(|_| CommandError::WrongParameter("USER".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(USERId, 0)) }
             OPER{ name, password } => {
                 validate_username(name)
-                    .map_err(|_| CommandError::WrongParameter("OPER".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(OPERId, 0)) }
             JOIN{ channels, keys } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
-                    .map_err(|_| CommandError::WrongParameter("JOIN".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(JOINId, 0)) }
             PART{ channels, reason } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
-                    .map_err(|_| CommandError::WrongParameter("PART".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(PARTId, 0)) }
             TOPIC{ channel, topic } => {
                 validate_channel(channel)
-                    .map_err(|_| CommandError::WrongParameter("TOPIC".to_string(), 0))}
+                    .map_err(|_| CommandError::WrongParameter(TOPICId, 0))}
             NAMES{ channels } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
-                    .map_err(|_| CommandError::WrongParameter("NAMES".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(NAMESId, 0)) }
             LIST{ channels, server } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
-                    .map_err(|_| CommandError::WrongParameter("LIST".to_string(), 0))}
+                    .map_err(|_| CommandError::WrongParameter(LISTId, 0))}
             INVITE{ nickname, channel } => {
                 validate_username(nickname)
-                    .map_err(|_| CommandError::WrongParameter("INVITE".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(INVITEId, 0)) }
             KICK{ channel, user, comment } => {
                 validate_channel(channel)
-                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 0))?;
+                    .map_err(|_| CommandError::WrongParameter(KICKId, 0))?;
                 validate_username(user)
-                    .map_err(|_| CommandError::WrongParameter("KICK".to_string(), 1)) }
+                    .map_err(|_| CommandError::WrongParameter(KICKId, 1)) }
             MOTD{ target } => {
                 if let Some(t) = target {
                     if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter("MOTD".to_string(), 0));
+                        return Err(CommandError::WrongParameter(MOTDId, 0));
                     }
                 }
                 Ok(())
@@ -743,7 +787,7 @@ impl<'a> Command<'a> {
             VERSION{ target } => {
                 if let Some(t) = target {
                     if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter("VERSION".to_string(), 0));
+                        return Err(CommandError::WrongParameter(VERSIONId, 0));
                     }
                 }
                 Ok(())
@@ -751,18 +795,18 @@ impl<'a> Command<'a> {
             ADMIN{ target } => {
                 if let Some(t) = target {
                     if !validate_server_mask(t) {
-                        return Err(CommandError::WrongParameter("ADMIN".to_string(), 0));
+                        return Err(CommandError::WrongParameter(ADMINId, 0));
                     }
                 }
                 Ok(())
             }
             CONNECT{ target_server, port, remote_server } => {
                 if !validate_server(target_server) {
-                    return Err(CommandError::WrongParameter("CONNECT".to_string(), 0));
+                    return Err(CommandError::WrongParameter(CONNECTId, 0));
                 }
                 if let Some(s) = remote_server {
                     if !validate_server(s) {
-                        return Err(CommandError::WrongParameter("CONNECT".to_string(), 1));
+                        return Err(CommandError::WrongParameter(CONNECTId, 1));
                     }
                 }
                 Ok(())
@@ -770,7 +814,7 @@ impl<'a> Command<'a> {
             TIME{ server } => {
                 if let Some(s) = server {
                     if !validate_server(s) {
-                        return Err(CommandError::WrongParameter("TIME".to_string(), 0));
+                        return Err(CommandError::WrongParameter(TIMEId, 0));
                     }
                 }
                 Ok(())
@@ -781,50 +825,50 @@ impl<'a> Command<'a> {
                         if let Some(s) = server {
                             if !validate_server(s) {
                                 return Err(CommandError::WrongParameter(
-                                        "STATS".to_string(), 1));
+                                        STATSId, 1));
                             }
                         }
                     }
-                    _ => return Err(CommandError::WrongParameter("STATS".to_string(), 0)),
+                    _ => return Err(CommandError::WrongParameter(STATSId, 0)),
                 };
                 Ok(())
             }
             MODE{ target, modestring, mode_args } => {
                 // TODO: validate modestring and mode_args
                 validate_username(target).or(validate_username(target))
-                    .map_err(|_| CommandError::WrongParameter("MODE".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(MODEId, 0)) }
             PRIVMSG{ targets, text } => {
                 targets.iter().try_for_each(|n| validate_username(n).or(
                     validate_channel(n)))
-                    .map_err(|_| CommandError::WrongParameter("PRIVMSG".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(PRIVMSGId, 0)) }
             NOTICE{ targets, text } => {
                 targets.iter().try_for_each(|n| validate_username(n).or(
                     validate_channel(n)))
-                    .map_err(|_| CommandError::WrongParameter("PRIVMSG".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(PRIVMSGId, 0)) }
             //WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmask } => {
                 let next_param_idx = if let Some(t) = target {
                     if !validate_server(t) {
-                        return Err(CommandError::WrongParameter("WHOIS".to_string(), 0));
+                        return Err(CommandError::WrongParameter(WHOISId, 0));
                     }
                     1
                 } else { 0 };
                 validate_username(nickmask)
-                    .map_err(|_| CommandError::WrongParameter("WHOIS".to_string(),
+                    .map_err(|_| CommandError::WrongParameter(WHOISId,
                         next_param_idx))
             }
             KILL{ nickname, comment } => {
                 validate_username(nickname)
-                    .map_err(|_| CommandError::WrongParameter("KILL".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(KILLId, 0)) }
             SQUIT{ server, comment } => {
                 if !validate_server(server) {
-                    return Err(CommandError::WrongParameter("SQUIT".to_string(), 0));
+                    return Err(CommandError::WrongParameter(SQUITId, 0));
                 }
                 Ok(())
             }
             USERHOST{ nicknames } => {
                 nicknames.iter().try_for_each(|n| validate_username(n))
-                    .map_err(|_| CommandError::WrongParameter("USERHOST".to_string(), 0)) }
+                    .map_err(|_| CommandError::WrongParameter(USERHOSTId, 0)) }
             _ => Ok(())
         }
     }
