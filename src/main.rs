@@ -2232,6 +2232,37 @@ no_external_messages = false
         assert_eq!(Ok(QUIT{}),
             Command::from_message(&Message{ source: None, command: "QUIT",
                 params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(JOIN{ channels: vec![ "#cats", "&fruits", "#software" ],
+                        keys: None }),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fruits,#software" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(JOIN{ channels: vec![ "#cats", "&fruits", "#software" ],
+                    keys: Some(vec![ "mycat", "apple", "wesnoth" ]) }),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fruits,#software", "mycat,apple,wesnoth" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'JOIN'".to_string()),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fru:its,#software" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'JOIN'".to_string()),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,fruits,#software" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(JOIN{ channels: vec![ "#cats", "&fru.its", "#software" ],
+                        keys: None }),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fru.its,#software" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Parameter 1 doesn't match for command 'JOIN'".to_string()),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fruits,#software,#countries",
+                    "mycat,apple,wesnoth" ] }) .map_err(|e| e.to_string()));
+        assert_eq!(Err("Parameter 1 doesn't match for command 'JOIN'".to_string()),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![ "#cats,&fruits,#software",
+                    "mycat,apple,wesnoth,zizi" ] }) .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'JOIN' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "JOIN",
+                params: vec![] }).map_err(|e| e.to_string()));
     }
     
     #[test]
