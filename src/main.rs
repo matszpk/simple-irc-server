@@ -468,14 +468,75 @@ enum Command<'a> {
 
 use Command::*;
 
-fn validate_server<E: std::error::Error>(s: &str, e: E) -> Result<(), E> {
+fn validate_server<E: Error>(s: &str, e: E) -> Result<(), E> {
     if s.contains('.') { Ok(()) }
     else { Err(e) }
 }
 
-fn validate_server_mask<E: std::error::Error>(s: &str, e: E) -> Result<(), E>  {
+fn validate_server_mask<E: Error>(s: &str, e: E) -> Result<(), E>  {
     if s.contains('.') | s.contains('*') { Ok(()) }
     else { Err(e) }
+}
+
+fn validate_usermodes<'a, E: Error>(modestring: &Option<&'a str>,
+                    mode_args: &Option<Vec<&'a str>>, e: E) -> Result<(), E> {
+    if let Some(modestring) = modestring {
+        if let Some(args) = mode_args {
+            if args.len() != 0 { return Err(e); }
+        }
+        if modestring.len() != 0 {
+            if modestring.find(|c|
+                c!='+' && c!='-' && c!='i' && c!='o' &&
+                    c!='O' && c!='t' && c!='w').is_some() {
+                Err(e)
+            } else { Ok(()) }
+        } else { // if empty
+            Err(e)
+        }
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
+                    mode_args: &Option<Vec<&'a str>>, e: E) -> Result<(), E> {
+    if let Some(modestring) = modestring {
+        if modestring.len() != 0 {
+            if modestring.find(|c|
+                c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
+                    c!='k' && c!='m' && c!='t' && c!='n').is_some() {
+                return Err(e);
+            }
+            // check list
+            let mut many_param_type_lists = 0;
+            let mut req_args = 0;
+            modestring.chars().for_each(|c| {
+                match c {
+                    'b' => many_param_type_lists += 1,
+                    'e' => many_param_type_lists += 1,
+                    'I' => many_param_type_lists += 1,
+                    'k' => req_args += 1,
+                    'l' => req_args += 1,
+                    _ => (),
+                };
+            });
+            if many_param_type_lists > 1 {
+                return Err(e);
+            }
+            if let Some(args) = mode_args {
+                if args.len() < req_args {
+                    return Err(e);
+                }
+            } else if req_args != 0 {
+                return Err(e);
+            }
+            Ok(())
+        } else { // if empty
+            Err(e)
+        }
+    } else {
+        Ok(())
+    }
 }
 
 impl<'a> Command<'a> {
@@ -820,9 +881,14 @@ impl<'a> Command<'a> {
                 Ok(())
             }
             MODE{ target, modestring, mode_args } => {
-                // TODO: validate modestring and mode_args
-                validate_username(target).or(validate_username(target))
-                    .map_err(|_| CommandError::WrongParameter(MODEId, 0)) }
+                if validate_username(target).is_ok() {
+                    validate_usermodes(modestring, mode_args,
+                        CommandError::WrongParameter(MODEId, 1))
+                } else if validate_channel(target).is_ok() {
+                    validate_channelmodes(modestring, mode_args,
+                        CommandError::WrongParameter(MODEId, 1))
+                } else { Err(CommandError::WrongParameter(MODEId, 0)) }
+            }
             PRIVMSG{ targets, text } => {
                 targets.iter().try_for_each(|n| validate_username(n).or(
                     validate_channel(n)))
