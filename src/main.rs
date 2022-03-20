@@ -400,6 +400,7 @@ enum CommandError {
     NeedMoreParams(CommandId),
     ParameterDoesntMatch(CommandId, usize),
     WrongParameter(CommandId, usize),
+    WrongModeArguments(CommandId),
 }
 
 use CommandError::*;
@@ -417,6 +418,8 @@ impl fmt::Display for CommandError {
                 write!(f, "Parameter {} doesn't match for command '{}'", i, s.name),
             WrongParameter(s, i) =>
                 write!(f, "Wrong parameter {} in command '{}'", i, s.name),
+            WrongModeArguments(s) =>
+                write!(f, "Wrong mode arguments in command '{}'", s.name),
         }
     }
 }
@@ -502,12 +505,13 @@ fn validate_usermodes<'a, E: Error>(modestring: &Option<&'a str>,
 }
 
 fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
-                    mode_args: &Option<Vec<&'a str>>, e: E) -> Result<(), E> {
+                    mode_args: &Option<Vec<&'a str>>, e: E, e2: E) -> Result<(), E> {
     if let Some(modestring) = modestring {
         if modestring.len() != 0 {
             if modestring.find(|c|
                 c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
-                    c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p').is_some() {
+                    c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p' && c!='o')
+                        .is_some() {
                 return Err(e);
             }
             // check list
@@ -523,18 +527,19 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
                     'I' => many_param_type_lists += 1,
                     'k' => if mode_set { req_args += 1 },
                     'l' => if mode_set { req_args += 1 },
+                    'o' => req_args += 1,
                     _ => (),
                 };
             });
             if many_param_type_lists > 1 {
-                return Err(e);
+                return Err(e2);
             }
             if let Some(args) = mode_args {
                 if args.len() < req_args {
-                    return Err(e);
+                    return Err(e2);
                 }
             } else if req_args != 0 {
-                return Err(e);
+                return Err(e2);
             }
             Ok(())
         } else { // if empty
@@ -911,7 +916,8 @@ impl<'a> Command<'a> {
             MODE{ target, modestring, mode_args } => {
                 if validate_channel(target).is_ok() {
                     validate_channelmodes(modestring, mode_args,
-                        WrongParameter(MODEId, 1))
+                        WrongParameter(MODEId, 1),
+                        WrongModeArguments(MODEId))
                 } else if validate_username(target).is_ok() {
                     validate_usermodes(modestring, mode_args,
                         WrongParameter(MODEId, 1))
@@ -2543,6 +2549,11 @@ no_external_messages = false
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-I", "*@192.168.1.3", "*.fixers.com" ] })
                     .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+b"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+b" ] })
+                    .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+l"),
             mode_args: Some(vec![ "123" ]) }),
             Command::from_message(&Message{ source: None, command: "MODE",
@@ -2568,6 +2579,34 @@ no_external_messages = false
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-bl+i", "*@192.168.0.1" ] })
                     .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+o"),
+            mode_args: Some(vec![ "barry" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+o", "barry" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-o"),
+            mode_args: Some(vec![ "barry" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-o", "barry" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "andy", modestring: None, mode_args: None }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "andy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong mode arguments in command 'MODE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+l" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong mode arguments in command 'MODE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+k" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong mode arguments in command 'MODE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+o" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong mode arguments in command 'MODE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-o" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'MODE' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![] }).map_err(|e| e.to_string()));
     }
     
     #[test]
