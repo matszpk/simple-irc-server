@@ -468,7 +468,7 @@ enum Command<'a> {
     PRIVMSG{ targets: Vec<&'a str>, text: &'a str },
     NOTICE{ targets: Vec<&'a str>, text: &'a str },
     WHO{ mask: &'a str },
-    WHOIS{ target: Option<&'a str>, nickmask: &'a str },
+    WHOIS{ target: Option<&'a str>, nickmasks: Vec<&'a str> },
     WHOWAS{ nickname: &'a str, count: Option<usize>, server: Option<&'a str> },
     KILL{ nickname: &'a str, comment: &'a str },
     REHASH{ },
@@ -778,9 +778,10 @@ impl<'a> Command<'a> {
                 if message.params.len() >= 1 {
                     if message.params.len() >= 2 {
                        Ok(WHOIS{ target: Some(message.params[0]),
-                            nickmask: message.params[1] })
+                            nickmasks: message.params[1].split(',').collect::<Vec<_>>() })
                     } else {
-                        Ok(WHOIS{ target: None, nickmask: message.params[0] })
+                        Ok(WHOIS{ target: None, nickmasks:
+                            message.params[0].split(',').collect::<Vec<_>>() })
                     }
                 } else {
                     Err(NeedMoreParams(WHOISId)) }
@@ -798,7 +799,7 @@ impl<'a> Command<'a> {
                         Ok(c) => Ok(WHOWAS{ nickname, count: c, server })
                     }
                 } else {
-                    Err(NeedMoreParams(WHOISId)) }
+                    Err(NeedMoreParams(WHOWASId)) }
             }
             "KILL" => {
                 if message.params.len() >= 2 {
@@ -821,8 +822,7 @@ impl<'a> Command<'a> {
             }
             "USERHOST" => {
                 if message.params.len() >= 1 {
-                    Ok(USERHOST{ nicknames: message.params[0]
-                            .split(',').collect::<Vec<_>>() })
+                    Ok(USERHOST{ nicknames: message.params.clone() })
                 } else {
                     Err(NeedMoreParams(USERHOSTId)) }
             }
@@ -975,19 +975,18 @@ impl<'a> Command<'a> {
                     validate_channel(n)))
                     .map_err(|_| WrongParameter(NOTICEId, 0)) }
             //WHO{ mask } => { Ok(()) }
-            WHOIS{ target, nickmask } => {
+            WHOIS{ target, nickmasks } => {
                 let next_param_idx = if let Some(t) = target {
                     validate_server(t, WrongParameter(WHOISId, 0))?;
                     1
                 } else { 0 };
-                validate_username(nickmask)
-                    .map_err(|_| WrongParameter(WHOISId,
-                        next_param_idx))
+                nickmasks.iter().try_for_each(|n| validate_username(n))
+                    .map_err(|_| WrongParameter(WHOISId, next_param_idx))
             }
             WHOWAS{ nickname, count, server } => {
-                validate_username(nickname).map_err(|_| WrongParameter(WHOWASId, 1))?;
+                validate_username(nickname).map_err(|_| WrongParameter(WHOWASId, 0))?;
                 if let Some(s) = server {
-                    validate_server(s, WrongParameter(CONNECTId, 1))?;
+                    validate_server(s, WrongParameter(WHOWASId, 2))?;
                 }
                 Ok(())
             }
@@ -999,8 +998,9 @@ impl<'a> Command<'a> {
                 Ok(())
             }
             USERHOST{ nicknames } => {
-                nicknames.iter().try_for_each(|n| validate_username(n))
-                    .map_err(|_| WrongParameter(USERHOSTId, 0)) }
+                nicknames.iter().enumerate().try_for_each(|(i,n)| validate_username(n)
+                            .map_err(|_| WrongParameter(USERHOSTId, i)))
+            }
             _ => Ok(())
         }
     }
@@ -2732,6 +2732,116 @@ no_external_messages = false
                 params: vec![ "bla*bla" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'WHO' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "WHO",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(WHOIS{ target: None, nickmasks: vec![ "alice", "eliz", "garry" ] }),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![ "alice,eliz,garry" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(WHOIS{ target: Some("coco.net"),
+                nickmasks: vec![ "alice", "eliz", "garry" ] }),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![ "coco.net", "alice,eliz,garry" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'WHOIS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![ "alice,el:iz,garry" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'WHOIS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![ "coconet", "alice,eliz,garry" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'WHOIS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![ "coco.net", "alice,eliz,ga:rry" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'WHOIS' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOIS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(WHOWAS{ nickname: "mat", count: None, server: None }),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(WHOWAS{ nickname: "mat", count: Some(10), server: None }),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat", "10" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(WHOWAS{ nickname: "mat", count: Some(10),
+                server: Some("some.where.net") }),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat", "10", "some.where.net" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'WHOWAS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat:" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'WHOWAS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat", "XX" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 2 in command 'WHOWAS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![ "mat", "10", "somewherenet" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'WHOWAS' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHOWAS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(KILL{ nickname: "bobby", comment: "Killed!" }),
+            Command::from_message(&Message{ source: None, command: "KILL",
+                params: vec![ "bobby", "Killed!" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'KILL'".to_string()),
+            Command::from_message(&Message{ source: None, command: "KILL",
+                params: vec![ "bob:by", "Killed!" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'KILL' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "KILL",
+                params: vec![ "bobby" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(REHASH{}),
+            Command::from_message(&Message{ source: None, command: "REHASH",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(RESTART{}),
+            Command::from_message(&Message{ source: None, command: "RESTART",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(SQUIT{ server: "somewhere.dot.com", comment: "Killed!" }),
+            Command::from_message(&Message{ source: None, command: "SQUIT",
+                params: vec![ "somewhere.dot.com", "Killed!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'SQUIT'".to_string()),
+            Command::from_message(&Message{ source: None, command: "SQUIT",
+                params: vec![ "bobxxx", "Killed!" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'SQUIT' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "SQUIT",
+                params: vec![ "somewhere.dot.com" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(AWAY{ text: None }),
+            Command::from_message(&Message{ source: None, command: "AWAY",
+                params: vec![] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(AWAY{ text: Some("I will make rest") }),
+            Command::from_message(&Message{ source: None, command: "AWAY",
+                params: vec![ "I will make rest" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(USERHOST{ nicknames: vec![ "bobby" ] }),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![ "bobby" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(USERHOST{ nicknames: vec![ "bobby", "jimmy" ] }),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![ "bobby", "jimmy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'USERHOST'".to_string()),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![ "bo:bby", "jimmy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'USERHOST'".to_string()),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![ "bobby", "ji:mmy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 2 in command 'USERHOST'".to_string()),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![ "bobby", "damon", "ji:mmy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'USERHOST' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "USERHOST",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(WALLOPS{ text: "This is some message" }),
+            Command::from_message(&Message{ source: None, command: "WALLOPS",
+                params: vec![ "This is some message" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'WALLOPS' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "WALLOPS",
                 params: vec![] }).map_err(|e| e.to_string()));
     }
     
