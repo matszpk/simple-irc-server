@@ -378,6 +378,7 @@ pub enum CommandId {
     LUSERSId = CommandName{ name: "LUSERS" },
     TIMEId = CommandName{ name: "TIME" },
     STATSId = CommandName{ name: "STATS" },
+    LINKSId = CommandName{ name: "LINKS" },
     HELPId = CommandName{ name: "HELP" },
     INFOId = CommandName{ name: "INFO" },
     MODEId = CommandName{ name: "MODE" },
@@ -385,6 +386,7 @@ pub enum CommandId {
     NOTICEId = CommandName{ name: "NOTICE" },
     WHOId = CommandName{ name: "WHO" },
     WHOISId = CommandName{ name: "WHOIS" },
+    WHOWASId = CommandName{ name: "WHOWAS" },
     KILLId = CommandName{ name: "KILL" },
     REHASHId = CommandName{ name: "REHASH" },
     RESTARTId = CommandName{ name: "RESTART" },
@@ -459,6 +461,7 @@ enum Command<'a> {
     LUSERS{ },
     TIME{ server: Option<&'a str> },
     STATS{ query: char, server: Option<&'a str> },
+    LINKS{ remote_server: Option<&'a str>, server_mask: Option<&'a str> },
     HELP{ subject: &'a str },
     INFO{ },
     MODE{ target: &'a str, modestring: Option<&'a str>, mode_args: Option<Vec<&'a str>> },
@@ -466,6 +469,7 @@ enum Command<'a> {
     NOTICE{ targets: Vec<&'a str>, text: &'a str },
     WHO{ mask: &'a str },
     WHOIS{ target: Option<&'a str>, nickmask: &'a str },
+    WHOWAS{ nickname: &'a str, count: Option<usize>, server: Option<&'a str> },
     KILL{ nickname: &'a str, comment: &'a str },
     REHASH{ },
     RESTART{ },
@@ -721,6 +725,16 @@ impl<'a> Command<'a> {
                 } else {
                     Err(NeedMoreParams(STATSId)) }
             }
+            "LINKS" => {
+                if message.params.len() == 2 {
+                    Ok(LINKS{ remote_server: Some(message.params[0]),
+                        server_mask: Some(message.params[1]) })
+                } else if message.params.len() == 1 {
+                    Ok(LINKS{ remote_server: None,
+                        server_mask: Some(message.params[0]) })
+                } else {
+                    Ok(LINKS{ remote_server: None, server_mask: None }) }
+            }
             "HELP" => {
                 if message.params.len() >= 1 {
                     Ok(HELP{ subject: message.params[0] })
@@ -767,6 +781,21 @@ impl<'a> Command<'a> {
                             nickmask: message.params[1] })
                     } else {
                         Ok(WHOIS{ target: None, nickmask: message.params[0] })
+                    }
+                } else {
+                    Err(NeedMoreParams(WHOISId)) }
+            }
+            "WHOWAS" => {
+                if message.params.len() >= 1 {
+                    let mut param_it = message.params.iter();
+                    let nickname = param_it.next().unwrap();
+                    let count = param_it.next().map(|x| x.parse()).transpose();
+                    let server = param_it.next().map(|x| *x);
+                    match count {
+                        Err(_) => {
+                            Err(WrongParameter(WHOWASId, 1))
+                        }
+                        Ok(c) => Ok(WHOWAS{ nickname, count: c, server })
                     }
                 } else {
                     Err(NeedMoreParams(WHOISId)) }
@@ -916,6 +945,17 @@ impl<'a> Command<'a> {
                 };
                 Ok(())
             }
+            LINKS{ remote_server, server_mask } => {
+                if let Some(s) = remote_server {
+                    validate_server(s, WrongParameter(LINKSId, 0))?;
+                    if let Some(sm) = server_mask {
+                        validate_server_mask(sm, WrongParameter(LINKSId, 1))?;
+                    }
+                } else if let Some(sm) = server_mask {
+                    validate_server_mask(sm, WrongParameter(LINKSId, 0))?;
+                }
+                Ok(())
+            }
             MODE{ target, modestring, mode_args } => {
                 if validate_channel(target).is_ok() {
                     validate_channelmodes(modestring, mode_args,
@@ -943,6 +983,13 @@ impl<'a> Command<'a> {
                 validate_username(nickmask)
                     .map_err(|_| WrongParameter(WHOISId,
                         next_param_idx))
+            }
+            WHOWAS{ nickname, count, server } => {
+                validate_username(nickname).map_err(|_| WrongParameter(WHOWASId, 1))?;
+                if let Some(s) = server {
+                    validate_server(s, WrongParameter(CONNECTId, 1))?;
+                }
+                Ok(())
             }
             KILL{ nickname, comment } => {
                 validate_username(nickname)
@@ -2656,6 +2703,13 @@ no_external_messages = false
             Command::from_message(&Message{ source: None, command: "NOTICE",
                 params: vec![ "#graphics,&musics,jimmy" ] })
                     .map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(WHO{ mask: "bla*bla" }),
+            Command::from_message(&Message{ source: None, command: "WHO",
+                params: vec![ "bla*bla" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'WHO' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "WHO",
+                params: vec![] }).map_err(|e| e.to_string()));
     }
     
     #[test]
