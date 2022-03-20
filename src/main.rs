@@ -2543,6 +2543,29 @@ no_external_messages = false
             Command::from_message(&Message{ source: None, command: "STATS",
                 params: vec![] }).map_err(|e| e.to_string()));
         
+        assert_eq!(Ok(LINKS{ remote_server: None, server_mask: Some("*.gigo.net") }),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![ "*.gigo.net" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(LINKS{ remote_server: Some("first.proxy.net"),
+                server_mask: Some("*.gigo.net") }),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![ "first.proxy.net", "*.gigo.net" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'LINKS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![ "gigonet" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'LINKS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![ "first.proxy.net", "gigonet" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'LINKS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![ "firstproxynet", "*.gigo.net" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(LINKS{ remote_server: None, server_mask: None }),
+            Command::from_message(&Message{ source: None, command: "LINKS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
         assert_eq!(Ok(HELP{ subject: "PING Message" }),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![ "PING Message" ] }).map_err(|e| e.to_string()));
