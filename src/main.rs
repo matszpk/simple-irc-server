@@ -517,7 +517,7 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
             modestring.chars().for_each(|c| {
                 match c {
                     '+' => mode_set = true,
-                    '-' => mode_set = true,
+                    '-' => mode_set = false,
                     'b' => many_param_type_lists += 1,
                     'e' => many_param_type_lists += 1,
                     'I' => many_param_type_lists += 1,
