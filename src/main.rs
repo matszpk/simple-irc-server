@@ -56,7 +56,10 @@ struct Cli {
 }
 
 fn validate_username(username: &str) -> Result<(), ValidationError> {
-    if !username.contains('.') && !username.contains(':') && !username.contains(',') {
+    if username.len() != 0 && (username.as_bytes()[0] == b'#' ||
+            username.as_bytes()[0] == b'&') {
+        Err(ValidationError::new("Username must not have channel prefix."))
+    } else if !username.contains('.') && !username.contains(':') && !username.contains(',') {
         Ok(())
     } else {
         Err(ValidationError::new("Username must not contains '.', ',' or ':'."))
