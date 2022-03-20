@@ -2370,6 +2370,9 @@ no_external_messages = false
         assert_eq!(Ok(MOTD{ target: Some("bubu.com") }),
             Command::from_message(&Message{ source: None, command: "MOTD",
                 params: vec![ "bubu.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(MOTD{ target: Some("*com") }),
+            Command::from_message(&Message{ source: None, command: "MOTD",
+                params: vec![ "*com" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'MOTD'".to_string()),
             Command::from_message(&Message{ source: None, command: "MOTD",
                 params: vec![ "bubucom" ] }).map_err(|e| e.to_string()));
@@ -2380,6 +2383,9 @@ no_external_messages = false
         assert_eq!(Ok(VERSION{ target: Some("bubu.com") }),
             Command::from_message(&Message{ source: None, command: "VERSION",
                 params: vec![ "bubu.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(VERSION{ target: Some("*com") }),
+            Command::from_message(&Message{ source: None, command: "VERSION",
+                params: vec![ "*com" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'VERSION'".to_string()),
             Command::from_message(&Message{ source: None, command: "VERSION",
                 params: vec![ "bubucom" ] }).map_err(|e| e.to_string()));
@@ -2390,6 +2396,9 @@ no_external_messages = false
         assert_eq!(Ok(ADMIN{ target: Some("bubu.com") }),
             Command::from_message(&Message{ source: None, command: "ADMIN",
                 params: vec![ "bubu.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(ADMIN{ target: Some("*com") }),
+            Command::from_message(&Message{ source: None, command: "ADMIN",
+                params: vec![ "*com" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'ADMIN'".to_string()),
             Command::from_message(&Message{ source: None, command: "ADMIN",
                 params: vec![ "bubucom" ] }).map_err(|e| e.to_string()));
