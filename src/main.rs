@@ -111,6 +111,7 @@ struct ChannelModes {
     client_limit: Option<usize>,
     invite_exception: Option<Vec<String>>,
     key: Option<String>,
+    private: bool,
     moderated: bool,
     secret: bool,
     protected_topic: bool,
@@ -489,7 +490,7 @@ fn validate_usermodes<'a, E: Error>(modestring: &Option<&'a str>,
         if modestring.len() != 0 {
             if modestring.find(|c|
                 c!='+' && c!='-' && c!='i' && c!='o' &&
-                    c!='O' && c!='t' && c!='w').is_some() {
+                    c!='O' && c!='r' && c!='w').is_some() {
                 Err(e)
             } else { Ok(()) }
         } else { // if empty
@@ -506,19 +507,22 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
         if modestring.len() != 0 {
             if modestring.find(|c|
                 c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
-                    c!='k' && c!='m' && c!='t' && c!='n').is_some() {
+                    c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p').is_some() {
                 return Err(e);
             }
             // check list
             let mut many_param_type_lists = 0;
             let mut req_args = 0;
+            let mut mode_set = false;
             modestring.chars().for_each(|c| {
                 match c {
+                    '+' => mode_set = true,
+                    '-' => mode_set = true,
                     'b' => many_param_type_lists += 1,
                     'e' => many_param_type_lists += 1,
                     'I' => many_param_type_lists += 1,
-                    'k' => req_args += 1,
-                    'l' => req_args += 1,
+                    'k' => if mode_set { req_args += 1 },
+                    'l' => if mode_set { req_args += 1 },
                     _ => (),
                 };
             });
@@ -1003,7 +1007,7 @@ enum Reply<'a> {
     RplwhoIsIdle317{ client: &'a str, nick: &'a str, secs: u64, signon: u64 },
     RplEndOfWhoIs318{ client: &'a str, nick: &'a str },
     RplWhoIsChannels319{ client: &'a str, nick: &'a str,
-            channels: &'a [WhoIsChannelStruct<'a>] }, 
+            channels: &'a [WhoIsChannelStruct<'a>] },
     RplWhoIsSpecial320{ client: &'a str, nick: &'a str, special_info: &'a str },
     RplListStart321{ client: &'a str },
     RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
@@ -1529,6 +1533,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -1548,6 +1553,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -1590,7 +1596,7 @@ no_external_messages = false
                         invite_exception: None,
                         client_limit: None,
                         moderated: false, secret: false, protected_topic: false,
-                        no_external_messages: false },
+                        private: false, no_external_messages: false },
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
@@ -1603,7 +1609,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ]),
                         client_limit: Some(200),
                         moderated: true, secret: false, protected_topic: true,
-                        no_external_messages: false },
+                        private: false, no_external_messages: false },
                 },
             ]),
         }), result);
@@ -1654,7 +1660,7 @@ no_external_messages = false
                         invite_exception: None,
                         client_limit: None,
                         moderated: false, secret: false, protected_topic: false,
-                        no_external_messages: false },
+                        private: false, no_external_messages: false },
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
@@ -1667,7 +1673,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ]),
                         client_limit: Some(200),
                         moderated: true, secret: false, protected_topic: true,
-                        no_external_messages: false },
+                        private: false, no_external_messages: false },
                 },
             ]),
         }), result);
@@ -1712,6 +1718,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = true
 protected_topic = false
 no_external_messages = false
 
@@ -1721,6 +1728,7 @@ topic = "Some topic 2"
 [channels.modes]
 moderated = true
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -1756,7 +1764,7 @@ no_external_messages = false
                         invite_exception: None,
                         client_limit: None,
                         moderated: false, secret: false, protected_topic: false,
-                        no_external_messages: false },
+                        private: true, no_external_messages: false },
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
@@ -1767,7 +1775,7 @@ no_external_messages = false
                         invite_exception: None,
                         client_limit: None,
                         moderated: true, secret: false, protected_topic: true,
-                        no_external_messages: false },
+                        private: false, no_external_messages: false },
                 },
             ]),
         }), result);
@@ -1812,6 +1820,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -1831,6 +1840,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -1880,6 +1890,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -1899,6 +1910,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -1945,6 +1957,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -1964,6 +1977,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -2010,6 +2024,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -2029,6 +2044,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -2076,6 +2092,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+private = false
 protected_topic = false
 no_external_messages = false
 
@@ -2095,6 +2112,7 @@ invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
 client_limit = 200
 secret = false
+private = false
 protected_topic = true
 no_external_messages = false
 "##).unwrap();
@@ -2479,6 +2497,18 @@ no_external_messages = false
         assert_eq!(Ok(INFO{}),
             Command::from_message(&Message{ source: None, command: "INFO",
                 params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(MODE{ target: "andy", modestring: Some("+ow"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "andy", "+ow" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "andy", modestring: Some("+oOr-iw"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "andy", "+oOr-iw" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "teddy", "+otOr" ] }).map_err(|e| e.to_string()));
     }
     
     #[test]
