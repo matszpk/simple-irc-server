@@ -853,7 +853,10 @@ impl<'a> Command<'a> {
             }
             INVITE{ nickname, channel } => {
                 validate_username(nickname)
-                    .map_err(|_| WrongParameter(INVITEId, 0)) }
+                    .map_err(|_| WrongParameter(INVITEId, 0))?;
+                validate_channel(channel)
+                    .map_err(|_| WrongParameter(INVITEId, 1))
+                }
             KICK{ channel, user, comment } => {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(KICKId, 0))?;
@@ -2329,6 +2332,19 @@ no_external_messages = false
         assert_eq!(Err("Command 'LIST' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "LIST",
                 params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(INVITE{ nickname: "greg", channel: "#plants" }),
+            Command::from_message(&Message{ source: None, command: "INVITE",
+                params: vec![ "greg", "#plants" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'INVITE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "INVITE",
+                params: vec![ "gr:eg", "#plants" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'INVITE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "INVITE",
+                params: vec![ "greg", "_plants" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'INVITE' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "INVITE",
+                params: vec![ "greg" ] }).map_err(|e| e.to_string()));
     }
     
     #[test]
