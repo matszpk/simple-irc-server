@@ -933,7 +933,7 @@ impl<'a> Command<'a> {
             NOTICE{ targets, text } => {
                 targets.iter().try_for_each(|n| validate_username(n).or(
                     validate_channel(n)))
-                    .map_err(|_| WrongParameter(PRIVMSGId, 0)) }
+                    .map_err(|_| WrongParameter(NOTICEId, 0)) }
             //WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmask } => {
                 let next_param_idx = if let Some(t) = target {
@@ -2610,6 +2610,52 @@ no_external_messages = false
         assert_eq!(Err("Command 'MODE' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "bobby", "andy" ], text: "Hello, guys" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "bobby,andy" , "Hello, guys" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "#graphics", "&musics" ],
+                text: "Hello, guys" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "#graphics,&musics" , "Hello, guys" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "#graphics", "&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "#graphics,&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'PRIVMSG'".to_string()),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "#graphics,&musics,ji.mmy", "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'PRIVMSG' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "#graphics,&musics,jimmy" ] })
+                    .map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(NOTICE{ targets: vec![ "bobby", "andy" ], text: "Hello, guys" }),
+            Command::from_message(&Message{ source: None, command: "NOTICE",
+                params: vec![ "bobby,andy" , "Hello, guys" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(NOTICE{ targets: vec![ "#graphics", "&musics" ],
+                text: "Hello, guys" }),
+            Command::from_message(&Message{ source: None, command: "NOTICE",
+                params: vec![ "#graphics,&musics" , "Hello, guys" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(NOTICE{ targets: vec![ "#graphics", "&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "NOTICE",
+                params: vec![ "#graphics,&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'NOTICE'".to_string()),
+            Command::from_message(&Message{ source: None, command: "NOTICE",
+                params: vec![ "#graphics,&musics,ji.mmy", "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'NOTICE' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "NOTICE",
+                params: vec![ "#graphics,&musics,jimmy" ] })
+                    .map_err(|e| e.to_string()));
     }
     
     #[test]
