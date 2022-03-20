@@ -2402,6 +2402,83 @@ no_external_messages = false
         assert_eq!(Err("Wrong parameter 0 in command 'ADMIN'".to_string()),
             Command::from_message(&Message{ source: None, command: "ADMIN",
                 params: vec![ "bubucom" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(CONNECT{ target_server: "chat.purple.com", port: None,
+            remote_server: None }),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chat.purple.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CONNECT{ target_server: "chat.purple.com", port: Some(6670),
+            remote_server: None }),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chat.purple.com", "6670" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CONNECT{ target_server: "chat.purple.com", port: Some(6670),
+            remote_server: Some("chat.broker.com") }),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chat.purple.com", "6670", "chat.broker.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'CONNECT'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chatpurplecom" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'CONNECT'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chat.purple.com", "xxxaa" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'CONNECT'".to_string()),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![ "chat.purple.com", "6670", "chatbrokercom" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'CONNECT' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "CONNECT",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(LUSERS{}),
+            Command::from_message(&Message{ source: None, command: "LUSERS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(TIME{ server: None }),
+            Command::from_message(&Message{ source: None, command: "TIME",
+                params: vec![] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(TIME{ server: Some("bubu.com") }),
+            Command::from_message(&Message{ source: None, command: "TIME",
+                params: vec![ "bubu.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'TIME'".to_string()),
+            Command::from_message(&Message{ source: None, command: "TIME",
+                params: vec![ "*com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'TIME'".to_string()),
+            Command::from_message(&Message{ source: None, command: "TIME",
+                params: vec![ "bubucom" ] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(STATS{ query: 'c', server: None }),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "c" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(STATS{ query: 'l', server: None }),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "l" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(STATS{ query: 'o', server: None }),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "o" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(STATS{ query: 'o', server: Some("chat.fruits.com") }),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "o", "chat.fruits.com" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 0 in command 'STATS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "z" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'STATS'".to_string()),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![ "o", "chatfruitscom" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'STATS' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "STATS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(HELP{ subject: "PING Message" }),
+            Command::from_message(&Message{ source: None, command: "HELP",
+                params: vec![ "PING Message" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'HELP' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "HELP",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(INFO{}),
+            Command::from_message(&Message{ source: None, command: "INFO",
+                params: vec![] }).map_err(|e| e.to_string()));
     }
     
     #[test]
