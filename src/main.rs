@@ -909,11 +909,11 @@ impl<'a> Command<'a> {
                 Ok(())
             }
             MODE{ target, modestring, mode_args } => {
-                if validate_username(target).is_ok() {
-                    validate_usermodes(modestring, mode_args,
-                        WrongParameter(MODEId, 1))
-                } else if validate_channel(target).is_ok() {
+                if validate_channel(target).is_ok() {
                     validate_channelmodes(modestring, mode_args,
+                        WrongParameter(MODEId, 1))
+                } else if validate_username(target).is_ok() {
+                    validate_usermodes(modestring, mode_args,
                         WrongParameter(MODEId, 1))
                 } else { Err(WrongParameter(MODEId, 0)) }
             }
@@ -2509,6 +2509,10 @@ no_external_messages = false
         assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "teddy", "+otOr" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+ntpsm"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+ntpsm" ] }).map_err(|e| e.to_string()));
     }
     
     #[test]
