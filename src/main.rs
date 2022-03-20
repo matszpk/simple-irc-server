@@ -2513,6 +2513,61 @@ no_external_messages = false
             mode_args: Some(vec![]) }),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+ntpsm" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+b"),
+            mode_args: Some(vec![ "*@192.168.1.7", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+b", "*@192.168.1.7", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-b"),
+            mode_args: Some(vec![ "*@192.168.1.3", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-b", "*@192.168.1.3", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+e"),
+            mode_args: Some(vec![ "*@192.168.1.7", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+e", "*@192.168.1.7", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-e"),
+            mode_args: Some(vec![ "*@192.168.1.3", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-e", "*@192.168.1.3", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+I"),
+            mode_args: Some(vec![ "*@192.168.1.7", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+I", "*@192.168.1.7", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-I"),
+            mode_args: Some(vec![ "*@192.168.1.3", "*.fixers.com" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-I", "*@192.168.1.3", "*.fixers.com" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+l"),
+            mode_args: Some(vec![ "123" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+l", "123" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-l"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-l" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("+k"),
+            mode_args: Some(vec![ "secretpassword" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "+k", "secretpassword" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-k"),
+            mode_args: Some(vec![]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-k" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#chasis", modestring: Some("-bl+i"),
+            mode_args: Some(vec![ "*@192.168.0.1" ]) }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#chasis", "-bl+i", "*@192.168.0.1" ] })
+                    .map_err(|e| e.to_string()));
     }
     
     #[test]
