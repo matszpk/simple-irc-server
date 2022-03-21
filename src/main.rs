@@ -535,8 +535,14 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
                     'b' => many_param_type_lists += 1,
                     'e' => many_param_type_lists += 1,
                     'I' => many_param_type_lists += 1,
-                    'k'|'l' => if mode_set { req_args += 1 },
-                    'o'|'v'|'h' => req_args += 1,
+                    'k'|'l' => if mode_set {
+                        req_args += 1;
+                        many_param_type_lists += 1;
+                    },
+                    'o'|'v'|'h' => {
+                        req_args += 1;
+                        many_param_type_lists += 1;
+                    }
                     _ => (),
                 };
             });
@@ -546,6 +552,31 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
             if let Some(args) = mode_args {
                 if args.len() < req_args {
                     return Err(e2);
+                }
+                
+                // validate arguments
+                let mut arg_it = args.iter();
+                let mut cit = modestring.chars();
+                mode_set = false;
+                while let Some(c) = cit.next() {
+                    match c {
+                        '+' => mode_set = true,
+                        '-' => mode_set = false,
+                        'l' => {
+                            if mode_set { 
+                                if let Err(_) = arg_it.next().unwrap()
+                                            .parse::<usize>() {
+                                    return Err(e2);
+                                }
+                            }
+                        }
+                        'k' => if mode_set { arg_it.next().unwrap(); },
+                        'o'|'v'|'h' => 
+                            if validate_username(arg_it.next().unwrap()).is_err() {
+                                return Err(e2);
+                            }
+                        _ => ()
+                    };
                 }
             } else if req_args != 0 {
                 return Err(e2);
