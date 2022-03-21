@@ -205,8 +205,19 @@ impl MainConfig {
             }
             if let Err(e) = config.validate() {
                 Err(Box::new(e))
-            } else { Ok(config) }
+            } else if !config.validate_nicknames() {
+                Err(Box::new(clap::error::Error::raw(clap::ErrorKind::ValueValidation,
+                        "Wrong nikname lengths")))
+            } else {
+                Ok(config)
+            }
         }
+    }
+    
+    fn validate_nicknames(&self) -> bool {
+        if let Some(ref users) = self.users {
+            users.iter().find(|u| u.nick.len() > self.max_nickname_len).is_none()
+        } else { true }
     }
 }
 
