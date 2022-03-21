@@ -437,7 +437,7 @@ impl Error for CommandError {
 
 #[derive(PartialEq, Eq, Debug)]
 enum CapCommand {
-    LS, LIST, REQ,
+    LS, LIST, REQ, END
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -569,6 +569,7 @@ impl<'a> Command<'a> {
                         "LS" => CapCommand::LS,
                         "LIST" => CapCommand::LIST,
                         "REQ" => CapCommand::REQ,
+                        "END" => CapCommand::END,
                         _ => return Err(UnknownSubcommand(
                                     CAPId, message.params[0].to_string()))
                     };
@@ -2255,6 +2256,9 @@ no_external_messages = false
             caps: Some(vec!["multi-prefix", "tls"]) }),
             Command::from_message(&Message{ source: None, command: "CAP",
                 params: vec![ "REQ", "multi-prefix tls" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::END, caps: None, version: None }),
+            Command::from_message(&Message{ source: None, command: "CAP",
+                params: vec![ "END" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 1 in command 'CAP'".to_string()),
             Command::from_message(&Message{ source: None, command: "CAP",
                 params: vec![ "REQ", "multi-prefix tlsx" ] }).map_err(|e| e.to_string()));
