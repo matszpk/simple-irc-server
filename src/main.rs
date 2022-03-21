@@ -518,7 +518,7 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
             if modestring.find(|c|
                 c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
                     c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p' && c!='o' &&
-                    c!='v').is_some() {
+                    c!='v' && c!='h').is_some() {
                 return Err(e);
             }
             // check list
@@ -533,7 +533,7 @@ fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
                     'e' => many_param_type_lists += 1,
                     'I' => many_param_type_lists += 1,
                     'k'|'l' => if mode_set { req_args += 1 },
-                    'o'|'v' => req_args += 1,
+                    'o'|'v'|'h' => req_args += 1,
                     _ => (),
                 };
             });
