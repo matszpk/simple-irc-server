@@ -239,6 +239,24 @@ fn validate_server_mask<E: Error>(s: &str, e: E) -> Result<(), E>  {
     else { Err(e) }
 }
 
+pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result<(), E> {
+    if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') {
+        let cfirst = channel.as_bytes()[0];
+        if channel.len() >= 3 && cfirst==b'&' && (
+            channel.as_bytes()[1] == b'&' || channel.as_bytes()[1] == b'#') {
+            return Ok(());  // protected prefix
+        }
+        let channel = if cfirst == b'~' || cfirst == b'@' || cfirst == b'%' ||
+                    cfirst == b'+' {
+            &channel[1..]
+        } else { channel };
+        let cfirst = channel.as_bytes()[0];
+        if (cfirst == b'#' || cfirst == b'&') {
+            Ok(())
+        } else { Err(e) }
+    } else { Err(e) }
+}
+
 fn validate_usermodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                 -> Result<(), CommandError> {
     let mut param_idx = 1;
@@ -769,13 +787,13 @@ impl<'a> Command<'a> {
                 } else { Err(WrongParameter(MODEId, 0)) }
             }
             PRIVMSG{ targets, text } => {
-                targets.iter().try_for_each(|n| validate_username(n).or(
-                    validate_channel(n)))
-                    .map_err(|_| WrongParameter(PRIVMSGId, 0)) }
+                targets.iter().try_for_each(|n| validate_username(n)
+                    .map_err(|_| WrongParameter(PRIVMSGId, 0)).or(
+                    validate_prefixed_channel(n, WrongParameter(PRIVMSGId, 0)))) }
             NOTICE{ targets, text } => {
-                targets.iter().try_for_each(|n| validate_username(n).or(
-                    validate_channel(n)))
-                    .map_err(|_| WrongParameter(NOTICEId, 0)) }
+                 targets.iter().try_for_each(|n| validate_username(n)
+                    .map_err(|_| WrongParameter(NOTICEId, 0)).or(
+                    validate_prefixed_channel(n, WrongParameter(NOTICEId, 0)))) }
             //WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmasks } => {
                 let next_param_idx = if let Some(t) = target {
@@ -1349,6 +1367,21 @@ mod test {
                 text: "Hello, cruel world!" }),
             Command::from_message(&Message{ source: None, command: "PRIVMSG",
                 params: vec![ "#graphics,&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "%#graphics", "~&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "%#graphics,~&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "@#graphics", "&&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "@#graphics,&&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "+#graphics", "+&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "+#graphics,+&musics,jimmy" , "Hello, cruel world!" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'PRIVMSG'".to_string()),
             Command::from_message(&Message{ source: None, command: "PRIVMSG",
