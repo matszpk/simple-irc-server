@@ -292,7 +292,6 @@ fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
             })?;
             param_idx += 1;
             
-            let mode_set = ms.bytes().rfind(|c| *c==b'+' || *c==b'-').unwrap() == b'+';
             if margs.len() != 0 {
                 match last_char {
                     // operator, half-op, voice
