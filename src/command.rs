@@ -268,19 +268,35 @@ fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
         if ms.len() != 0 {
-            if ms.find(|c|
-                c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
-                    c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p' && c!='o' &&
-                    c!='v' && c!='h').is_some() {
-                return Err(WrongParameter(MODEId, param_idx));
+            // check characters except last character
+            let mut char_count = 0;
+            let mut last_char = ' ';
+            let mut chars_it = ms.chars();
+            while let Some(c) = chars_it.next() {
+                last_char = c;
+                char_count += 1;
             }
+            
+            let mut mode_set = false;
+            ms.chars().take(char_count-1).try_for_each(|c| {
+                if c!='+' && c!='-' && c!='b' && c!='e' && c!='i' && c!='I' &&
+                    c!='m' && c!='t' && c!='n' && c!='s' && c!='p' {
+                    return Err(WrongParameter(MODEId, param_idx));
+                }
+                if (c=='k' || c=='l') && mode_set {
+                    return Err(WrongParameter(MODEId, param_idx));
+                }
+                if c!='+' { mode_set = true; }
+                else if c!='-' { mode_set = false; }
+                Ok(())
+            })?;
             param_idx += 1;
             
             let mode_set = ms.bytes().rfind(|c| *c==b'+' || *c==b'-').unwrap() == b'+';
             if margs.len() != 0 {
-                match ms.bytes().last().unwrap() {
+                match last_char {
                     // operator, half-op, voice
-                    b'o'|b'h'|b'v' => {
+                    'o'|'h'|'v' => {
                         if margs.len() == 1 && validate_username(margs[0]).is_ok() {
                             param_idx += 1;
                         } else {
@@ -288,7 +304,7 @@ fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                         }
                     }
                     // limit
-                    b'l' => {
+                    'l' => {
                         if mode_set {
                             if margs.len() == 1 {
                                 if margs[0].parse::<usize>().is_err() {
@@ -303,7 +319,7 @@ fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                         }
                     }
                     // key
-                    b'k' => {
+                    'k' => {
                         if mode_set {
                             if margs.len() != 1 {
                                 return Err(WrongParameter(MODEId, param_idx));
@@ -314,16 +330,16 @@ fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                         }
                     }
                     // lists
-                    b'b'|b'e'|b'I' => { param_idx += margs.len(); }
+                    'b'|'e'|'I' => { param_idx += margs.len(); }
                     _ => { return Err(WrongParameter(MODEId, param_idx)); }
                 }
             } else {
-                match ms.bytes().last().unwrap() {
-                    b'l'|b'k' => {
+                match last_char {
+                    'l'|'k' => {
                         if mode_set { return Err(WrongParameter(MODEId, param_idx)); }
                     }
-                    b'o'|b'h'|b'v' => { return Err(WrongParameter(MODEId, param_idx)); }
-                    _ => { }
+                    'b'|'e'|'i'|'I'|'m'|'t'|'n'|'s'|'p' => { }
+                    _ => { return Err(WrongParameter(MODEId, param_idx)); }
                 }
             }
             
