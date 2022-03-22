@@ -215,7 +215,7 @@ enum Command<'a> {
     LINKS{ remote_server: Option<&'a str>, server_mask: Option<&'a str> },
     HELP{ subject: &'a str },
     INFO{ },
-    MODE{ target: &'a str, modestring: Option<&'a str>, mode_args: Option<Vec<&'a str>> },
+    MODE{ target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)> },
     PRIVMSG{ targets: Vec<&'a str>, text: &'a str },
     NOTICE{ targets: Vec<&'a str>, text: &'a str },
     WHO{ mask: &'a str },
@@ -242,100 +242,96 @@ fn validate_server_mask<E: Error>(s: &str, e: E) -> Result<(), E>  {
     else { Err(e) }
 }
 
-fn validate_usermodes<'a, E: Error>(modestring: &Option<&'a str>,
-                    mode_args: &Option<Vec<&'a str>>, e: E) -> Result<(), E> {
-    if let Some(modestring) = modestring {
-        if let Some(args) = mode_args {
-            if args.len() != 0 { return Err(e); }
-        }
-        if modestring.len() != 0 {
-            if modestring.find(|c|
+fn validate_usermodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
+                -> Result<(), CommandError> {
+    let mut param_idx = 1;
+    modes.iter().try_for_each(|(ms, margs)| {
+        if ms.len() != 0 {
+            if ms.find(|c|
                 c!='+' && c!='-' && c!='i' && c!='o' &&
                     c!='O' && c!='r' && c!='w').is_some() {
-                Err(e)
-            } else { Ok(()) }
+                Err(WrongParameter(MODEId, param_idx))
+            } else if margs.len() != 0 {
+                Err(WrongParameter(MODEId, param_idx))
+            } else {
+                param_idx += 1;
+                Ok(())
+            }
         } else { // if empty
-            Err(e)
+            Err(WrongParameter(MODEId, param_idx))
         }
-    } else {
-        Ok(())
-    }
+    })
 }
 
-fn validate_channelmodes<'a, E: Error>(modestring: &Option<&'a str>,
-                    mode_args: &Option<Vec<&'a str>>, e: E, e2: E) -> Result<(), E> {
-    if let Some(modestring) = modestring {
-        if modestring.len() != 0 {
-            if modestring.find(|c|
+fn validate_channelmodes<'a, E: Error>(modes: &Vec<(&'a str, Vec<&'a str>)>)
+                -> Result<(), CommandError> {
+    let mut param_idx = 1;
+    modes.iter().try_for_each(|(ms, margs)| {
+        if ms.len() != 0 {
+            if ms.find(|c|
                 c!='+' && c!='-' && c!='b' && c!='e' && c!='l' && c!='i' && c!='I' &&
                     c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p' && c!='o' &&
                     c!='v' && c!='h').is_some() {
-                return Err(e);
+                return Err(WrongParameter(MODEId, param_idx));
             }
-            // check list
-            let mut many_param_type_lists = 0;
-            let mut req_args = 0;
-            let mut mode_set = false;
-            modestring.chars().for_each(|c| {
-                match c {
-                    '+' => mode_set = true,
-                    '-' => mode_set = false,
-                    'b' => many_param_type_lists += 1,
-                    'e' => many_param_type_lists += 1,
-                    'I' => many_param_type_lists += 1,
-                    'k'|'l' => if mode_set {
-                        req_args += 1;
-                        many_param_type_lists += 1;
-                    },
-                    'o'|'v'|'h' => {
-                        req_args += 1;
-                        many_param_type_lists += 1;
-                    }
-                    _ => (),
-                };
-            });
-            if many_param_type_lists > 1 {
-                return Err(e2);
-            }
-            if let Some(args) = mode_args {
-                if args.len() < req_args {
-                    return Err(e2);
-                }
-                
-                // validate arguments
-                let mut arg_it = args.iter();
-                let mut cit = modestring.chars();
-                mode_set = false;
-                while let Some(c) = cit.next() {
-                    match c {
-                        '+' => mode_set = true,
-                        '-' => mode_set = false,
-                        'l' => {
-                            if mode_set { 
-                                if let Err(_) = arg_it.next().unwrap()
-                                            .parse::<usize>() {
-                                    return Err(e2);
-                                }
-                            }
+            param_idx += 1;
+            
+            let mode_set = ms.bytes().rfind(|c| *c==b'+' || *c==b'-').unwrap() == b'+';
+            if margs.len() != 0 {
+                match ms.bytes().last().unwrap() {
+                    // operator, half-op, voice
+                    b'o'|b'h'|b'v' => {
+                        if margs.len() == 1 && validate_username(margs[0]).is_ok() {
+                            param_idx += 1;
+                        } else {
+                            return Err(WrongParameter(MODEId, param_idx));
                         }
-                        'k' => if mode_set { arg_it.next().unwrap(); },
-                        'o'|'v'|'h' => 
-                            if validate_username(arg_it.next().unwrap()).is_err() {
-                                return Err(e2);
+                    }
+                    // limit
+                    b'l' => {
+                        if mode_set {
+                            if margs.len() == 1 {
+                                if margs[0].parse::<usize>().is_err() {
+                                    return Err(WrongParameter(MODEId, param_idx));
+                                }
+                                param_idx += 1;
+                            } else {
+                                return Err(WrongParameter(MODEId, param_idx));
                             }
-                        _ => ()
-                    };
+                        } else {
+                            return Err(WrongParameter(MODEId, param_idx));
+                        }
+                    }
+                    // key
+                    b'k' => {
+                        if mode_set {
+                            if margs.len() != 1 {
+                                return Err(WrongParameter(MODEId, param_idx));
+                            }
+                            param_idx += 1;
+                        } else {
+                            return Err(WrongParameter(MODEId, param_idx));
+                        }
+                    }
+                    // lists
+                    b'b'|b'e'|b'I' => { param_idx += margs.len(); }
+                    _ => { return Err(WrongParameter(MODEId, param_idx)); }
                 }
-            } else if req_args != 0 {
-                return Err(e2);
+            } else {
+                match ms.bytes().last().unwrap() {
+                    b'l'|b'k' => {
+                        if mode_set { return Err(WrongParameter(MODEId, param_idx)); }
+                    }
+                    b'o'|b'h'|b'v' => { return Err(WrongParameter(MODEId, param_idx)); }
+                    _ => { }
+                }
             }
+            
             Ok(())
         } else { // if empty
-            Err(e)
+            Err(WrongParameter(MODEId, param_idx))
         }
-    } else {
-        Ok(())
-    }
+    })
 }
 
 impl<'a> Command<'a> {
@@ -526,13 +522,30 @@ impl<'a> Command<'a> {
             "INFO" => Ok(INFO{}),
             "MODE" => {
                 if message.params.len() >= 1 {
+                    let mut modes = vec![];
                     let mut param_it = message.params.iter();
                     let target = param_it.next().unwrap();
-                    let modestring = param_it.next().map(|x| *x);
-                    let mode_args = if modestring.is_some() {
-                        Some(param_it.map(|x| *x).collect::<Vec<_>>())
-                    } else { None };
-                    Ok(MODE{ target, modestring, mode_args })
+                    if let Some(s) = param_it.next() {
+                        if s.starts_with("+") || s.starts_with("-") {
+                            
+                            let mut modestring = *s;
+                            let mut mode_args = vec![];
+                            while let Some(s) = param_it.next() {
+                                if s.starts_with("+") || s.starts_with("-") {
+                                    modes.push((modestring, mode_args));
+                                    modestring = *s;
+                                    mode_args = vec![];
+                                } else {
+                                    mode_args.push(*s);
+                                }
+                            }
+                            modes.push((modestring, mode_args));
+                            
+                        } else {
+                            return Err(WrongParameter(MODEId, 1));
+                        }
+                    }
+                    Ok(MODE{ target, modes })
                 } else {
                     Err(NeedMoreParams(MODEId)) }
             }
@@ -738,15 +751,16 @@ impl<'a> Command<'a> {
                 }
                 Ok(())
             }
-            MODE{ target, modestring, mode_args } => {
-                if validate_channel(target).is_ok() {
+            MODE{ target, modes } => {
+                /*if validate_channel(target).is_ok() {
                     validate_channelmodes(modestring, mode_args,
                         WrongParameter(MODEId, 1),
                         WrongModeArguments(MODEId))
                 } else if validate_username(target).is_ok() {
                     validate_usermodes(modestring, mode_args,
                         WrongParameter(MODEId, 1))
-                } else { Err(WrongParameter(MODEId, 0)) }
+                } else { Err(WrongParameter(MODEId, 0)) }*/
+                Ok(())
             }
             PRIVMSG{ targets, text } => {
                 targets.iter().try_for_each(|n| validate_username(n).or(
@@ -1178,7 +1192,7 @@ mod test {
             Command::from_message(&Message{ source: None, command: "INFO",
                 params: vec![] }).map_err(|e| e.to_string()));
         
-        assert_eq!(Ok(MODE{ target: "andy", modestring: Some("+ow"),
+        /*assert_eq!(Ok(MODE{ target: "andy", modestring: Some("+ow"),
             mode_args: Some(vec![]) }),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "andy", "+ow" ] }).map_err(|e| e.to_string()));
@@ -1296,7 +1310,7 @@ mod test {
                 params: vec![ "#chasis", "-v" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'MODE' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![] }).map_err(|e| e.to_string()));
+                params: vec![] }).map_err(|e| e.to_string()));*/
         
         assert_eq!(Ok(PRIVMSG{ targets: vec![ "bobby", "andy" ], text: "Hello, guys" }),
             Command::from_message(&Message{ source: None, command: "PRIVMSG",
