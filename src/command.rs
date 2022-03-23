@@ -251,7 +251,7 @@ pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result
             &channel[1..]
         } else { channel };
         let cfirst = channel.as_bytes()[0];
-        if (cfirst == b'#' || cfirst == b'&') {
+        if cfirst == b'#' || cfirst == b'&' {
             Ok(())
         } else { Err(e) }
     } else { Err(e) }
