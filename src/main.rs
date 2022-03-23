@@ -80,7 +80,7 @@ struct User {
     modes: UserModes,
     ip_addr: IpAddr,
     hostname: String,
-    output: Framed<TcpStream, LinesCodec>,
+    stream: Framed<TcpStream, IRCLinesCodec>,
 }
 
 enum OperatorType {
