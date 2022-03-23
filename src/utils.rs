@@ -313,4 +313,19 @@ mod test {
         assert_eq!(false, validate_prefixed_channel("*&ala",
                 WrongParameter(PINGId, 0)).is_ok());
     }
+    
+    #[test]
+    fn test_validate_usermodes() {
+        assert_eq!(Ok(()), validate_usermodes(&vec![
+            ("+io-rw", vec![]), ("-O", vec![])]).map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_usermodes(&vec![
+            ("+io", vec![]), ("-rO", vec![]), ("-w", vec![])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+            validate_usermodes(&vec![("+io-rw", vec!["xx"]),
+                    ("-O", vec![])]).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+            validate_usermodes(&vec![
+                ("+io-rw", vec![]), ("-x", vec![])]).map_err(|e| e.to_string()));
+    }
 }
