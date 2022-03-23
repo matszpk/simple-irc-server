@@ -328,4 +328,45 @@ mod test {
             validate_usermodes(&vec![
                 ("+io-rw", vec![]), ("-x", vec![])]).map_err(|e| e.to_string()));
     }
+    
+    #[test]
+    fn test_validate_channelmodes() {
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("+ntp", vec![]), ("-sm", vec![])]).map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("+nltp", vec!["22"]), ("-s+km", vec!["xxyy"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("-nltp", vec![]), ("+s-km", vec![])]).map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("+ot", vec!["barry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("-to", vec!["barry"]), ("+hn", vec!["guru"]), ("-mv", vec!["jerry"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("-tb", vec!["barry", "zero"]), ("+iI", vec!["guru", "daddo"]),
+                ("-es", vec!["eagle", "jerry"])]).map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("+tb", vec!["barry", "zero"]), ("-iI", vec!["guru", "daddo"]),
+                ("+es", vec!["eagle", "jerry"])]).map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+            validate_channelmodes(&vec![("+ntp", vec![]), ("-sum", vec![])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+            validate_channelmodes(&vec![("+nltp", vec![]), ("-s+km", vec!["xxyy"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 6 in command 'MODE'".to_string()),
+            validate_channelmodes(&vec![
+                ("+ot", vec!["barry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jer:ry"])])
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 4 in command 'MODE'".to_string()),
+            validate_channelmodes(&vec![
+                ("+ot", vec!["barry"]), ("-nh", vec!["gu:ru"]), ("+vm", vec!["jerry"])])
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+            validate_channelmodes(&vec![
+                ("+ot", vec!["b,arry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
+                    .map_err(|e| e.to_string()));
+    }
 }
