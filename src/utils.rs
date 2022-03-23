@@ -211,3 +211,106 @@ pub(crate) fn validate_channelmodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
         }
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    #[test]
+    fn test_irc_lines_codec() {
+        let mut codec = IRCLinesCodec::new();
+        let mut buf = BytesMut::new();
+        codec.encode("my line", &mut buf).unwrap();
+        assert_eq!("my line\r\n".as_bytes(), buf);
+        let mut buf = BytesMut::from("my line 2\n");
+        assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
+                Ok(Some("my line 2".to_string())));
+        assert_eq!(buf, BytesMut::new());
+        let mut buf = BytesMut::from("my line 2\r\n");
+        assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
+                Ok(Some("my line 2".to_string())));
+        assert_eq!(buf, BytesMut::new());
+    }
+    
+    #[test]
+    fn test_validate_username() {
+        assert_eq!(true, validate_username("ala").is_ok());
+        assert_eq!(false, validate_username("#ala").is_ok());
+        assert_eq!(false, validate_username("&ala").is_ok());
+        assert_eq!(false, validate_username("a.la").is_ok());
+        assert_eq!(false, validate_username("a,la").is_ok());
+        assert_eq!(false, validate_username("aL:a").is_ok());
+    }
+    
+    #[test]
+    fn test_validate_channel() {
+        assert_eq!(true, validate_channel("#ala").is_ok());
+        assert_eq!(true, validate_channel("&ala").is_ok());
+        assert_eq!(false, validate_channel("&al:a").is_ok());
+        assert_eq!(false, validate_channel("&al,a").is_ok());
+        assert_eq!(false, validate_channel("#al:a").is_ok());
+        assert_eq!(false, validate_channel("#al,a").is_ok());
+        assert_eq!(false, validate_channel("ala").is_ok());
+    }
+    
+    #[test]
+    fn test_validate_server() {
+        assert_eq!(true, validate_server("somebody.org",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_server("somebodyorg",
+                WrongParameter(PINGId, 0)).is_ok());
+    }
+    
+    #[test]
+    fn test_validate_server_mask() {
+        assert_eq!(true, validate_server_mask("somebody.org",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_server_mask("*org",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_server_mask("somebodyorg",
+                WrongParameter(PINGId, 0)).is_ok());
+    }
+    
+    #[test]
+    fn test_validate_prefixed_channel() {
+        assert_eq!(true, validate_prefixed_channel("#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("&al:a",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("&al,a",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("#al:a",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("#al,a",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        
+        assert_eq!(true, validate_prefixed_channel("~#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("+#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("%#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("&#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("@#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("~&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("+&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("%&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("&&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(true, validate_prefixed_channel("@&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("*#ala",
+                WrongParameter(PINGId, 0)).is_ok());
+        assert_eq!(false, validate_prefixed_channel("*&ala",
+                WrongParameter(PINGId, 0)).is_ok());
+    }
+}

@@ -311,27 +311,6 @@ impl MainState {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    
-    #[test]
-    fn test_irc_lines_codec() {
-        let mut codec = IRCLinesCodec::new();
-        let mut buf = BytesMut::new();
-        codec.encode("my line", &mut buf).unwrap();
-        assert_eq!("my line\r\n".as_bytes(), buf);
-        let mut buf = BytesMut::from("my line 2\n");
-        assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
-                Ok(Some("my line 2".to_string())));
-        assert_eq!(buf, BytesMut::new());
-        let mut buf = BytesMut::from("my line 2\r\n");
-        assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
-                Ok(Some("my line 2".to_string())));
-        assert_eq!(buf, BytesMut::new());
-    }
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
