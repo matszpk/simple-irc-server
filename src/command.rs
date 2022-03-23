@@ -24,7 +24,7 @@ use const_table::const_table;
 use crate::config::{validate_username, validate_channel};
 
 #[derive(Clone, Copy, Debug)]
-enum MessageError {
+pub(crate) enum MessageError {
     Empty,
     WrongSource,
     NoCommand,
@@ -44,7 +44,7 @@ impl Error for MessageError {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-struct Message<'a> {
+pub(crate) struct Message<'a> {
     source: Option<&'a str>,
     command: &'a str,
     params: Vec<&'a str>,
@@ -105,7 +105,7 @@ impl<'a> Message<'a> {
 }
 
 #[const_table]
-pub enum CommandId {
+pub(crate) enum CommandId {
     CommandName{ name: &'static str },
     CAPId = CommandName{ name: "CAP" },
     AUTHENTICATEId = CommandName{ name: "AUTHENTICATE" },
@@ -150,7 +150,7 @@ pub enum CommandId {
 use CommandId::*;
 
 #[derive(Clone, Debug)]
-enum CommandError {
+pub(crate) enum CommandError {
     UnknownCommand(String),
     UnknownSubcommand(CommandId, String),
     NeedMoreParams(CommandId),
@@ -181,12 +181,12 @@ impl Error for CommandError {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-enum CapCommand {
+pub(crate) enum CapCommand {
     LS, LIST, REQ, END
 }
 
 #[derive(PartialEq, Eq, Debug)]
-enum Command<'a> {
+pub(crate) enum Command<'a> {
     CAP{ subcommand: CapCommand, caps: Option<Vec<&'a str>>, version: Option<u32> },
     AUTHENTICATE{ },
     PASS{ password: &'a str },

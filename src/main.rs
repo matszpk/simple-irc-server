@@ -80,7 +80,7 @@ struct User {
     modes: UserModes,
     ip_addr: IpAddr,
     hostname: String,
-    stream: Framed<TcpStream, IRCLinesCodec>,
+    stream: Rc<Framed<TcpStream, IRCLinesCodec>>,
 }
 
 enum OperatorType {
@@ -102,6 +102,11 @@ struct Channel {
     topic: String,
     modes: ChannelModes,
     users: Vec<ChannelUser>,
+}
+
+struct ConnectionState {
+    stream: Rc<Framed<TcpStream, IRCLinesCodec>>,
+    user: Option<Rc<User>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -127,25 +132,50 @@ struct MainState {
 }
 
 impl MainState {
-    pub fn check_password(username: &str, password: &str) -> Result<bool, MainStateError> {
-        Ok(false)
+    fn process_command<'a>(&mut self, conn_state: &mut ConnectionState,
+                    cmd: Command) -> Vec<Reply<'a>> {
+        vec![]
     }
     
-    pub fn set_nickname(username: &str, nickname: &str) -> Result<(), MainStateError> {
-        Ok(())
+    fn process_cap<'a>(&mut self, conn_state: &mut ConnectionState,
+            subcommand: CapCommand, caps: Option<Vec<&'a str>>,
+            version: Option<u32>) -> Vec<Reply<'a>> {
+        vec![]
     }
     
-    pub fn begin_user(username: &str, realname: &str) -> Result<(), MainStateError> {
-        Ok(())
+    fn process_authenticate<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
     }
     
-    pub fn set_oper(username: &str, password: &str) -> Result<bool, MainStateError> {
-        Ok(false)
+    fn process_ping<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
     }
     
-    pub fn join_to_channel(username: &str, channels: Vec<(&str, &str)>) ->
-                Result<bool, MainStateError> {
-        Ok(false)
+    fn process_quit<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
+    }
+    
+    fn process_lusers<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
+    }
+    
+    fn process_info<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
+    }
+    
+    fn process_rehash<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
+    }
+    
+    fn process_restart<'a>(&mut self, conn_state: &mut ConnectionState)
+            -> Vec<Reply<'a>> {
+        vec![]
     }
 }
 

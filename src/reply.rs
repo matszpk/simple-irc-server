@@ -21,17 +21,17 @@
 
 use std::fmt;
 
-struct WhoIsChannelStruct<'a> {
+pub(crate) struct WhoIsChannelStruct<'a> {
     prefix: Option<&'a str>,
     channel: &'a str,
 }
 
-struct NameReplyStruct<'a> {
+pub(crate) struct NameReplyStruct<'a> {
     prefix: Option<&'a str>,
     nick: &'a str,
 }
 
-enum Reply<'a> {
+pub(crate) enum Reply<'a> {
     RplWelcome001{ client: &'a str, networkname: &'a str, nick: &'a str,
             user: &'a str, host: &'a str },
     RplYourHost002{ client: &'a str, servername: &'a str, version: &'a str },
