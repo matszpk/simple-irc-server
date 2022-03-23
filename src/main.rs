@@ -20,57 +20,25 @@
 mod config;
 mod reply;
 mod command;
+mod utils;
 
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::fs::File;
 use std::io::Read;
 use std::net::{IpAddr, TcpStream};
 use std::error::Error;
-use bytes::{BufMut, BytesMut};
 use clap;
 use clap::Parser;
 use toml;
 use tokio;
-use tokio_util::codec::{Framed, LinesCodec, Decoder, Encoder};
+use tokio_util::codec::Framed;
 use dashmap::DashMap;
 
 use config::*;
 use reply::*;
 use command::*;
-
-// special LinesCodec for IRC - encode with "\r\n".
-
-struct IRCLinesCodec(LinesCodec);
-
-impl IRCLinesCodec {
-    pub fn new() -> IRCLinesCodec {
-        IRCLinesCodec(LinesCodec::new())
-    }
-}
-
-impl<T: AsRef<str>> Encoder<T> for IRCLinesCodec {
-    type Error = <LinesCodec as Encoder<T>>::Error;
-
-    fn encode(&mut self, line: T, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        let line = line.as_ref();
-        buf.reserve(line.len() + 1);
-        buf.put(line.as_bytes());
-        // put "\r\n"
-        buf.put_u8(b'\r');
-        buf.put_u8(b'\n');
-        Ok(())
-    }
-}
-
-impl Decoder for IRCLinesCodec {
-    type Item = <LinesCodec as Decoder>::Item;
-    type Error = <LinesCodec as Decoder>::Error;
-    
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, Self::Error> {
-        self.0.decode(buf)
-    }
-}
+use utils::*;
 
 //
 
@@ -80,7 +48,7 @@ struct User {
     modes: UserModes,
     ip_addr: IpAddr,
     hostname: String,
-    stream: Rc<Framed<TcpStream, IRCLinesCodec>>,
+    stream: Arc<Framed<TcpStream, IRCLinesCodec>>,
 }
 
 enum OperatorType {
@@ -90,7 +58,7 @@ enum OperatorType {
 }
 
 struct ChannelUser {
-    user: Rc<User>,
+    user: Arc<User>,
     founder: bool,
     protected: bool,
     voice: bool,
@@ -105,8 +73,8 @@ struct Channel {
 }
 
 struct ConnState {
-    stream: Rc<Framed<TcpStream, IRCLinesCodec>>,
-    user: Option<Rc<User>>,
+    stream: Arc<Framed<TcpStream, IRCLinesCodec>>,
+    user: Option<Arc<User>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -127,7 +95,7 @@ impl Error for MainStateError {
 
 struct MainState {
     config: MainConfig,
-    users: DashMap<String, Rc<User>>,
+    users: DashMap<String, Arc<User>>,
     channels: DashMap<String, Channel>,
 }
 

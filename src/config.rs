@@ -27,6 +27,9 @@ use toml;
 use serde_derive::{Serialize, Deserialize};
 use validator::{Validate,ValidationError};
 
+use crate::utils::validate_channel;
+use crate::utils::validate_username;
+
 #[derive(clap::Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
 pub(crate) struct Cli {
@@ -46,27 +49,6 @@ pub(crate) struct Cli {
     tls_cert_file: Option<String>,
     #[clap(short='K', long, help="TLS certificate key file")]
     tls_cert_key_file: Option<String>,
-}
-
-pub(crate) fn validate_username(username: &str) -> Result<(), ValidationError> {
-    if username.len() != 0 && (username.as_bytes()[0] == b'#' ||
-            username.as_bytes()[0] == b'&') {
-        Err(ValidationError::new("Username must not have channel prefix."))
-    } else if !username.contains('.') && !username.contains(':') && !username.contains(',') {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Username must not contains '.', ',' or ':'."))
-    }
-}
-
-pub(crate) fn validate_channel(channel: &str) -> Result<(), ValidationError> {
-    if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') &&
-        (channel.as_bytes()[0] == b'#' || channel.as_bytes()[0] == b'&') {
-        Ok(())
-    } else {
-        Err(ValidationError::new("Channel name must have '#' or '&' at start and \
-                must not contains ',' or ':'."))
-    }
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
