@@ -22,9 +22,10 @@ mod reply;
 mod command;
 mod utils;
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::rc::{Rc,Weak};
 use std::sync::Arc;
 use std::fs::File;
 use std::io::Read;
@@ -46,10 +47,12 @@ use utils::*;
 
 struct User {
     name: String,
-    nick: String,
-    modes: UserModes,
+    nick: Cell<String>,
+    realname: String,
+    modes: Cell<UserModes>,
     ip_addr: IpAddr,
     hostname: String,
+    channels: HashMap<String, Weak<Channel>>,
     stream: Arc<Framed<TcpStream, IRCLinesCodec>>,
 }
 
@@ -59,19 +62,23 @@ enum OperatorType {
     HalfOper,
 }
 
-struct ChannelUser {
-    user: Rc<User>,
+struct ChannelUserMode {
     founder: bool,
     protected: bool,
     voice: bool,
     oper_type: OperatorType,
 }
 
+struct ChannelUser {
+    user: Rc<User>,
+    mode: Cell<ChannelUserMode>,
+}
+
 struct Channel {
     name: String,
     topic: String,
     modes: ChannelModes,
-    users: Vec<ChannelUser>,
+    users: HashMap<String,ChannelUser>,
 }
 
 struct ConnState {
@@ -97,7 +104,7 @@ impl Error for MainStateError {
 
 struct VolatileState {
     users: HashMap<String, Rc<User>>,
-    channels: HashMap<String, Channel>,
+    channels: HashMap<String, Rc<Channel>>,
 }
 
 struct MainState {
