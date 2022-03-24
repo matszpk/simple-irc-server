@@ -1103,41 +1103,35 @@ mod test {
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+ntpsm" ] }).map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
-            modes: vec![("+b", vec![ "*@192.168.1.7", "*.fixers.com" ])] }),
+            modes: vec![("+b", vec![ "*@192.168.1.7" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "+b", "*@192.168.1.7", "*.fixers.com" ] })
+                params: vec![ "#chasis", "+b", "*@192.168.1.7" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
-            modes: vec![("-b", vec![ "*@192.168.1.7", "*.fixers.com" ])] }),
+            modes: vec![("-b", vec![ "*@192.168.1.7" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "-b", "*@192.168.1.7", "*.fixers.com" ] })
+                params: vec![ "#chasis", "-b", "*@192.168.1.7" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
-            modes: vec![("+b", vec![ "*@192.168.1.7", "*.fixers.com" ]),
-                        ("+e", vec![ "*@192.168.1.3", "*.supers.com" ]),
-                        ("+I", vec![ "*@192.168.1.9", "*.creators.com" ])] }),
+            modes: vec![("+b", vec![ "*@192.168.1.7" ]), ("+e", vec![ "*@192.168.1.3" ]),
+                        ("+I", vec![ "*@192.168.1.9" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "+b", "*@192.168.1.7", "*.fixers.com",
-                                "+e", "*@192.168.1.3", "*.supers.com",
-                                "+I", "*@192.168.1.9", "*.creators.com" ] })
+                params: vec![ "#chasis", "+b", "*@192.168.1.7", "+e", "*@192.168.1.3",
+                                "+I", "*@192.168.1.9" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
-            modes: vec![("-b", vec![ "*@192.168.1.7", "*.fixers.com" ]),
-                        ("-e", vec![ "*@192.168.1.3", "*.supers.com" ]),
-                        ("-I", vec![ "*@192.168.1.9", "*.creators.com" ])] }),
+            modes: vec![("-b", vec![ "*@192.168.1.7" ]), ("-e", vec![ "*@192.168.1.3" ]),
+                        ("-I", vec![ "*@192.168.1.9" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "-b", "*@192.168.1.7", "*.fixers.com",
-                                "-e", "*@192.168.1.3", "*.supers.com",
-                                "-I", "*@192.168.1.9", "*.creators.com" ] })
+                params: vec![ "#chasis", "-b", "*@192.168.1.7", "-e", "*@192.168.1.3",
+                                "-I", "*@192.168.1.9" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
-            modes: vec![("-mb", vec![ "*@192.168.1.7", "*.fixers.com" ]),
-                        ("-ne", vec![ "*@192.168.1.3", "*.supers.com" ]),
-                        ("-tI", vec![ "*@192.168.1.9", "*.creators.com" ])] }),
+            modes: vec![("-mb", vec![ "*@192.168.1.7" ]), ("-ne", vec![ "*@192.168.1.3" ]),
+                        ("-tI", vec![ "*@192.168.1.9" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "-mb", "*@192.168.1.7", "*.fixers.com",
-                                "-ne", "*@192.168.1.3", "*.supers.com",
-                                "-tI", "*@192.168.1.9", "*.creators.com" ] })
+                params: vec![ "#chasis", "-mb", "*@192.168.1.7", "-ne", "*@192.168.1.3",
+                                "-tI", "*@192.168.1.9" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis", modes: vec![("+b", vec![])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
@@ -1180,28 +1174,28 @@ mod test {
         assert_eq!(Ok(MODE{ target: "andy", modes: vec![] }),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "andy" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+l" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+k" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+o" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-o" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+h" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-h" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+v" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-v" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
@@ -1213,7 +1207,7 @@ mod test {
         assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-k", "145" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 3 in command 'MODE'".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-bl+oi", "*@192.168.0.1" ] })
                     .map_err(|e| e.to_string()));

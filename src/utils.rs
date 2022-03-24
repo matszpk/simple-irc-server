@@ -133,77 +133,60 @@ pub(crate) fn validate_channelmodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
         if ms.len() != 0 {
-            let mut args_char = ' ';
-            let mut cur_mode_set = false;
             let mut mode_set = false;
+            let mut arg_param_idx = param_idx+1;
+            
+            let mut margs_it = margs.iter();
+            
             ms.chars().try_for_each(|c| {
-                if c!='+' && c!='-' && c!='b' && c!='e' && c!='i' && c!='I' &&
-                    c!='l' && c!='k' && c!='m' && c!='t' && c!='n' && c!='s' && c!='p' &&
-                    c!='o' && c!='v' && c!='h' {
-                    return Err(WrongParameter(MODEId, param_idx));
-                }
-                if c=='+' { cur_mode_set = true; }
-                else if c=='-' { cur_mode_set = false; }
-                // if found flag with argument
-                if c=='b' || c=='e' || c=='I' || c=='o' || c=='v' || c=='h' ||
-                        (cur_mode_set && (c=='l' || c=='k')) {
-                    if args_char != ' ' {
-                        return Err(WrongParameter(MODEId, param_idx));
+                match c {
+                    '+' => { mode_set = true; }
+                    '-' => { mode_set = false; }
+                    'b'|'e'|'I' => {
+                        margs_it.next(); // consume argument
+                        arg_param_idx += 1;
                     }
-                    args_char = c;
-                    mode_set = cur_mode_set;
+                    'o'|'v'|'h' => {
+                        if let Some(arg) = margs_it.next() {
+                            validate_username(arg).map_err(|_|
+                                WrongParameter(MODEId, arg_param_idx))?;
+                            arg_param_idx += 1;
+                        } else {
+                            return Err(WrongParameter(MODEId, arg_param_idx));
+                        }
+                    }
+                    'l' => {
+                        if mode_set {
+                            if let Some(arg) = margs_it.next() {
+                                if arg.parse::<usize>().is_err() {
+                                    return Err(WrongParameter(MODEId, arg_param_idx));
+                                }
+                                arg_param_idx += 1;
+                            } else {
+                                return Err(WrongParameter(MODEId, arg_param_idx));
+                            }
+                        } else if margs_it.next().is_some() {
+                            return Err(WrongParameter(MODEId, arg_param_idx));
+                        }
+                    }
+                    'k' => {
+                        if mode_set {
+                            if let Some(arg) = margs_it.next() {
+                                arg_param_idx += 1;
+                            } else {
+                                return Err(WrongParameter(MODEId, arg_param_idx));
+                            }
+                        } else if margs_it.next().is_some() {
+                            return Err(WrongParameter(MODEId, arg_param_idx));
+                        }
+                    }
+                    'i'|'m'|'t'|'n'|'s'|'p' => { },
+                    _ => { return Err(WrongParameter(MODEId, param_idx)); }
                 }
                 Ok(())
             })?;
-            param_idx += 1;
             
-            if margs.len() != 0 {
-                match args_char {
-                    // operator, half-op, voice
-                    'o'|'h'|'v' => {
-                        if margs.len() == 1 && validate_username(margs[0]).is_ok() {
-                            param_idx += 1;
-                        } else {
-                            return Err(WrongParameter(MODEId, param_idx));
-                        }
-                    }
-                    // limit
-                    'l' => {
-                        if mode_set {
-                            if margs.len() == 1 {
-                                if margs[0].parse::<usize>().is_err() {
-                                    return Err(WrongParameter(MODEId, param_idx));
-                                }
-                                param_idx += 1;
-                            } else {
-                                return Err(WrongParameter(MODEId, param_idx));
-                            }
-                        }
-                    }
-                    // key
-                    'k' => {
-                        if mode_set {
-                            if margs.len() != 1 {
-                                return Err(WrongParameter(MODEId, param_idx));
-                            }
-                            param_idx += 1;
-                        }
-                    }
-                    // lists
-                    'b'|'e'|'I' => { param_idx += margs.len(); }
-                    ' ' => { return Err(WrongParameter(MODEId, param_idx)); }
-                    _ => { return Err(WrongParameter(MODEId, param_idx)); }
-                }
-            } else {
-                match args_char {
-                    'l'|'k' => {
-                        if mode_set { return Err(WrongParameter(MODEId, param_idx-1)); }
-                    }
-                    'b'|'e'|'i'|'I'|'m'|'t'|'n'|'s'|'p' => { }
-                    ' ' => {}
-                    _ => { return Err(WrongParameter(MODEId, param_idx-1)); }
-                }
-            }
+            param_idx += margs.len() + 1;
             
             Ok(())
         } else { // if empty
@@ -337,6 +320,9 @@ mod test {
             ("+nltp", vec!["22"]), ("-s+km", vec!["xxyy"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes(&vec![
+            ("+ibl-h", vec!["*dudu.com", "22", "derek"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes(&vec![
             ("-nltp", vec![]), ("+s-km", vec![])]).map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes(&vec![
             ("+ot", vec!["barry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
@@ -345,15 +331,15 @@ mod test {
             ("-to", vec!["barry"]), ("+hn", vec!["guru"]), ("-mv", vec!["jerry"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes(&vec![
-            ("-tb", vec!["barry", "zero"]), ("+iI", vec!["guru", "daddo"]),
-                ("-es", vec!["eagle", "jerry"])]).map_err(|e| e.to_string()));
+            ("-tb", vec!["barry"]), ("+iI", vec!["guru"]), ("-es", vec!["eagle"])])
+                .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes(&vec![
-            ("+tb", vec!["barry", "zero"]), ("-iI", vec!["guru", "daddo"]),
-                ("+es", vec!["eagle", "jerry"])]).map_err(|e| e.to_string()));
+            ("+tb", vec!["barry"]), ("-iI", vec!["guru"]), ("+es", vec!["eagle"])])
+                .map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             validate_channelmodes(&vec![("+ntp", vec![]), ("-sum", vec![])])
                 .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
+        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
             validate_channelmodes(&vec![("+nltp", vec![]), ("-s+km", vec!["xxyy"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 6 in command 'MODE'".to_string()),
