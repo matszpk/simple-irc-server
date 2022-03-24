@@ -22,7 +22,9 @@ mod reply;
 mod command;
 mod utils;
 
+use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::fs::File;
 use std::io::Read;
@@ -32,8 +34,8 @@ use clap;
 use clap::Parser;
 use toml;
 use tokio;
+use tokio::sync::RwLock;
 use tokio_util::codec::Framed;
-use dashmap::DashMap;
 
 use config::*;
 use reply::*;
@@ -58,7 +60,7 @@ enum OperatorType {
 }
 
 struct ChannelUser {
-    user: Arc<User>,
+    user: Rc<User>,
     founder: bool,
     protected: bool,
     voice: bool,
@@ -93,10 +95,14 @@ impl fmt::Display for MainStateError {
 impl Error for MainStateError {
 }
 
+struct VolatileState {
+    users: HashMap<String, Rc<User>>,
+    channels: HashMap<String, Channel>,
+}
+
 struct MainState {
     config: MainConfig,
-    users: DashMap<String, Arc<User>>,
-    channels: DashMap<String, Channel>,
+    state: RwLock<VolatileState>,
 }
 
 impl MainState {
