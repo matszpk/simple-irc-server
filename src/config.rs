@@ -82,6 +82,18 @@ impl Default for UserModes {
     }
 }
 
+impl ToString for UserModes {
+    fn to_string(&self) -> String {
+        let mut s = '+'.to_string();
+        if self.invisible { s.push('i'); }
+        if self.oper { s.push('o'); }
+        if self.local_oper { s.push('O'); }
+        if self.registered { s.push('r'); }
+        if self.wallops { s.push('w'); }
+        s
+    }
+}
+
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 pub(crate) struct ChannelModes {
     ban: Option<Vec<String>>,
@@ -97,6 +109,63 @@ pub(crate) struct ChannelModes {
     secret: bool,
     protected_topic: bool,
     no_external_messages: bool,
+}
+
+impl ToString for ChannelModes {
+    fn to_string(&self) -> String {
+        let mut s = '+'.to_string();
+        if self.private { s.push('p'); }
+        if self.moderated { s.push('m'); }
+        if self.secret { s.push('s'); }
+        if self.protected_topic { s.push('t'); }
+        if self.no_external_messages { s.push('n'); }
+        if let Some(_) = self.key { s.push('k'); }
+        if let Some(_) = self.client_limit { s.push('l'); }
+        if let Some(ref k) = self.key {
+            s.push(' ');
+            s += &k; }
+        if let Some(l) = self.client_limit {
+            s.push(' ');
+            s += &l.to_string(); }
+        if let Some(ref ban) = self.ban {
+            ban.iter().for_each(|b| {
+                s += " +b";
+                s += b;
+            });
+        }
+        if let Some(ref exception) = self.exception {
+            exception.iter().for_each(|e| {
+                s += " +e";
+                s += e;
+            });
+        }
+        if let Some(ref invite_exception) = self.invite_exception {
+            invite_exception.iter().for_each(|i| {
+                s += " +I";
+                s += i;
+            });
+        }
+        
+        if let Some(ref operators) = self.operators {
+            operators.iter().for_each(|o| {
+                s += " +o";
+                s += o;
+            });
+        }
+        if let Some(ref half_operators) = self.half_operators {
+            half_operators.iter().for_each(|h| {
+                s += " +h";
+                s += h;
+            });
+        }
+        if let Some(ref voices) = self.voices {
+            voices.iter().for_each(|v| {
+                s += " +v";
+                s += v;
+            });
+        }
+        s
+    }
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
