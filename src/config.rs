@@ -1004,5 +1004,25 @@ no_external_messages = false
                     voices: None,
                     invite: true, private: true, moderated: false, secret: false,
                     protected_topic: true, no_external_messages: true }.to_string());
+        assert_eq!("+pstk password +b somebody +b somebody2 +o expert +h spec".to_string(),
+            ChannelModes { ban: Some(vec!["somebody".to_string(), "somebody2".to_string()]),
+                    exception: None,
+                    invite_exception: None,
+                    client_limit: None, key: Some("password".to_string()),
+                    operators: Some(vec!["expert".to_string()]),
+                    half_operators: Some(vec!["spec".to_string()]),
+                    voices: None,
+                    invite: false, private: true, moderated: false, secret: true,
+                    protected_topic: true, no_external_messages: false }.to_string());
+        assert_eq!("+imn +I somebody +v guy1 +v guy2".to_string(),
+            ChannelModes { ban: None,
+                    exception: None,
+                    invite_exception: Some(vec!["somebody".to_string()]),
+                    client_limit: None, key: None,
+                    operators: None,
+                    half_operators: None,
+                    voices: Some(vec!["guy1".to_string(), "guy2".to_string()]),
+                    invite: true, private: false, moderated: true, secret: false,
+                    protected_topic: false, no_external_messages: true }.to_string());
     }
 }
