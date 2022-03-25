@@ -27,6 +27,7 @@ use crate::command::CommandError;
 use crate::command::CommandError::*;
 
 // special LinesCodec for IRC - encode with "\r\n".
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub(crate) struct IRCLinesCodec(LinesCodec);
 
 impl IRCLinesCodec {

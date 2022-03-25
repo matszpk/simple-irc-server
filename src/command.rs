@@ -66,7 +66,7 @@ fn validate_source(s: &str) -> bool {
 }
 
 impl<'a> Message<'a> {
-    fn from_shared_str(input: &'a str) -> Result<Self, MessageError> {
+    pub(crate) fn from_shared_str(input: &'a str) -> Result<Self, MessageError> {
         let trimmed = input.trim_start();
         
         if trimmed.len() != 0 {
@@ -526,7 +526,7 @@ impl<'a> Command<'a> {
         }
     }
     
-    fn from_message(message: &Message<'a>) -> Result<Self, CommandError> {
+    pub(crate) fn from_message(message: &Message<'a>) -> Result<Self, CommandError> {
         match Self::parse_from_message(message) {
             Ok(x) => {
                 match x.validate() {
