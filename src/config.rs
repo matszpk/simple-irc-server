@@ -131,38 +131,38 @@ impl ToString for ChannelModes {
             s += &l.to_string(); }
         if let Some(ref ban) = self.ban {
             ban.iter().for_each(|b| {
-                s += " +b";
+                s += " +b ";
                 s += b;
             });
         }
         if let Some(ref exception) = self.exception {
             exception.iter().for_each(|e| {
-                s += " +e";
+                s += " +e ";
                 s += e;
             });
         }
         if let Some(ref invite_exception) = self.invite_exception {
             invite_exception.iter().for_each(|i| {
-                s += " +I";
+                s += " +I ";
                 s += i;
             });
         }
         
         if let Some(ref operators) = self.operators {
             operators.iter().for_each(|o| {
-                s += " +o";
+                s += " +o ";
                 s += o;
             });
         }
         if let Some(ref half_operators) = self.half_operators {
             half_operators.iter().for_each(|h| {
-                s += " +h";
+                s += " +h ";
                 s += h;
             });
         }
         if let Some(ref voices) = self.voices {
             voices.iter().for_each(|v| {
-                s += " +v";
+                s += " +v ";
                 s += v;
             });
         }
@@ -980,5 +980,29 @@ no_external_messages = false
         assert_eq!(Err("channels[1].name: Validation error: Channel name must have '#' or \
 '&' at start and must not contains ',' or ':'. \
 [{\"value\": String(\"#cha:nnel2\")}]".to_string()), result);
+    }
+    
+    #[test]
+    fn test_usermodes_to_string() {
+        assert_eq!("+oOr".to_string(),
+            UserModes{ invisible: false, oper: true, local_oper: true,
+                registered: true, wallops: false }.to_string());
+        assert_eq!("+irw".to_string(),
+            UserModes{ invisible: true, oper: false, local_oper: false,
+                registered: true, wallops: true }.to_string());
+    }
+    
+    #[test]
+    fn test_channelmodes_to_string() {
+        assert_eq!("+iptnl 10 +I somebody +o expert".to_string(),
+            ChannelModes { ban: None,
+                    exception: None,
+                    invite_exception: Some(vec!["somebody".to_string()]),
+                    client_limit: Some(10), key: None,
+                    operators: Some(vec!["expert".to_string()]),
+                    half_operators: None,
+                    voices: None,
+                    invite: true, private: true, moderated: false, secret: false,
+                    protected_topic: true, no_external_messages: true }.to_string());
     }
 }
