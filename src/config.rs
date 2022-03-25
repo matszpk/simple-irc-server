@@ -26,6 +26,7 @@ use clap::Parser;
 use toml;
 use serde_derive::{Serialize, Deserialize};
 use validator::{Validate,ValidationError};
+use tokio;
 
 use crate::utils::validate_channel;
 use crate::utils::validate_username;
@@ -196,6 +197,7 @@ struct UserConfig {
     nick: String,
     #[validate(length(min = 6))]
     password: String,
+    mask: Option<String>,
 }
 
 /// Main configuration structure.

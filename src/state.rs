@@ -65,7 +65,7 @@ struct Channel {
     name: String,
     topic: String,
     modes: ChannelModes,
-    users: HashMap<String,ChannelUser>,
+    users: HashMap<String, ChannelUser>,
 }
 
 struct ConnState {
@@ -100,7 +100,7 @@ struct MainState {
 }
 
 impl MainState {
-    fn process_command<'a>(&mut self, conn_state: &mut ConnState,
+    fn process_command(&mut self, conn_state: &mut ConnState,
                     cmd: Command) {
         use crate::Command::*;
         match cmd {
