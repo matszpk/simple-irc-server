@@ -17,6 +17,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -102,9 +103,9 @@ pub(crate) struct ChannelModes {
     client_limit: Option<usize>,
     invite_exception: Option<Vec<String>>,
     key: Option<String>,
-    operators: Option<Vec<String>>,
-    half_operators: Option<Vec<String>>,
-    voices: Option<Vec<String>>,
+    operators: Option<HashSet<String>>,
+    half_operators: Option<HashSet<String>>,
+    voices: Option<HashSet<String>>,
     invite: bool,
     private: bool,
     moderated: bool,
@@ -396,6 +397,7 @@ key = "hokus pokus"
 ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
+operators = [ "banny", "rorry" ]
 moderated = true
 invite = true
 client_limit = 200
@@ -431,7 +433,7 @@ no_external_messages = false
             ]),
             users: Some(vec![
                 UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
-                    password: "luckyluke".to_string() }
+                    password: "luckyluke".to_string(), mask: None }
             ]),
             channels: Some(vec![
                 ChannelConfig{
@@ -456,7 +458,8 @@ no_external_messages = false
                         invite_exception: Some(
                             vec![ "nomi@buru.com".to_string(),
                                 "pampam@zerox.net".to_string() ]),
-                        operators: None, half_operators: None, voices: None,
+                        operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
+                        half_operators: None, voices: None,
                         client_limit: Some(200),
                         invite: true,
                         moderated: true, secret: false, protected_topic: true,
@@ -499,7 +502,7 @@ no_external_messages = false
             ]),
             users: Some(vec![
                 UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
-                    password: "luckyluke".to_string() }
+                    password: "luckyluke".to_string(), mask: None }
             ]),
             channels: Some(vec![
                 ChannelConfig{
@@ -524,7 +527,8 @@ no_external_messages = false
                         invite_exception: Some(
                             vec![ "nomi@buru.com".to_string(),
                                 "pampam@zerox.net".to_string() ]),
-                        operators: None, half_operators: None, voices: None,
+                        operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
+                        half_operators: None, voices: None,
                         client_limit: Some(200),
                         invite: true,
                         moderated: true, secret: false, protected_topic: true,
@@ -1010,7 +1014,7 @@ no_external_messages = false
                     exception: None,
                     invite_exception: Some(vec!["somebody".to_string()]),
                     client_limit: Some(10), key: None,
-                    operators: Some(vec!["expert".to_string()]),
+                    operators: Some(["expert".to_string()].into()),
                     half_operators: None,
                     voices: None,
                     invite: true, private: true, moderated: false, secret: false,
@@ -1020,8 +1024,8 @@ no_external_messages = false
                     exception: None,
                     invite_exception: None,
                     client_limit: None, key: Some("password".to_string()),
-                    operators: Some(vec!["expert".to_string()]),
-                    half_operators: Some(vec!["spec".to_string()]),
+                    operators: Some(["expert".to_string()].into()),
+                    half_operators: Some(["spec".to_string()].into()),
                     voices: None,
                     invite: false, private: true, moderated: false, secret: true,
                     protected_topic: true, no_external_messages: false }.to_string());
@@ -1032,7 +1036,7 @@ no_external_messages = false
                     client_limit: None, key: None,
                     operators: None,
                     half_operators: None,
-                    voices: Some(vec!["guy1".to_string(), "guy2".to_string()]),
+                    voices: Some(["guy1".to_string(), "guy2".to_string()].into()),
                     invite: true, private: false, moderated: true, secret: false,
                     protected_topic: false, no_external_messages: true }.to_string());
     }
