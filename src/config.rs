@@ -54,27 +54,27 @@ pub(crate) struct Cli {
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
-struct TLSConfig {
-    cert_file: String,
-    cert_key_file: String,
+pub(crate) struct TLSConfig {
+    pub(crate) cert_file: String,
+    pub(crate) cert_key_file: String,
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
-struct OperatorConfig {
+pub(crate) struct OperatorConfig {
     #[validate(custom = "validate_username")]
-    name: String,
+    pub(crate) name: String,
     #[validate(length(min = 6))]
-    password: String,
-    mask: Option<String>,
+    pub(crate) password: String,
+    pub(crate) mask: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub(crate) struct UserModes {
-    invisible: bool,
-    oper: bool,
-    local_oper: bool,
-    registered: bool,
-    wallops: bool,
+    pub(crate) invisible: bool,
+    pub(crate) oper: bool,
+    pub(crate) local_oper: bool,
+    pub(crate) registered: bool,
+    pub(crate) wallops: bool,
 }
 
 impl Default for UserModes {
@@ -96,22 +96,22 @@ impl ToString for UserModes {
     }
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 pub(crate) struct ChannelModes {
-    ban: Option<Vec<String>>,
-    exception: Option<Vec<String>>,
-    client_limit: Option<usize>,
-    invite_exception: Option<Vec<String>>,
-    key: Option<String>,
-    operators: Option<HashSet<String>>,
-    half_operators: Option<HashSet<String>>,
-    voices: Option<HashSet<String>>,
-    invite: bool,
-    private: bool,
-    moderated: bool,
-    secret: bool,
-    protected_topic: bool,
-    no_external_messages: bool,
+    pub(crate) ban: Option<Vec<String>>,
+    pub(crate) exception: Option<Vec<String>>,
+    pub(crate) client_limit: Option<usize>,
+    pub(crate) invite_exception: Option<Vec<String>>,
+    pub(crate) key: Option<String>,
+    pub(crate) operators: Option<HashSet<String>>,
+    pub(crate) half_operators: Option<HashSet<String>>,
+    pub(crate) voices: Option<HashSet<String>>,
+    pub(crate) invite: bool,
+    pub(crate) private: bool,
+    pub(crate) moderated: bool,
+    pub(crate) secret: bool,
+    pub(crate) protected_topic: bool,
+    pub(crate) no_external_messages: bool,
 }
 
 impl Default for ChannelModes {
@@ -182,50 +182,50 @@ impl ToString for ChannelModes {
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
-struct ChannelConfig {
+pub(crate) struct ChannelConfig {
     #[validate(custom = "validate_channel")]
-    name: String,
-    topic: String,
+    pub(crate) name: String,
+    pub(crate) topic: String,
     #[validate]
-    modes: ChannelModes,
+    pub(crate) modes: ChannelModes,
 }
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
-struct UserConfig {
+pub(crate) struct UserConfig {
     #[validate(custom = "validate_username")]
-    name: String,
+    pub(crate) name: String,
     #[validate(custom = "validate_username")]
-    nick: String,
+    pub(crate) nick: String,
     #[validate(length(min = 6))]
-    password: String,
-    mask: Option<String>,
+    pub(crate) password: String,
+    pub(crate) mask: Option<String>,
 }
 
 /// Main configuration structure.
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
 pub(crate) struct MainConfig {
     #[validate(contains = ".")]
-    name: String,
-    admin_info: String,
-    admin_info2: Option<String>,
-    info: String,
-    listen: IpAddr,
-    port: u16,
-    network: String,
-    max_connections: Option<usize>,
-    max_joins: Option<usize>,
-    max_nickname_len: usize,
-    ping_timeout: usize,
-    pong_timeout: usize,
-    dns_lookup: bool,
-    default_user_modes: UserModes,
-    tls: Option<TLSConfig>,
+    pub(crate) name: String,
+    pub(crate) admin_info: String,
+    pub(crate) admin_info2: Option<String>,
+    pub(crate) info: String,
+    pub(crate) listen: IpAddr,
+    pub(crate) port: u16,
+    pub(crate) network: String,
+    pub(crate) max_connections: Option<usize>,
+    pub(crate) max_joins: Option<usize>,
+    pub(crate) max_nickname_len: usize,
+    pub(crate) ping_timeout: usize,
+    pub(crate) pong_timeout: usize,
+    pub(crate) dns_lookup: bool,
+    pub(crate) default_user_modes: UserModes,
+    pub(crate) tls: Option<TLSConfig>,
     #[validate]
-    operators: Option<Vec<OperatorConfig>>,
+    pub(crate) operators: Option<Vec<OperatorConfig>>,
     #[validate]
-    users: Option<Vec<UserConfig>>,
+    pub(crate) users: Option<Vec<UserConfig>>,
     #[validate]
-    channels: Option<Vec<ChannelConfig>>,
+    pub(crate) channels: Option<Vec<ChannelConfig>>,
 }
 
 impl MainConfig {

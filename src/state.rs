@@ -73,25 +73,24 @@ struct ConnState {
     user: Option<Arc<User>>,
 }
 
-#[derive(Copy, Clone, Debug)]
-enum MainStateError {
-    NoSuchUser,
-}
-
-impl fmt::Display for MainStateError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MainStateError::NoSuchUser => write!(f, "No such user"),
-        }
-    }
-}
-
-impl Error for MainStateError {
-}
-
 struct VolatileState {
     users: HashMap<String, Rc<User>>,
     channels: HashMap<String, Rc<Channel>>,
+}
+
+impl VolatileState {
+    fn new_from_config(config: &MainConfig) -> VolatileState {
+        let mut channels = HashMap::new();
+        if let Some(ref cfg_channels) = config.channels {
+            cfg_channels.iter().for_each(|c| {
+                channels.insert(c.name.clone(), Rc::new(Channel{ name: c.name.clone(), 
+                    topic: c.topic.clone(), modes: c.modes.clone(),
+                    users: HashMap::new() }));
+            });
+        }
+        
+        VolatileState{ users: HashMap::new(), channels }
+    }
 }
 
 struct MainState {
