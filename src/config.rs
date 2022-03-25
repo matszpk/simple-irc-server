@@ -104,6 +104,7 @@ pub(crate) struct ChannelModes {
     operators: Option<Vec<String>>,
     half_operators: Option<Vec<String>>,
     voices: Option<Vec<String>>,
+    invite: bool,
     private: bool,
     moderated: bool,
     secret: bool,
@@ -114,6 +115,7 @@ pub(crate) struct ChannelModes {
 impl ToString for ChannelModes {
     fn to_string(&self) -> String {
         let mut s = '+'.to_string();
+        if self.invite { s.push('i'); }
         if self.private { s.push('p'); }
         if self.moderated { s.push('m'); }
         if self.secret { s.push('s'); }
@@ -364,6 +366,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = false
 protected_topic = false
@@ -383,6 +386,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
@@ -428,6 +432,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
+                        invite: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: false, no_external_messages: false },
                 },
@@ -442,6 +447,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ]),
                         operators: None, half_operators: None, voices: None,
                         client_limit: Some(200),
+                        invite: true,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -494,6 +500,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
+                        invite: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: false, no_external_messages: false },
                 },
@@ -508,6 +515,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ]),
                         operators: None, half_operators: None, voices: None,
                         client_limit: Some(200),
+                        invite: true,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -553,6 +561,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = true
 protected_topic = false
@@ -564,6 +573,7 @@ topic = "Some topic 2"
 [channels.modes]
 moderated = true
 secret = false
+invite = false
 private = false
 protected_topic = true
 no_external_messages = false
@@ -600,6 +610,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
+                        invite: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: true, no_external_messages: false },
                 },
@@ -612,6 +623,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
+                        invite: false,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -657,6 +669,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = false
 protected_topic = false
@@ -676,6 +689,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
@@ -728,6 +742,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
+invite = false
 private = false
 protected_topic = false
 no_external_messages = false
@@ -746,6 +761,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
@@ -794,6 +810,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = false
 protected_topic = false
@@ -813,6 +830,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
@@ -861,6 +879,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = false
 protected_topic = false
@@ -880,6 +899,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
@@ -929,6 +949,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
+invite = false
 secret = false
 private = false
 protected_topic = false
@@ -948,6 +969,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
+invite = true
 client_limit = 200
 secret = false
 private = false
