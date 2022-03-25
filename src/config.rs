@@ -112,6 +112,15 @@ pub(crate) struct ChannelModes {
     no_external_messages: bool,
 }
 
+impl Default for ChannelModes {
+    fn default() -> Self {
+        ChannelModes{ ban: None, exception: None, invite_exception: None,
+            client_limit: None, key: None, operators: None, half_operators: None,
+            voices: None, invite: false, private: false, moderated: false,
+            secret: false, protected_topic: false, no_external_messages: false }
+    }
+}
+
 impl ToString for ChannelModes {
     fn to_string(&self) -> String {
         let mut s = '+'.to_string();
