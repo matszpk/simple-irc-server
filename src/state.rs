@@ -29,6 +29,8 @@ use tokio::sync::{Mutex,RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
 use futures::SinkExt;
 
 use crate::config::*;
@@ -44,7 +46,7 @@ struct User {
     ip_addr: IpAddr,
     hostname: String,
     channels: HashMap<String, Weak<Channel>>,
-    stream: Arc<Framed<TcpStream, IRCLinesCodec>>,
+    sender: UnboundedSender<String>,
 }
 
 enum OperatorType {
@@ -73,8 +75,9 @@ struct Channel {
 }
 
 pub(crate) struct ConnState {
-    stream: Arc<Mutex<Framed<TcpStream, IRCLinesCodec>>>,
+    stream: Framed<TcpStream, IRCLinesCodec>,
     user: Option<Arc<User>>,
+    receiver: UnboundedReceiver<String>,
 }
 
 impl ConnState {
@@ -117,15 +120,15 @@ impl MainState {
 
 impl MainState {
     pub(crate) async fn process_command(&mut self, conn_state: &mut ConnState) {
-        let mut msg_str = String::new();
-        let cmd = {
-            if let Some(msg_str_res) = conn_state.stream.lock().await.next().await {
-                msg_str = msg_str_res.unwrap();
-                Command::from_message(&Message::from_shared_str(&msg_str)
-                            .unwrap())
-            } else {
-                Err(CommandError::UnknownCommand("none".to_string()))
-            }
+        let msg_str_res = { 
+                conn_state.stream.next().await
+        };
+        
+        let cmd = match msg_str_res {
+            Some(Ok(ref msg_str)) => Command::from_message(
+                        &Message::from_shared_str(&msg_str).unwrap()),
+            Some(Err(_)) => Err(CommandError::UnknownCommand("XXX".to_string())),
+            None => Err(CommandError::UnknownCommand("XXX".to_string())),
         }.unwrap();
         use crate::Command::*;
         match cmd {
