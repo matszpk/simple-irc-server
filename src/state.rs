@@ -119,89 +119,93 @@ impl MainState {
 }
 
 impl MainState {
-    pub(crate) async fn process_command(&mut self, conn_state: &mut ConnState) {
-        let msg_str_res = { 
-                conn_state.stream.next().await
-        };
-        
-        let cmd = match msg_str_res {
-            Some(Ok(ref msg_str)) => Command::from_message(
-                        &Message::from_shared_str(&msg_str).unwrap()),
-            Some(Err(_)) => Err(CommandError::UnknownCommand("XXX".to_string())),
-            None => Err(CommandError::UnknownCommand("XXX".to_string())),
-        }.unwrap();
-        use crate::Command::*;
-        match cmd {
-            CAP{ subcommand, caps, version } =>
-                self.process_cap(conn_state, subcommand, caps, version).await,
-            AUTHENTICATE{ } =>
-                self.process_authenticate(conn_state).await,
-            PASS{ password } =>
-                self.process_pass(conn_state, password).await,
-            NICK{ nickname } =>
-                self.process_nick(conn_state, nickname).await,
-            USER{ username, hostname, servername, realname } =>
-                self.process_user(conn_state, username, hostname,
-                            servername, realname).await,
-            PING{ } => self.process_ping(conn_state).await,
-            OPER{ name, password } =>
-                self.process_oper(conn_state, name, password).await,
-            QUIT{ } => self.process_quit(conn_state).await,
-            JOIN{ channels, keys } =>
-                self.process_join(conn_state, channels, keys).await,
-            PART{ channels, reason } =>
-                self.process_part(conn_state, channels, reason).await,
-            TOPIC{ channel, topic } =>
-                self.process_topic(conn_state, channel, topic).await,
-            NAMES{ channels } =>
-                self.process_names(conn_state, channels).await,
-            LIST{ channels, server } =>
-                self.process_list(conn_state, channels, server).await,
-            INVITE{ nickname, channel } =>
-                self.process_invite(conn_state, nickname, channel).await,
-            KICK{ channel, user, comment } =>
-                self.process_kick(conn_state, channel, user, comment).await,
-            MOTD{ target } =>
-                self.process_motd(conn_state, target).await,
-            VERSION{ target } =>
-                self.process_version(conn_state, target).await,
-            ADMIN{ target } =>
-                self.process_admin(conn_state, target).await,
-            CONNECT{ target_server, port, remote_server } =>
-                self.process_connect(conn_state, target_server, port, remote_server).await,
-            LUSERS{ } => self.process_lusers(conn_state).await,
-            TIME{ server } =>
-                self.process_time(conn_state, server).await,
-            STATS{ query, server } =>
-                self.process_stats(conn_state, query, server).await,
-            LINKS{ remote_server, server_mask } =>
-                self.process_links(conn_state, remote_server, server_mask).await,
-            HELP{ subject } =>
-                self.process_help(conn_state, subject).await,
-            INFO{ } => self.process_info(conn_state).await,
-            MODE{ target, modes } =>
-                self.process_mode(conn_state, target, modes).await,
-            PRIVMSG{ targets, text } =>
-                self.process_privmsg(conn_state, targets, text).await,
-            NOTICE{ targets, text } =>
-                self.process_notice(conn_state, targets, text).await,
-            WHO{ mask } => self.process_who(conn_state, mask).await,
-            WHOIS{ target, nickmasks } =>
-                self.process_whois(conn_state, target, nickmasks).await,
-            WHOWAS{ nickname, count, server } =>
-                self.process_whowas(conn_state, nickname, count, server).await,
-            KILL{ nickname, comment } =>
-                self.process_kill(conn_state, nickname, comment).await,
-            REHASH{ } => self.process_rehash(conn_state).await,
-            RESTART{ } => self.process_restart(conn_state).await,
-            SQUIT{ server, comment } =>
-                self.process_squit(conn_state, server, comment).await,
-            AWAY{ text } =>
-                self.process_away(conn_state, text).await,
-            USERHOST{ nicknames } =>
-                self.process_userhost(conn_state, nicknames).await, 
-            WALLOPS{ text } =>
-                self.process_wallops(conn_state, text).await,
+    pub(crate) async fn process(&mut self, conn_state: &mut ConnState) {
+        tokio::select! {
+            Some(msg) = conn_state.receiver.recv() => { },
+            msg_str_res = conn_state.stream.next() => {
+                
+                let cmd = match msg_str_res {
+                    Some(Ok(ref msg_str)) => Command::from_message(
+                                &Message::from_shared_str(&msg_str).unwrap()),
+                    Some(Err(_)) => Err(CommandError::UnknownCommand("XXX".to_string())),
+                    None => Err(CommandError::UnknownCommand("XXX".to_string())),
+                }.unwrap();
+                
+                use crate::Command::*;
+                match cmd {
+                    CAP{ subcommand, caps, version } =>
+                        self.process_cap(conn_state, subcommand, caps, version).await,
+                    AUTHENTICATE{ } =>
+                        self.process_authenticate(conn_state).await,
+                    PASS{ password } =>
+                        self.process_pass(conn_state, password).await,
+                    NICK{ nickname } =>
+                        self.process_nick(conn_state, nickname).await,
+                    USER{ username, hostname, servername, realname } =>
+                        self.process_user(conn_state, username, hostname,
+                                servername, realname).await,
+                    PING{ } => self.process_ping(conn_state).await,
+                    OPER{ name, password } =>
+                        self.process_oper(conn_state, name, password).await,
+                    QUIT{ } => self.process_quit(conn_state).await,
+                    JOIN{ channels, keys } =>
+                        self.process_join(conn_state, channels, keys).await,
+                    PART{ channels, reason } =>
+                        self.process_part(conn_state, channels, reason).await,
+                    TOPIC{ channel, topic } =>
+                        self.process_topic(conn_state, channel, topic).await,
+                    NAMES{ channels } =>
+                        self.process_names(conn_state, channels).await,
+                    LIST{ channels, server } =>
+                        self.process_list(conn_state, channels, server).await,
+                    INVITE{ nickname, channel } =>
+                        self.process_invite(conn_state, nickname, channel).await,
+                    KICK{ channel, user, comment } =>
+                        self.process_kick(conn_state, channel, user, comment).await,
+                    MOTD{ target } =>
+                        self.process_motd(conn_state, target).await,
+                    VERSION{ target } =>
+                        self.process_version(conn_state, target).await,
+                    ADMIN{ target } =>
+                        self.process_admin(conn_state, target).await,
+                    CONNECT{ target_server, port, remote_server } =>
+                        self.process_connect(conn_state, target_server, port,
+                                remote_server).await,
+                    LUSERS{ } => self.process_lusers(conn_state).await,
+                    TIME{ server } =>
+                        self.process_time(conn_state, server).await,
+                    STATS{ query, server } =>
+                        self.process_stats(conn_state, query, server).await,
+                    LINKS{ remote_server, server_mask } =>
+                        self.process_links(conn_state, remote_server, server_mask).await,
+                    HELP{ subject } =>
+                        self.process_help(conn_state, subject).await,
+                    INFO{ } => self.process_info(conn_state).await,
+                    MODE{ target, modes } =>
+                        self.process_mode(conn_state, target, modes).await,
+                    PRIVMSG{ targets, text } =>
+                        self.process_privmsg(conn_state, targets, text).await,
+                    NOTICE{ targets, text } =>
+                        self.process_notice(conn_state, targets, text).await,
+                    WHO{ mask } => self.process_who(conn_state, mask).await,
+                    WHOIS{ target, nickmasks } =>
+                        self.process_whois(conn_state, target, nickmasks).await,
+                    WHOWAS{ nickname, count, server } =>
+                        self.process_whowas(conn_state, nickname, count, server).await,
+                    KILL{ nickname, comment } =>
+                        self.process_kill(conn_state, nickname, comment).await,
+                    REHASH{ } => self.process_rehash(conn_state).await,
+                    RESTART{ } => self.process_restart(conn_state).await,
+                    SQUIT{ server, comment } =>
+                        self.process_squit(conn_state, server, comment).await,
+                    AWAY{ text } =>
+                        self.process_away(conn_state, text).await,
+                    USERHOST{ nicknames } =>
+                        self.process_userhost(conn_state, nicknames).await, 
+                    WALLOPS{ text } =>
+                        self.process_wallops(conn_state, text).await,
+                }
+            },
         }
     }
     
