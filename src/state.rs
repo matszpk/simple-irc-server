@@ -21,6 +21,7 @@ use std::cell::Cell;
 use std::pin::Pin;
 use std::collections::HashMap;
 use std::fmt;
+use std::marker::Unpin;
 use std::rc::{Rc,Weak};
 use std::sync::Arc;
 use std::net::{IpAddr};
@@ -32,13 +33,25 @@ use tokio_util::codec::{Framed, LinesCodec};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
 use futures::SinkExt;
-use tokio_util::codec::{LinesCodecError};
-use clap;
+use futures::sink;
+use async_trait::async_trait;
 
 use crate::config::*;
 use crate::reply::*;
 use crate::command::*;
 use crate::utils::*;
+
+#[async_trait]
+pub(crate) trait SendReply: SinkExt<String> + Unpin + Send {
+    async fn send_reply<'a>(&mut self, reply: Reply<'a>) -> sink::Send<'_, Self, String>;
+}
+
+#[async_trait]
+impl<S: SinkExt<String> + Unpin + Send> SendReply for S {
+    async fn send_reply<'a>(&mut self, reply: Reply<'a>) -> sink::Send<'_, Self, String> {
+        self.send(reply.to_string())
+    }
+}
 
 struct User {
     name: String,
@@ -49,6 +62,9 @@ struct User {
     hostname: String,
     channels: HashMap<String, Weak<Channel>>,
     sender: UnboundedSender<String>,
+    // user state
+    operator: bool,
+    away: Option<String>,
 }
 
 enum OperatorType {
@@ -218,6 +234,7 @@ impl MainState {
     
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
+        conn_state.stream.send_reply(Reply::RplUnAway305{ client: "aaaa" });
         Ok(())
     }
     
