@@ -28,7 +28,7 @@ use std::error::Error;
 use tokio::sync::{Mutex,RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_util::codec::{Framed, LinesCodec};
+use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
 use futures::SinkExt;
@@ -81,6 +81,9 @@ pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
     user: Option<Arc<User>>,
     receiver: UnboundedReceiver<String>,
+    // state
+    caps_negotation: bool,  // if caps negotation process
+    caps_enabled: Vec<String>,
 }
 
 impl ConnState {
@@ -217,9 +220,44 @@ impl MainState {
         }
     }
     
+    async fn send_reply<'a>(&self, conn_state: &mut ConnState, reply: Reply<'a>)
+            -> Result<(), LinesCodecError> {
+        let mut s = ":".to_string();
+        s += &self.config.name;
+        s += " ";
+        s += &reply.to_string();
+        conn_state.stream.send(s).await
+    }
+    
+    async fn send_string<'a>(&self, conn_state: &mut ConnState, input: &'a str)
+            -> Result<(), LinesCodecError> {
+        let mut s = ":".to_string();
+        s += &self.config.name;
+        s += " ";
+        s += input;
+        conn_state.stream.send(s).await
+    }
+    
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
-        conn_state.stream.send(Reply::RplUnAway305{ client: "aaaa" }.to_string());
+        match subcommand {
+            CapCommand::LS => {
+                conn_state.caps_negotation = true;
+                self.send_string(conn_state, "CAP * LS: multi-prefix").await
+            }
+            CapCommand::LIST => {
+                self.send_string(conn_state, &format!("CAP * LIST: {}",
+                    conn_state.caps_enabled.join(" "))).await
+                }
+            CapCommand::REQ => {
+                conn_state.caps_negotation = true;
+                if let Some(caps) = caps {
+                }
+                Ok(()) }
+            CapCommand::END => {
+                conn_state.caps_negotation = false;
+                Ok(()) }
+        }?;
         Ok(())
     }
     
