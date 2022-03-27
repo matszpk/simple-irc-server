@@ -1010,7 +1010,7 @@ no_external_messages = false
     #[test]
     fn test_channelmodes_to_string() {
         assert_eq!("+iptnl 10 +I somebody +o expert".to_string(),
-            ChannelModes { ban: None,
+            ChannelModes{ ban: None,
                     exception: None,
                     invite_exception: Some(vec!["somebody".to_string()]),
                     client_limit: Some(10), key: None,
@@ -1020,7 +1020,7 @@ no_external_messages = false
                     invite: true, private: true, moderated: false, secret: false,
                     protected_topic: true, no_external_messages: true }.to_string());
         assert_eq!("+pstk password +b somebody +b somebody2 +o expert +h spec".to_string(),
-            ChannelModes { ban: Some(vec!["somebody".to_string(), "somebody2".to_string()]),
+            ChannelModes{ ban: Some(vec!["somebody".to_string(), "somebody2".to_string()]),
                     exception: None,
                     invite_exception: None,
                     client_limit: None, key: Some("password".to_string()),
@@ -1029,8 +1029,7 @@ no_external_messages = false
                     voices: None,
                     invite: false, private: true, moderated: false, secret: true,
                     protected_topic: true, no_external_messages: false }.to_string());
-        assert_eq!("+imn +I somebody +v guy1 +v guy2".to_string(),
-            ChannelModes { ban: None,
+        let chm_str = ChannelModes{ ban: None,
                     exception: None,
                     invite_exception: Some(vec!["somebody".to_string()]),
                     client_limit: None, key: None,
@@ -1038,6 +1037,8 @@ no_external_messages = false
                     half_operators: None,
                     voices: Some(["guy1".to_string(), "guy2".to_string()].into()),
                     invite: true, private: false, moderated: true, secret: false,
-                    protected_topic: false, no_external_messages: true }.to_string());
+                    protected_topic: false, no_external_messages: true }.to_string();
+        assert!("+imn +I somebody +v guy1 +v guy2".to_string() == chm_str ||
+                "+imn +I somebody +v guy2 +v guy1".to_string() == chm_str);
     }
 }
