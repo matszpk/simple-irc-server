@@ -541,14 +541,7 @@ impl<'a> Command<'a> {
     fn validate(&self) -> Result<(), CommandError> {
         match self {
             CAP { subcommand, caps, version } => {
-                if let Some(cs) = caps {
-                    cs.iter().try_for_each(|x| {
-                        match *x {
-                            "multi-prefix"|"tls"|"sasl" => Ok(()),
-                            _ => Err(WrongParameter(CAPId, 1))
-                        }
-                    })
-                } else if let Some(v) = version {
+                if let Some(v) = version {
                     if *v < 302 { Err(WrongParameter(CAPId, 1)) }
                     else { Ok(()) }
                 } else { Ok(()) }
@@ -753,7 +746,8 @@ mod test {
         assert_eq!(Ok(CAP{ subcommand: CapCommand::END, caps: None, version: None }),
             Command::from_message(&Message{ source: None, command: "CAP",
                 params: vec![ "END" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 1 in command 'CAP'".to_string()),
+        assert_eq!(Ok(CAP{ subcommand: CapCommand::REQ, version: None,
+            caps: Some(vec!["multi-prefix", "tlsx"]) }),
             Command::from_message(&Message{ source: None, command: "CAP",
                 params: vec![ "REQ", "multi-prefix tlsx" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Unknown subcommand 'LSS' in command 'CAP'".to_string()),

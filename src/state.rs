@@ -77,13 +77,32 @@ struct Channel {
     users: HashMap<String, ChannelUser>,
 }
 
+#[derive(Copy, Clone)]
 pub(crate) struct CapState {
     multi_prefix: bool,
+}
+
+impl fmt::Display for CapState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.multi_prefix {
+            f.write_str("multi_prefix")
+        } else { Ok(()) }
+    }
 }
 
 impl Default for CapState {
     fn default() -> Self {
         CapState{ multi_prefix: false }
+    }
+}
+
+impl CapState {
+    fn apply_cap(&mut self, cap: &str) -> bool {
+        match cap {
+            "multi-prefix" => self.multi_prefix = true,
+            _ => return false,
+        };
+        true
     }
 }
 
@@ -229,7 +248,7 @@ impl MainState {
         }
     }
     
-    async fn send<T: fmt::Display>(&self, conn_state: &mut ConnState, t: T)
+    async fn send_msg<T: fmt::Display>(&self, conn_state: &mut ConnState, t: T)
             -> Result<(), LinesCodecError> {
         conn_state.stream.send(format!(":{} {}", self.config.name, t)).await
     }
@@ -239,16 +258,26 @@ impl MainState {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                self.send(conn_state, "CAP * LS: multi-prefix").await
+                self.send_msg(conn_state, "CAP * LS :multi-prefix").await
             }
             CapCommand::LIST => {
-                //self.send_string(conn_state, &format!("CAP * LIST: {}",
-                //    conn_state.caps_enabled.join(" "))).await
-                Ok(())
+                self.send_msg(conn_state, &format!("CAP * LIST :{}",
+                            conn_state.caps)).await
                 }
             CapCommand::REQ => {
                 conn_state.caps_negotation = true;
-                Ok(()) }
+                if let Some(cs) = caps {
+                    let mut new_caps = conn_state.caps;
+                    if cs.iter().all(|c| new_caps.apply_cap(c)) {
+                        conn_state.caps = new_caps;
+                        self.send_msg(conn_state,
+                            format!("CAP * ACK :{}", cs.join(" "))).await
+                    } else {    // NAK
+                        self.send_msg(conn_state,
+                            format!("CAP * NAK :{}", cs.join(" "))).await
+                    }
+                } else { Ok(()) }
+            }
             CapCommand::END => {
                 conn_state.caps_negotation = false;
                 Ok(()) }
