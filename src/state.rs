@@ -17,7 +17,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::cell::Cell;
+use std::cell::{RefCell,Cell};
 use std::pin::Pin;
 use std::collections::HashMap;
 use std::fmt;
@@ -38,18 +38,30 @@ use crate::reply::*;
 use crate::command::*;
 use crate::utils::*;
 
-struct User {
-    name: String,
-    nick: Cell<String>,
-    realname: String,
-    modes: Cell<UserModes>,
-    ip_addr: IpAddr,
-    hostname: String,
-    channels: HashMap<String, Weak<Channel>>,
-    sender: UnboundedSender<String>,
+struct UserModifiable {
+    nick: Option<String>,
+    modes: UserModes,
+    away: Option<String>,
     // user state
     operator: bool,
-    away: Option<String>,
+    channels: HashMap<String, Weak<Channel>>,
+}
+
+struct User {
+    name: Option<String>,
+    realname: String,
+    ip_addr: IpAddr,
+    hostname: String,
+    sender: UnboundedSender<String>,
+    modifiable: RefCell<UserModifiable>,
+}
+
+impl User {
+    fn client_name(&self) -> String {
+        if let Some(ref n) = self.modifiable.borrow().nick { n.clone() }
+        else if let Some(ref n) = self.name { n.clone() }
+        else { self.hostname.clone() }
+    }
 }
 
 enum OperatorType {
@@ -115,9 +127,13 @@ pub(crate) struct ConnState {
 }
 
 impl ConnState {
-    /*async fn read_command(&mut self) -> Command {
-        Command::QUIT{}
-    }*/
+    fn client_name(&self) -> String {
+        if let Some(ref user) = self.user {
+            user.client_name()
+        } else {
+            panic!("No user supplied!");
+        }
+    }
 }
 
 struct VolatileState {
@@ -162,12 +178,50 @@ impl MainState {
             },
             msg_str_res = conn_state.stream.next() => {
                 
-                let cmd = match msg_str_res {
-                    Some(Ok(ref msg_str)) => Command::from_message(
-                                &Message::from_shared_str(&msg_str)?)?,
+                let msg = match msg_str_res {
+                    Some(Ok(ref msg_str)) => {
+                        match Message::from_shared_str(&msg_str) {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                match e {
+                                    MessageError::Empty => {
+                                        self.send_msg(conn_state,
+                                            "ERROR :Empty message").await?;
+                                    }
+                                    MessageError::WrongSource => {
+                                        self.send_msg(conn_state,
+                                            "ERROR :Wrong source").await?;
+                                    }
+                                    MessageError::NoCommand => {
+                                        self.send_msg(conn_state,
+                                            "ERROR :No command supplied").await?;
+                                    }
+                                }
+                                return Err(Box::new(e));
+                            }
+                        }
+                    }
                     Some(Err(e)) => return Err(Box::new(e)),
                     // if end of stream
                     None => return Ok(()),
+                };
+                
+                let cmd = match Command::from_message(&msg) {
+                    Ok(cmd) => cmd,
+                    Err(e) => {
+                        use crate::CommandError::*;
+                        match e {
+                            UnknownCommand(ref cmd_name) => {}
+                            UnknownSubcommand(_, _) => {}
+                            NeedMoreParams(_) => {}
+                            ParameterDoesntMatch(_, _) => {}
+                            WrongParameter(_, _) => {}
+                            UnknownMode(_) => {}
+                            UnknownUModeFlag(_) => {}
+                            InvalidModeParam(_) => {}
+                        }
+                        return Err(Box::new(e));
+                    }
                 };
                 
                 use crate::Command::*;
