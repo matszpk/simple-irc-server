@@ -212,12 +212,28 @@ impl MainState {
                                         conn_state.user.client_name(&*modifiable),
                                         command: cmd_name }).await?;
                             }
-                            UnknownSubcommand(_, _) => {}
-                            NeedMoreParams(_) => {}
-                            ParameterDoesntMatch(_, _) => {}
-                            WrongParameter(_, _) => {}
-                            UnknownMode(_, _) => {}
-                            UnknownUModeFlag(_) => {}
+                            UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
+                                    WrongParameter(_, _) => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        format!("ERROR :{}", e.to_string())).await?;
+                            }
+                            NeedMoreParams(command) => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        Reply::ErrNeedMoreParams461{ client: 
+                                        conn_state.user.client_name(&*modifiable),
+                                        command: command.name }).await?;
+                            }
+                            UnknownMode(_, modechar) => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        Reply::ErrUnknownMode472{ client: 
+                                        conn_state.user.client_name(&*modifiable),
+                                        modechar }).await?;
+                            }
+                            UnknownUModeFlag(_) => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        Reply::ErrUmodeUnknownFlag501{ client:
+                                        conn_state.user.client_name(&*modifiable) }).await?;
+                            }
                             InvalidModeParam{ ref target, modechar, ref param,
                                     ref description } => {
                                 main_state_send!(conn_state.stream, self.config.name,

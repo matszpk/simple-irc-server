@@ -106,7 +106,7 @@ impl<'a> Message<'a> {
 
 #[const_table]
 pub(crate) enum CommandId {
-    CommandName{ name: &'static str },
+    CommandName{ pub(crate) name: &'static str },
     CAPId = CommandName{ name: "CAP" },
     AUTHENTICATEId = CommandName{ name: "AUTHENTICATE" },
     PASSId = CommandName{ name: "PASS" },
