@@ -57,10 +57,10 @@ struct User {
 }
 
 impl User {
-    fn client_name(&self) -> String {
-        if let Some(ref n) = self.modifiable.borrow().nick { n.clone() }
-        else if let Some(ref n) = self.name { n.clone() }
-        else { self.hostname.clone() }
+    fn client_name<'a>(&'a self, modifiable: &'a UserModifiable) -> &'a str {
+        if let Some(ref n) = modifiable.nick { &n }
+        else if let Some(ref n) = self.name { &n }
+        else { &self.hostname }
     }
 }
 
@@ -120,20 +120,10 @@ impl CapState {
 
 pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
-    user: Option<Arc<User>>,
+    user: Arc<User>,
     receiver: UnboundedReceiver<String>,
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
-}
-
-impl ConnState {
-    fn client_name(&self) -> String {
-        if let Some(ref user) = self.user {
-            user.client_name()
-        } else {
-            panic!("No user supplied!");
-        }
-    }
 }
 
 struct VolatileState {
@@ -168,6 +158,10 @@ impl MainState {
     }
 }
 
+macro_rules! main_state_send {
+    ($s:expr, $n:expr, $t:expr) => { $s.send(format!(":{} {}", $n, $t)) };
+}
+
 impl MainState {
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
@@ -185,15 +179,15 @@ impl MainState {
                             Err(e) => {
                                 match e {
                                     MessageError::Empty => {
-                                        self.send_msg(conn_state,
+                                        main_state_send!(conn_state.stream, self.config.name,
                                             "ERROR :Empty message").await?;
                                     }
                                     MessageError::WrongSource => {
-                                        self.send_msg(conn_state,
+                                        main_state_send!(conn_state.stream, self.config.name,
                                             "ERROR :Wrong source").await?;
                                     }
                                     MessageError::NoCommand => {
-                                        self.send_msg(conn_state,
+                                        main_state_send!(conn_state.stream, self.config.name,
                                             "ERROR :No command supplied").await?;
                                     }
                                 }
@@ -210,8 +204,14 @@ impl MainState {
                     Ok(cmd) => cmd,
                     Err(e) => {
                         use crate::CommandError::*;
+                        let modifiable = conn_state.user.modifiable.borrow();
                         match e {
-                            UnknownCommand(ref cmd_name) => {}
+                            UnknownCommand(ref cmd_name) => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        Reply::ErrUnknownCommand421{ client: 
+                                        conn_state.user.client_name(&*modifiable),
+                                        command: cmd_name }).await?;
+                            }
                             UnknownSubcommand(_, _) => {}
                             NeedMoreParams(_) => {}
                             ParameterDoesntMatch(_, _) => {}
@@ -302,21 +302,17 @@ impl MainState {
         }
     }
     
-    async fn send_msg<T: fmt::Display>(&self, conn_state: &mut ConnState, t: T)
-            -> Result<(), LinesCodecError> {
-        conn_state.stream.send(format!(":{} {}", self.config.name, t)).await
-    }
-    
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                self.send_msg(conn_state, "CAP * LS :multi-prefix").await
+                main_state_send!(conn_state.stream, self.config.name,
+                        "CAP * LS :multi-prefix").await
             }
             CapCommand::LIST => {
-                self.send_msg(conn_state, &format!("CAP * LIST :{}",
-                            conn_state.caps)).await
+                main_state_send!(conn_state.stream, self.config.name,
+                        &format!("CAP * LIST :{}", conn_state.caps)).await
                 }
             CapCommand::REQ => {
                 conn_state.caps_negotation = true;
@@ -324,10 +320,10 @@ impl MainState {
                     let mut new_caps = conn_state.caps;
                     if cs.iter().all(|c| new_caps.apply_cap(c)) {
                         conn_state.caps = new_caps;
-                        self.send_msg(conn_state,
+                        main_state_send!(conn_state.stream, self.config.name,
                             format!("CAP * ACK :{}", cs.join(" "))).await
                     } else {    // NAK
-                        self.send_msg(conn_state,
+                        main_state_send!(conn_state.stream, self.config.name,
                             format!("CAP * NAK :{}", cs.join(" "))).await
                     }
                 } else { Ok(()) }
