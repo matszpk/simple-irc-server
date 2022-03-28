@@ -229,22 +229,9 @@ impl MainState {
         }
     }
     
-    async fn send_reply<'a>(&self, conn_state: &mut ConnState, reply: Reply<'a>)
+    async fn send<T: fmt::Display>(&self, conn_state: &mut ConnState, t: T)
             -> Result<(), LinesCodecError> {
-        let mut s = ":".to_string();
-        s += &self.config.name;
-        s += " ";
-        s += &reply.to_string();
-        conn_state.stream.send(s).await
-    }
-    
-    async fn send_string<'a>(&self, conn_state: &mut ConnState, input: &'a str)
-            -> Result<(), LinesCodecError> {
-        let mut s = ":".to_string();
-        s += &self.config.name;
-        s += " ";
-        s += input;
-        conn_state.stream.send(s).await
+        conn_state.stream.send(format!(":{} {}", self.config.name, t)).await
     }
     
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
@@ -252,7 +239,7 @@ impl MainState {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                self.send_string(conn_state, "CAP * LS: multi-prefix").await
+                self.send(conn_state, "CAP * LS: multi-prefix").await
             }
             CapCommand::LIST => {
                 //self.send_string(conn_state, &format!("CAP * LIST: {}",
