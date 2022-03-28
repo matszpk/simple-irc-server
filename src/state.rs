@@ -216,9 +216,15 @@ impl MainState {
                             NeedMoreParams(_) => {}
                             ParameterDoesntMatch(_, _) => {}
                             WrongParameter(_, _) => {}
-                            UnknownMode(_) => {}
+                            UnknownMode(_, _) => {}
                             UnknownUModeFlag(_) => {}
-                            InvalidModeParam(_) => {}
+                            InvalidModeParam{ ref target, modechar, ref param,
+                                    ref description } => {
+                                main_state_send!(conn_state.stream, self.config.name,
+                                        Reply::ErrInvalidModeParam696{ client: 
+                                        conn_state.user.client_name(&*modifiable),
+                                        target, modechar, param, description }).await?;
+                            }
                         }
                         return Err(Box::new(e));
                     }

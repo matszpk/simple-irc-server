@@ -156,9 +156,9 @@ pub(crate) enum CommandError {
     NeedMoreParams(CommandId),
     ParameterDoesntMatch(CommandId, usize),
     WrongParameter(CommandId, usize),
-    UnknownMode(usize),
+    UnknownMode(usize, char),
     UnknownUModeFlag(usize),
-    InvalidModeParam(usize),
+    InvalidModeParam{ target: String, modechar: char, param: String, description: String },
 }
 
 use CommandError::*;
@@ -176,12 +176,13 @@ impl fmt::Display for CommandError {
                 write!(f, "Parameter {} doesn't match for command '{}'", i, s.name),
             WrongParameter(s, i) =>
                 write!(f, "Wrong parameter {} in command '{}'", i, s.name),
-            UnknownMode(i) =>
-                write!(f, "Unknown mode in parameter {}", i),
+            UnknownMode(i, c) =>
+                write!(f, "Unknown mode {} in parameter {}", c, i),
             UnknownUModeFlag(i) =>
                 write!(f, "Unknown umode flag in parameter {}", i),
-            InvalidModeParam(i) =>
-                write!(f, "Invalid mode parameter in parameter {}", i),
+            InvalidModeParam{ modechar, param, target, description } =>
+                write!(f, "Invalid mode parameter: {} {} {} {}", target, modechar,
+                        param, description),
         }
     }
 }
@@ -650,7 +651,7 @@ impl<'a> Command<'a> {
             }
             MODE{ target, modes } => {
                 if validate_channel(target).is_ok() {
-                    validate_channelmodes(modes)
+                    validate_channelmodes(target, modes)
                 } else if validate_username(target).is_ok() {
                     validate_usermodes(modes)
                 } else { Err(WrongParameter(MODEId, 0)) }
@@ -1177,40 +1178,43 @@ mod test {
         assert_eq!(Ok(MODE{ target: "andy", modes: vec![] }),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "andy" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis l  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+l" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis k  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+k" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis o  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+o" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis o  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-o" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis h  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+h" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis h  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-h" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis v  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+v" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis v  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-v" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis l xxx invalid digit found in \
+                string".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "+l", "xxx" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis l 145 \
+                Unexpected argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-l", "145" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis k 145 \
+                Unexpected argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-k", "145" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Invalid mode parameter in parameter 3".to_string()),
+        assert_eq!(Err("Invalid mode parameter: #chasis o  No argument".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "#chasis", "-bl+oi", "*@192.168.0.1" ] })
                     .map_err(|e| e.to_string()));
