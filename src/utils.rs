@@ -116,7 +116,7 @@ pub(crate) fn validate_usermodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
             if ms.find(|c|
                 c!='+' && c!='-' && c!='i' && c!='o' &&
                     c!='O' && c!='r' && c!='w').is_some() {
-                Err(WrongParameter(MODEId, param_idx))
+                Err(UnknownUModeFlag(param_idx))
             } else if margs.len() != 0 {
                 Err(WrongParameter(MODEId, param_idx))
             } else {
@@ -150,24 +150,24 @@ pub(crate) fn validate_channelmodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                     'o'|'v'|'h' => {
                         if let Some(arg) = margs_it.next() {
                             validate_username(arg).map_err(|_|
-                                WrongParameter(MODEId, arg_param_idx))?;
+                                InvalidModeParam(arg_param_idx))?;
                             arg_param_idx += 1;
                         } else {
-                            return Err(WrongParameter(MODEId, arg_param_idx));
+                            return Err(InvalidModeParam(arg_param_idx));
                         }
                     }
                     'l' => {
                         if mode_set {
                             if let Some(arg) = margs_it.next() {
                                 if arg.parse::<usize>().is_err() {
-                                    return Err(WrongParameter(MODEId, arg_param_idx));
+                                    return Err(InvalidModeParam(arg_param_idx));
                                 }
                                 arg_param_idx += 1;
                             } else {
-                                return Err(WrongParameter(MODEId, arg_param_idx));
+                                return Err(InvalidModeParam(arg_param_idx));
                             }
                         } else if margs_it.next().is_some() {
-                            return Err(WrongParameter(MODEId, arg_param_idx));
+                            return Err(InvalidModeParam(arg_param_idx));
                         }
                     }
                     'k' => {
@@ -175,14 +175,14 @@ pub(crate) fn validate_channelmodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                             if let Some(arg) = margs_it.next() {
                                 arg_param_idx += 1;
                             } else {
-                                return Err(WrongParameter(MODEId, arg_param_idx));
+                                return Err(InvalidModeParam(arg_param_idx));
                             }
                         } else if margs_it.next().is_some() {
-                            return Err(WrongParameter(MODEId, arg_param_idx));
+                            return Err(InvalidModeParam(arg_param_idx));
                         }
                     }
                     'i'|'m'|'t'|'n'|'s'|'p' => { },
-                    _ => { return Err(WrongParameter(MODEId, param_idx)); }
+                    _ => { return Err(UnknownMode(param_idx)); }
                 }
                 Ok(())
             })?;
@@ -308,7 +308,7 @@ mod test {
         assert_eq!(Err("Wrong parameter 1 in command 'MODE'".to_string()),
             validate_usermodes(&vec![("+io-rw", vec!["xx"]),
                     ("-O", vec![])]).map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+        assert_eq!(Err("Unknown umode flag in parameter 2".to_string()),
             validate_usermodes(&vec![
                 ("+io-rw", vec![]), ("-x", vec![])]).map_err(|e| e.to_string()));
     }
@@ -337,21 +337,21 @@ mod test {
         assert_eq!(Ok(()), validate_channelmodes(&vec![
             ("+tb", vec!["barry"]), ("-iI", vec!["guru"]), ("+es", vec!["eagle"])])
                 .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+        assert_eq!(Err("Unknown mode in parameter 2".to_string()),
             validate_channelmodes(&vec![("+ntp", vec![]), ("-sum", vec![])])
                 .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
             validate_channelmodes(&vec![("+nltp", vec![]), ("-s+km", vec!["xxyy"])])
                 .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 6 in command 'MODE'".to_string()),
+        assert_eq!(Err("Invalid mode parameter in parameter 6".to_string()),
             validate_channelmodes(&vec![
                 ("+ot", vec!["barry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jer:ry"])])
                     .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 4 in command 'MODE'".to_string()),
+        assert_eq!(Err("Invalid mode parameter in parameter 4".to_string()),
             validate_channelmodes(&vec![
                 ("+ot", vec!["barry"]), ("-nh", vec!["gu:ru"]), ("+vm", vec!["jerry"])])
                     .map_err(|e| e.to_string()));
-        assert_eq!(Err("Wrong parameter 2 in command 'MODE'".to_string()),
+        assert_eq!(Err("Invalid mode parameter in parameter 2".to_string()),
             validate_channelmodes(&vec![
                 ("+ot", vec!["b,arry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
                     .map_err(|e| e.to_string()));
