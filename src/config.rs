@@ -19,6 +19,7 @@
 
 use std::collections::HashSet;
 use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
@@ -84,15 +85,15 @@ impl Default for UserModes {
     }
 }
 
-impl ToString for UserModes {
-    fn to_string(&self) -> String {
+impl fmt::Display for UserModes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = '+'.to_string();
         if self.invisible { s.push('i'); }
         if self.oper { s.push('o'); }
         if self.local_oper { s.push('O'); }
         if self.registered { s.push('r'); }
         if self.wallops { s.push('w'); }
-        s
+        f.write_str(&s)
     }
 }
 
@@ -123,8 +124,8 @@ impl Default for ChannelModes {
     }
 }
 
-impl ToString for ChannelModes {
-    fn to_string(&self) -> String {
+impl fmt::Display for ChannelModes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = '+'.to_string();
         if self.invite { s.push('i'); }
         if self.private { s.push('p'); }
@@ -177,7 +178,7 @@ impl ToString for ChannelModes {
                 s += v;
             });
         }
-        s
+        f.write_str(&s)
     }
 }
 

@@ -77,13 +77,22 @@ struct Channel {
     users: HashMap<String, ChannelUser>,
 }
 
+pub(crate) struct CapState {
+    multi_prefix: bool,
+}
+
+impl Default for CapState {
+    fn default() -> Self {
+        CapState{ multi_prefix: false }
+    }
+}
+
 pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
     user: Option<Arc<User>>,
     receiver: UnboundedReceiver<String>,
-    // state
     caps_negotation: bool,  // if caps negotation process
-    caps_enabled: Vec<String>,
+    caps: CapState,
 }
 
 impl ConnState {
@@ -246,13 +255,12 @@ impl MainState {
                 self.send_string(conn_state, "CAP * LS: multi-prefix").await
             }
             CapCommand::LIST => {
-                self.send_string(conn_state, &format!("CAP * LIST: {}",
-                    conn_state.caps_enabled.join(" "))).await
+                //self.send_string(conn_state, &format!("CAP * LIST: {}",
+                //    conn_state.caps_enabled.join(" "))).await
+                Ok(())
                 }
             CapCommand::REQ => {
                 conn_state.caps_negotation = true;
-                if let Some(caps) = caps {
-                }
                 Ok(()) }
             CapCommand::END => {
                 conn_state.caps_negotation = false;
