@@ -241,11 +241,12 @@ use Command::*;
 
 impl<'a> Command<'a> {
     fn parse_from_message(message: &Message<'a>) -> Result<Self, CommandError> {
-        match message.command {
+        match message.command.to_ascii_uppercase().as_str() {
             "CAP" => {
                 if message.params.len() >= 1 {
                     let mut param_it = message.params.iter();
-                    let subcommand = match *param_it.next().unwrap() {
+                    let subcommand = match param_it.next().unwrap()
+                            .to_ascii_uppercase().as_str() {
                         "LS" => CapCommand::LS,
                         "LIST" => CapCommand::LIST,
                         "REQ" => CapCommand::REQ,
@@ -1406,6 +1407,11 @@ mod test {
                 params: vec![ "This is some message" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'WALLOPS' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "WALLOPS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        // case-insensitivness
+        assert_eq!(Ok(RESTART{}),
+            Command::from_message(&Message{ source: None, command: "reStaRt",
                 params: vec![] }).map_err(|e| e.to_string()));
     }
 }
