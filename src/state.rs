@@ -164,7 +164,7 @@ impl MainState {
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
         let res = self.process_internal(conn_state).await;
-        conn_state.stream.flush().await;
+        conn_state.stream.flush().await?;
         res
     }
 
