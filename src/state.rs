@@ -17,7 +17,8 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::cell::{RefCell,Cell};
+use std::ops::Deref;
+use std::cell::{RefCell};
 use std::pin::Pin;
 use std::collections::HashMap;
 use std::fmt;
@@ -79,7 +80,7 @@ struct ChannelUserMode {
 
 struct ChannelUser {
     user: Rc<User>,
-    mode: Cell<ChannelUserMode>,
+    mode: RefCell<ChannelUserMode>,
 }
 
 struct Channel {
@@ -209,7 +210,7 @@ impl MainState {
                             UnknownCommand(ref cmd_name) => {
                                 main_state_send!(conn_state.stream, self.config.name,
                                         Reply::ErrUnknownCommand421{ client: 
-                                        conn_state.user.client_name(&*modifiable),
+                                        conn_state.user.client_name(modifiable.deref()),
                                         command: cmd_name }).await?;
                             }
                             UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
@@ -220,25 +221,26 @@ impl MainState {
                             NeedMoreParams(command) => {
                                 main_state_send!(conn_state.stream, self.config.name,
                                         Reply::ErrNeedMoreParams461{ client: 
-                                        conn_state.user.client_name(&*modifiable),
+                                        conn_state.user.client_name(modifiable.deref()),
                                         command: command.name }).await?;
                             }
                             UnknownMode(_, modechar) => {
                                 main_state_send!(conn_state.stream, self.config.name,
                                         Reply::ErrUnknownMode472{ client: 
-                                        conn_state.user.client_name(&*modifiable),
+                                        conn_state.user.client_name(modifiable.deref()),
                                         modechar }).await?;
                             }
                             UnknownUModeFlag(_) => {
                                 main_state_send!(conn_state.stream, self.config.name,
                                         Reply::ErrUmodeUnknownFlag501{ client:
-                                        conn_state.user.client_name(&*modifiable) }).await?;
+                                        conn_state.user.client_name(modifiable.deref()) })
+                                        .await?;
                             }
                             InvalidModeParam{ ref target, modechar, ref param,
                                     ref description } => {
                                 main_state_send!(conn_state.stream, self.config.name,
                                         Reply::ErrInvalidModeParam696{ client: 
-                                        conn_state.user.client_name(&*modifiable),
+                                        conn_state.user.client_name(modifiable.deref()),
                                         target, modechar, param, description }).await?;
                             }
                         }
