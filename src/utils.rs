@@ -19,7 +19,7 @@
 
 use std::error::Error;
 use bytes::{BufMut, BytesMut};
-use tokio_util::codec::{Framed, LinesCodec, Decoder, Encoder};
+use tokio_util::codec::{Framed, LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
 
 use crate::command::CommandId::*;
@@ -36,11 +36,10 @@ impl IRCLinesCodec {
     }
 }
 
-impl<T: AsRef<str>> Encoder<T> for IRCLinesCodec {
-    type Error = <LinesCodec as Encoder<T>>::Error;
+impl Encoder<String> for IRCLinesCodec {
+    type Error = LinesCodecError;
 
-    fn encode(&mut self, line: T, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        let line = line.as_ref();
+    fn encode(&mut self, line: String, buf: &mut BytesMut) -> Result<(), Self::Error> {
         buf.reserve(line.len() + 1);
         buf.put(line.as_bytes());
         // put "\r\n"
@@ -51,8 +50,8 @@ impl<T: AsRef<str>> Encoder<T> for IRCLinesCodec {
 }
 
 impl Decoder for IRCLinesCodec {
-    type Item = <LinesCodec as Decoder>::Item;
-    type Error = <LinesCodec as Decoder>::Error;
+    type Item = String;
+    type Error = LinesCodecError;
     
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, Self::Error> {
         self.0.decode(buf)
@@ -218,7 +217,7 @@ mod test {
     fn test_irc_lines_codec() {
         let mut codec = IRCLinesCodec::new();
         let mut buf = BytesMut::new();
-        codec.encode("my line", &mut buf).unwrap();
+        codec.encode("my line".to_string(), &mut buf).unwrap();
         assert_eq!("my line\r\n".as_bytes(), buf);
         let mut buf = BytesMut::from("my line 2\n");
         assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),

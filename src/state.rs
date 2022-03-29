@@ -163,6 +163,13 @@ impl MainState {
 impl MainState {
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
+        let res = self.process_internal(conn_state).await;
+        conn_state.stream.flush().await;
+        res
+    }
+
+    async fn process_internal(&mut self, conn_state: &mut ConnState)
+                -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Some(msg) = conn_state.receiver.recv() => {
                 conn_state.stream.send(msg).await?;
