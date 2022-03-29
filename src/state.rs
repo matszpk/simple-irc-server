@@ -329,8 +329,7 @@ impl MainState {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                self.send_msg(&mut conn_state.stream,
-                        "CAP * LS :multi-prefix").await
+                self.send_msg(&mut conn_state.stream, "CAP * LS :multi-prefix").await
             }
             CapCommand::LIST => {
                 self.send_msg(&mut conn_state.stream,
@@ -380,6 +379,9 @@ impl MainState {
     
     async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
+        let mut pong = "PONG ".to_string();
+        pong.push_str(token) ;
+        self.send_msg(&mut conn_state.stream, pong).await?;
         Ok(())
     }
     
