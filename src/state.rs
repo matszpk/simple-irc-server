@@ -172,7 +172,7 @@ impl MainState {
                 -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Some(msg) = conn_state.receiver.recv() => {
-                conn_state.stream.send(msg).await?;
+                conn_state.stream.feed(msg).await?;
                 Ok(())
             },
             msg_str_res = conn_state.stream.next() => {
@@ -184,15 +184,15 @@ impl MainState {
                             Err(e) => {
                                 match e {
                                     MessageError::Empty => {
-                                        self.send_msg(&mut conn_state.stream,
+                                        self.feed_msg(&mut conn_state.stream,
                                             "ERROR :Empty message").await?;
                                     }
                                     MessageError::WrongSource => {
-                                        self.send_msg(&mut conn_state.stream,
+                                        self.feed_msg(&mut conn_state.stream,
                                             "ERROR :Wrong source").await?;
                                     }
                                     MessageError::NoCommand => {
-                                        self.send_msg(&mut conn_state.stream,
+                                        self.feed_msg(&mut conn_state.stream,
                                             "ERROR :No command supplied").await?;
                                     }
                                 }
@@ -213,33 +213,33 @@ impl MainState {
                         let client = conn_state.user.client_name(modifiable.deref());
                         match e {
                             UnknownCommand(ref cmd_name) => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         Reply::ErrUnknownCommand421{ client,
                                         command: cmd_name }).await?;
                             }
                             UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
                                     WrongParameter(_, _) => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         format!("ERROR :{}", e.to_string())).await?;
                             }
                             NeedMoreParams(command) => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         Reply::ErrNeedMoreParams461{ client,
                                         command: command.name }).await?;
                             }
                             UnknownMode(_, modechar) => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         Reply::ErrUnknownMode472{ client,
                                         modechar }).await?;
                             }
                             UnknownUModeFlag(_) => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         Reply::ErrUmodeUnknownFlag501{ client })
                                         .await?;
                             }
                             InvalidModeParam{ ref target, modechar, ref param,
                                     ref description } => {
-                                self.send_msg(&mut conn_state.stream,
+                                self.feed_msg(&mut conn_state.stream,
                                         Reply::ErrInvalidModeParam696{ client,
                                         target, modechar, param, description }).await?;
                             }
@@ -326,10 +326,10 @@ impl MainState {
         }
     }
     
-    async fn send_msg<T: fmt::Display>(&self,
+    async fn feed_msg<T: fmt::Display>(&self,
             stream: &mut Framed<TcpStream, IRCLinesCodec>, t: T)
             -> Result<(), LinesCodecError> {
-        stream.send(format!(":{} {}", self.config.name, t)).await
+        stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
@@ -337,10 +337,10 @@ impl MainState {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                self.send_msg(&mut conn_state.stream, "CAP * LS :multi-prefix").await
+                self.feed_msg(&mut conn_state.stream, "CAP * LS :multi-prefix").await
             }
             CapCommand::LIST => {
-                self.send_msg(&mut conn_state.stream,
+                self.feed_msg(&mut conn_state.stream,
                         &format!("CAP * LIST :{}", conn_state.caps)).await
                 }
             CapCommand::REQ => {
@@ -349,10 +349,10 @@ impl MainState {
                     let mut new_caps = conn_state.caps;
                     if cs.iter().all(|c| new_caps.apply_cap(c)) {
                         conn_state.caps = new_caps;
-                        self.send_msg(&mut conn_state.stream,
+                        self.feed_msg(&mut conn_state.stream,
                             format!("CAP * ACK :{}", cs.join(" "))).await
                     } else {    // NAK
-                        self.send_msg(&mut conn_state.stream,
+                        self.feed_msg(&mut conn_state.stream,
                             format!("CAP * NAK :{}", cs.join(" "))).await
                     }
                 } else { Ok(()) }
@@ -387,7 +387,7 @@ impl MainState {
     
     async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
-        self.send_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
+        self.feed_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
                     token)).await?;
         Ok(())
     }
@@ -400,7 +400,7 @@ impl MainState {
     async fn process_quit<'a>(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         conn_state.quit = true;
-        self.send_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
+        self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
     }
     
