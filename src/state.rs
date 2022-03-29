@@ -159,10 +159,6 @@ impl MainState {
     }
 }
 
-macro_rules! main_state_send {
-    ($s:expr, $n:expr, $t:expr) => { $s.send(format!(":{} {}", $n, $t)) };
-}
-
 impl MainState {
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
@@ -180,15 +176,15 @@ impl MainState {
                             Err(e) => {
                                 match e {
                                     MessageError::Empty => {
-                                        main_state_send!(conn_state.stream, self.config.name,
+                                        self.send_msg(&mut conn_state.stream,
                                             "ERROR :Empty message").await?;
                                     }
                                     MessageError::WrongSource => {
-                                        main_state_send!(conn_state.stream, self.config.name,
+                                        self.send_msg(&mut conn_state.stream,
                                             "ERROR :Wrong source").await?;
                                     }
                                     MessageError::NoCommand => {
-                                        main_state_send!(conn_state.stream, self.config.name,
+                                        self.send_msg(&mut conn_state.stream,
                                             "ERROR :No command supplied").await?;
                                     }
                                 }
@@ -206,41 +202,37 @@ impl MainState {
                     Err(e) => {
                         use crate::CommandError::*;
                         let modifiable = conn_state.user.modifiable.borrow();
+                        let client = conn_state.user.client_name(modifiable.deref());
                         match e {
                             UnknownCommand(ref cmd_name) => {
-                                main_state_send!(conn_state.stream, self.config.name,
-                                        Reply::ErrUnknownCommand421{ client: 
-                                        conn_state.user.client_name(modifiable.deref()),
+                                self.send_msg(&mut conn_state.stream,
+                                        Reply::ErrUnknownCommand421{ client,
                                         command: cmd_name }).await?;
                             }
                             UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
                                     WrongParameter(_, _) => {
-                                main_state_send!(conn_state.stream, self.config.name,
+                                self.send_msg(&mut conn_state.stream,
                                         format!("ERROR :{}", e.to_string())).await?;
                             }
                             NeedMoreParams(command) => {
-                                main_state_send!(conn_state.stream, self.config.name,
-                                        Reply::ErrNeedMoreParams461{ client: 
-                                        conn_state.user.client_name(modifiable.deref()),
+                                self.send_msg(&mut conn_state.stream,
+                                        Reply::ErrNeedMoreParams461{ client,
                                         command: command.name }).await?;
                             }
                             UnknownMode(_, modechar) => {
-                                main_state_send!(conn_state.stream, self.config.name,
-                                        Reply::ErrUnknownMode472{ client: 
-                                        conn_state.user.client_name(modifiable.deref()),
+                                self.send_msg(&mut conn_state.stream,
+                                        Reply::ErrUnknownMode472{ client,
                                         modechar }).await?;
                             }
                             UnknownUModeFlag(_) => {
-                                main_state_send!(conn_state.stream, self.config.name,
-                                        Reply::ErrUmodeUnknownFlag501{ client:
-                                        conn_state.user.client_name(modifiable.deref()) })
+                                self.send_msg(&mut conn_state.stream,
+                                        Reply::ErrUmodeUnknownFlag501{ client })
                                         .await?;
                             }
                             InvalidModeParam{ ref target, modechar, ref param,
                                     ref description } => {
-                                main_state_send!(conn_state.stream, self.config.name,
-                                        Reply::ErrInvalidModeParam696{ client: 
-                                        conn_state.user.client_name(modifiable.deref()),
+                                self.send_msg(&mut conn_state.stream,
+                                        Reply::ErrInvalidModeParam696{ client,
                                         target, modechar, param, description }).await?;
                             }
                         }
@@ -326,16 +318,22 @@ impl MainState {
         }
     }
     
+    async fn send_msg<T: fmt::Display>(&self,
+            stream: &mut Framed<TcpStream, IRCLinesCodec>, t: T)
+            -> Result<(), LinesCodecError> {
+        stream.send(format!(":{} {}", self.config.name, t)).await
+    }
+    
     async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
-                main_state_send!(conn_state.stream, self.config.name,
+                self.send_msg(&mut conn_state.stream,
                         "CAP * LS :multi-prefix").await
             }
             CapCommand::LIST => {
-                main_state_send!(conn_state.stream, self.config.name,
+                self.send_msg(&mut conn_state.stream,
                         &format!("CAP * LIST :{}", conn_state.caps)).await
                 }
             CapCommand::REQ => {
@@ -344,10 +342,10 @@ impl MainState {
                     let mut new_caps = conn_state.caps;
                     if cs.iter().all(|c| new_caps.apply_cap(c)) {
                         conn_state.caps = new_caps;
-                        main_state_send!(conn_state.stream, self.config.name,
+                        self.send_msg(&mut conn_state.stream,
                             format!("CAP * ACK :{}", cs.join(" "))).await
                     } else {    // NAK
-                        main_state_send!(conn_state.stream, self.config.name,
+                        self.send_msg(&mut conn_state.stream,
                             format!("CAP * NAK :{}", cs.join(" "))).await
                     }
                 } else { Ok(()) }
