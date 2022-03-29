@@ -147,6 +147,7 @@ pub(crate) enum Reply<'a> {
     ErrNoPrivileges481{ client: &'a str },
     ErrChanOpPrivsNeeded482{ client: &'a str, channel: &'a str },
     ErrCantKillServer483{ client: &'a str },
+    ErrYourConnRestricted484{ client: &'a str },
     ErrNoOperhost491{ client: &'a str },
     ErrUmodeUnknownFlag501{ client: &'a str },
     ErrUsersDontMatch502{ client: &'a str },
@@ -406,6 +407,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "482 {} {} :You're not channel operator", client, channel) }
             ErrCantKillServer483{ client } => {
                 write!(f, "483 {} :You cant kill a server!", client) }
+            ErrYourConnRestricted484{ client } => {
+                write!(f, "484 {} :Your connection is restricted!", client) }
             ErrNoOperhost491{ client } => {
                 write!(f, "491 {} :No O-lines for your host", client) }
             ErrUmodeUnknownFlag501{ client } => {
@@ -726,6 +729,8 @@ mod test {
                 channel: "<channel>" }));
         assert_eq!("483 <client> :You cant kill a server!",
             format!("{}", ErrCantKillServer483{ client: "<client>" }));
+        assert_eq!("484 <client> :Your connection is restricted!",
+            format!("{}", ErrYourConnRestricted484{ client: "<client>" }));
         assert_eq!("491 <client> :No O-lines for your host",
             format!("{}", ErrNoOperhost491{ client: "<client>" }));
         assert_eq!("501 <client> :Unknown MODE flag",

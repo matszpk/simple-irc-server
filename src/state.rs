@@ -39,6 +39,8 @@ use crate::reply::*;
 use crate::command::*;
 use crate::utils::*;
 
+use Reply::*;
+
 struct UserModifiable {
     nick: Option<String>,
     modes: UserModes,
@@ -214,7 +216,7 @@ impl MainState {
                         match e {
                             UnknownCommand(ref cmd_name) => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        Reply::ErrUnknownCommand421{ client,
+                                        ErrUnknownCommand421{ client,
                                         command: cmd_name }).await?;
                             }
                             UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
@@ -224,23 +226,23 @@ impl MainState {
                             }
                             NeedMoreParams(command) => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        Reply::ErrNeedMoreParams461{ client,
+                                        ErrNeedMoreParams461{ client,
                                         command: command.name }).await?;
                             }
                             UnknownMode(_, modechar) => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        Reply::ErrUnknownMode472{ client,
+                                        ErrUnknownMode472{ client,
                                         modechar }).await?;
                             }
                             UnknownUModeFlag(_) => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        Reply::ErrUmodeUnknownFlag501{ client })
+                                        ErrUmodeUnknownFlag501{ client })
                                         .await?;
                             }
                             InvalidModeParam{ ref target, modechar, ref param,
                                     ref description } => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        Reply::ErrInvalidModeParam696{ client,
+                                        ErrInvalidModeParam696{ client,
                                         target, modechar, param, description }).await?;
                             }
                         }
@@ -364,8 +366,13 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_authenticate<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_authenticate(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        let modifiable = conn_state.user.modifiable.borrow();
+        let client = conn_state.user.client_name(modifiable.deref());
+        
+        self.feed_msg(&mut conn_state.stream, ErrUnknownCommand421{ client,
+                command: "AUTHENTICATE" }).await?;
         Ok(())
     }
     
@@ -397,7 +404,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_quit<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_quit(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         conn_state.quit = true;
         self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
@@ -441,6 +448,14 @@ impl MainState {
     
     async fn process_motd<'a>(&mut self, conn_state: &mut ConnState, target: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
+        let modifiable = conn_state.user.modifiable.borrow();
+        let client = conn_state.user.client_name(modifiable.deref());
+        
+        self.feed_msg(&mut conn_state.stream, RplMotdStart375{ client,
+                server: &self.config.name }).await?;
+        self.feed_msg(&mut conn_state.stream, RplMotd372{ client,
+                motd: &self.config.motd }).await?;
+        self.feed_msg(&mut conn_state.stream, RplEndOfMotd376{ client }).await?;
         Ok(())
     }
     
@@ -459,7 +474,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_lusers<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_lusers(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
@@ -485,8 +500,14 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_info<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_info(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        let modifiable = conn_state.user.modifiable.borrow();
+        let client = conn_state.user.client_name(modifiable.deref());
+        
+        self.feed_msg(&mut conn_state.stream, RplInfo371{ client, info:
+            concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION")) }).await?;
+        self.feed_msg(&mut conn_state.stream, RplEndOfInfo374{ client }).await?;
         Ok(())
     }
     
@@ -525,12 +546,12 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_rehash<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_rehash(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_restart<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_restart(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }

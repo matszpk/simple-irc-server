@@ -210,6 +210,7 @@ pub(crate) struct MainConfig {
     pub(crate) admin_info: String,
     pub(crate) admin_info2: Option<String>,
     pub(crate) info: String,
+    pub(crate) motd: String,
     pub(crate) listen: IpAddr,
     pub(crate) port: u16,
     pub(crate) network: String,
@@ -296,6 +297,7 @@ impl Default for MainConfig {
             listen: "127.0.0.1".parse().unwrap(),
             port: 6667,
             network: "IRCnetwork".to_string(),
+            motd: "Hello, world!".to_string(),
             max_connections: None,
             max_joins: None,
             max_nickname_len: 20,
@@ -355,6 +357,7 @@ max_joins = 10
 max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
+motd = "Hello, guys!"
 dns_lookup = false
 
 [default_user_modes]
@@ -415,6 +418,7 @@ no_external_messages = false
             info: "This is IRCI server".to_string(),
             listen: "127.0.0.1".parse().unwrap(),
             port: 6667,
+            motd: "Hello, guys!".to_string(),
             network: "IRCInetwork".to_string(),
             max_connections: Some(4000),
             max_joins: Some(10),
@@ -484,6 +488,7 @@ no_external_messages = false
             info: "This is IRCI server".to_string(),
             listen: "192.168.1.4".parse().unwrap(),
             port: 6668,
+            motd: "Hello, guys!".to_string(),
             network: "SomeNetwork".to_string(),
             max_connections: Some(4000),
             max_joins: Some(10),
@@ -557,6 +562,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_nickname_len = 20
 ping_timeout = 100
@@ -602,6 +608,7 @@ no_external_messages = false
             info: "This is IRCI server".to_string(),
             listen: "127.0.0.1".parse().unwrap(),
             port: 6667,
+            motd: "Hello, guys!".to_string(),
             network: "IRCInetwork".to_string(),
             max_connections: None,
             max_joins: None,
@@ -655,6 +662,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
@@ -727,6 +735,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
@@ -796,6 +805,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
@@ -865,6 +875,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
@@ -935,6 +946,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
