@@ -253,7 +253,7 @@ impl MainState {
                     USER{ username, hostname, servername, realname } =>
                         self.process_user(conn_state, username, hostname,
                                 servername, realname).await,
-                    PING{ } => self.process_ping(conn_state).await,
+                    PING{ token } => self.process_ping(conn_state, token).await,
                     OPER{ name, password } =>
                         self.process_oper(conn_state, name, password).await,
                     QUIT{ } => self.process_quit(conn_state).await,
@@ -372,13 +372,13 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_user<'a>(&mut self, conn_state: &mut ConnState, usernama: &'a str,
+    async fn process_user<'a>(&mut self, conn_state: &mut ConnState, username: &'a str,
             hostname: &'a str, servername: &'a str, realname: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_ping<'a>(&mut self, conn_state: &mut ConnState)
+    async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }

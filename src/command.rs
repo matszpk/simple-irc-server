@@ -202,7 +202,7 @@ pub(crate) enum Command<'a> {
     PASS{ password: &'a str },
     NICK{ nickname: &'a str },
     USER{ username: &'a str, hostname: &'a str, servername: &'a str, realname: &'a str },
-    PING{ },
+    PING{ token: &'a str },
     OPER{ name: &'a str, password: &'a str },
     QUIT{ },
     JOIN{ channels: Vec<&'a str>, keys: Option<Vec<&'a str>> },
@@ -292,7 +292,12 @@ impl<'a> Command<'a> {
                 } else {
                     Err(NeedMoreParams(USERId)) }
             }
-            "PING" => Ok(PING{}),
+            "PING" => {
+                if message.params.len() >= 1 {
+                    Ok(PING{ token: message.params[0] })
+                } else {
+                    Err(NeedMoreParams(PINGId)) }
+            }
             "OPER" => {
                 if message.params.len() >= 2 {
                     Ok(OPER{ name: message.params[0],
@@ -807,7 +812,10 @@ mod test {
             Command::from_message(&Message{ source: None, command: "USER",
                 params: vec![ "chris", "0", "*" ] }).map_err(|e| e.to_string()));
         
-        assert_eq!(Ok(PING{}),
+        assert_eq!(Ok(PING{ token: "xxxaaa" }),
+            Command::from_message(&Message{ source: None, command: "PING",
+                params: vec![ "xxxaaa" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'PING' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "PING",
                 params: vec![] }).map_err(|e| e.to_string()));
         
