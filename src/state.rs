@@ -125,6 +125,7 @@ pub(crate) struct ConnState {
     receiver: UnboundedReceiver<String>,
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
+    quit: bool,
 }
 
 struct VolatileState {
@@ -379,9 +380,8 @@ impl MainState {
     
     async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
-        let mut pong = "PONG ".to_string();
-        pong.push_str(token) ;
-        self.send_msg(&mut conn_state.stream, pong).await?;
+        self.send_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
+                    token)).await?;
         Ok(())
     }
     
@@ -392,6 +392,8 @@ impl MainState {
     
     async fn process_quit<'a>(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        conn_state.quit = true;
+        self.send_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
     }
     
