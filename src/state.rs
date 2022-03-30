@@ -52,6 +52,7 @@ struct UserModifiable {
     operator: bool,
     channels: HashMap<String, Weak<Channel>>,
     password: Option<String>,
+    authenticated: bool,
 }
 
 impl UserModifiable {
@@ -411,38 +412,56 @@ impl MainState {
     
     async fn authenticate(&mut self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
-        if !conn_state.caps_negotation {
-            let modifiable = conn_state.user.modifiable.borrow();
-            if let Some(ref nick) = modifiable.nick {
-                if let Some(ref name) = modifiable.name {
-                    let password_opt = if let Some(uidx) = self.user_config_idxs.get(name) {
-                        // match user mask
-                        if let Some(ref users) = self.config.users {
-                            if let Some(ref mask) = users[*uidx].mask {
-                                if match_wildcard(&mask, &modifiable.source) {
-                                    users[*uidx].password.as_ref()
-                                } else {
-                                    self.feed_msg(&mut conn_state.stream,
-                                        "ERROR: user mask doesn't match").await?;
-                                    return Ok(());
-                                }
-                            } else { users[*uidx].password.as_ref() }
+        let auth_opt = { 
+            if !conn_state.caps_negotation {
+                let mut modifiable = conn_state.user.modifiable.borrow_mut();
+                if let Some(ref nick) = modifiable.nick {
+                    if let Some(ref name) = modifiable.name {
+                        let password_opt = if let Some(uidx) = self.user_config_idxs.get(name) {
+                            // match user mask
+                            if let Some(ref users) = self.config.users {
+                                if let Some(ref mask) = users[*uidx].mask {
+                                    if match_wildcard(&mask, &modifiable.source) {
+                                        users[*uidx].password.as_ref()
+                                    } else {
+                                        self.feed_msg(&mut conn_state.stream,
+                                            "ERROR: user mask doesn't match").await?;
+                                        return Ok(());
+                                    }
+                                } else { users[*uidx].password.as_ref() }
+                            } else { None }
                         } else { None }
-                    } else { None }
-                        .or(self.config.password.as_ref());
-                    
-                    if let Some(password) = password_opt {
-                        let good = if let Some(ref entered_pwd) = modifiable.password {
-                            *entered_pwd == *password
-                        } else { false };
+                            .or(self.config.password.as_ref());
                         
-                        if good {
-                            // welcome
-                        } else {
-                            // error
-                        }
-                    }
-                }
+                        if let Some(password) = password_opt {
+                            let good = if let Some(ref entered_pwd) = modifiable.password {
+                                *entered_pwd == *password
+                            } else { false };
+                            
+                            modifiable.authenticated = good;
+                            Some(good)
+                        } else { Some(true) }
+                    } else { None }
+                } else { None }
+            } else { None }
+        };
+        
+        if let Some(good) = auth_opt {
+            let modifiable = conn_state.user.modifiable.borrow();
+            let client = conn_state.user.client_name(modifiable.deref());
+            if good {
+                // welcome
+                self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
+                    networkname: &self.config.network,
+                            nick: modifiable.name.as_deref().unwrap_or_default(),
+                            user: modifiable.name.as_deref().unwrap_or_default(),
+                            host: &conn_state.user.hostname }).await?;
+                self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,
+                        servername: &self.config.name,
+                        version: concat!(env!("CARGO_PKG_NAME"), " ",
+                                env!("CARGO_PKG_VERSION")) }).await?;
+            } else {
+                self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
         }
         Ok(())
