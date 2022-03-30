@@ -183,17 +183,27 @@ impl VolatileState {
 
 pub(crate) struct MainState {
     config: MainConfig,
+    user_config_idxs: HashMap<String, usize>,
+    oper_config_idxs: HashMap<String, usize>,
     state: RwLock<VolatileState>,
 }
 
 impl MainState {
     fn new_from_config(config: MainConfig) -> MainState {
+        let mut user_config_idxs = HashMap::new();
+        if let Some(ref users) = config.users {
+            users.iter().enumerate().for_each(|(i,u)| { 
+                user_config_idxs.insert(u.name.clone(), i); });
+        }
+        let mut oper_config_idxs = HashMap::new();
+        if let Some(ref opers) = config.operators {
+            opers.iter().enumerate().for_each(|(i,o)| {
+                oper_config_idxs.insert(o.name.clone(), i); });
+        }
         let state = RwLock::new(VolatileState::new_from_config(&config));
-        MainState{ config, state }
+        MainState{ config, user_config_idxs, oper_config_idxs, state }
     }
-}
-
-impl MainState {
+    
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
         let res = self.process_internal(conn_state).await;

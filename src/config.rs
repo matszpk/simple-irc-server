@@ -353,6 +353,7 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 listen = "127.0.0.1"
 port = 6667
+password = "bambambam"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
@@ -420,7 +421,7 @@ no_external_messages = false
             info: "This is IRCI server".to_string(),
             listen: "127.0.0.1".parse().unwrap(),
             port: 6667,
-            password: None,
+            password: Some("bambambam".to_string()),
             motd: "Hello, guys!".to_string(),
             network: "IRCInetwork".to_string(),
             max_connections: Some(4000),
@@ -491,7 +492,7 @@ no_external_messages = false
             info: "This is IRCI server".to_string(),
             listen: "192.168.1.4".parse().unwrap(),
             port: 6668,
-            password: None,
+            password: Some("bambambam".to_string()),
             motd: "Hello, guys!".to_string(),
             network: "SomeNetwork".to_string(),
             max_connections: Some(4000),
