@@ -33,6 +33,7 @@ use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
 use futures::SinkExt;
+use chrono::prelude::*;
 
 use crate::config::*;
 use crate::reply::*;
@@ -189,6 +190,7 @@ pub(crate) struct MainState {
     // key is oper name
     oper_config_idxs: HashMap<String, usize>,
     state: RwLock<VolatileState>,
+    created: String,
 }
 
 impl MainState {
@@ -204,7 +206,8 @@ impl MainState {
                 oper_config_idxs.insert(o.name.clone(), i); });
         }
         let state = RwLock::new(VolatileState::new_from_config(&config));
-        MainState{ config, user_config_idxs, oper_config_idxs, state }
+        MainState{ config, user_config_idxs, oper_config_idxs, state,
+                created: Local::now().to_rfc2822() }
     }
     
     pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
@@ -458,8 +461,17 @@ impl MainState {
                             host: &conn_state.user.hostname }).await?;
                 self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,
                         servername: &self.config.name,
-                        version: concat!(env!("CARGO_PKG_NAME"), " ",
+                        version: concat!(env!("CARGO_PKG_NAME"), "-",
                                 env!("CARGO_PKG_VERSION")) }).await?;
+                self.feed_msg(&mut conn_state.stream, RplCreated003{ client,
+                        datetime: &self.created }).await?;
+                self.feed_msg(&mut conn_state.stream, RplMyInfo004{ client,
+                        servername: &self.config.name,
+                        version: concat!(env!("CARGO_PKG_NAME"), "-",
+                                env!("CARGO_PKG_VERSION")),
+                        avail_user_modes: "Oiorw",
+                        avail_chmodes: "Ibehiklmnopstv",
+                        avail_chmodes_with_params: None }).await?;
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
