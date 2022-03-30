@@ -228,6 +228,8 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
             (&pat[pat.len()..pat.len()], pat)
         };
         
+        //println!("'{}' '{}': '{}' '{}' '{}'", pattern, text, newpat, m, t);
+        
         if m.len() != 0 {
             if !asterisk {
                 // if first match
@@ -237,9 +239,9 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
                 // after asterisk
                 let mut i = 0;
                 // find first single wildcards occurrence.
-                while i < t.len()-m.len() && !starts_single_wilcards(m, &t[i..]) {
+                while i <= t.len()-m.len() && !starts_single_wilcards(m, &t[i..]) {
                     i += 1; }
-                if i < t.len()-m.len() { // if found
+                if i <= t.len()-m.len() { // if found
                     t = &t[i+m.len()..]
                 } else { return false; }
             }
@@ -248,7 +250,8 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
         asterisk = true;
         pat = newpat;
     }
-    t.len() == 0
+    // if last character in pattern is '*' or text has been fully consumed
+    (pattern.len()!=0 && pattern.as_bytes()[pattern.len()-1] == b'*') || t.len() == 0
 }
 
 #[cfg(test)]
@@ -420,7 +423,29 @@ mod test {
         assert!(match_wildcard("somebody", "somebody"));
         assert!(!match_wildcard("somebody", "somebady"));
         assert!(match_wildcard("s?meb?dy", "samebady"));
+        assert!(!match_wildcard("s?mec?dy", "samebady"));
         assert!(!match_wildcard("somebody", "somebod"));
-        assert!(!match_wildcard("somebody", "somebodyis"));;
+        assert!(!match_wildcard("somebody", "somebodyis"));
+        assert!(match_wildcard("so*body", "somebody"));
+        assert!(match_wildcard("so*body", "sobody"));
+        assert!(match_wildcard("so*body*", "sobody"));
+        assert!(match_wildcard("*so*body*", "sobody"));
+        assert!(!match_wildcard("so*body", "sbody"));
+        assert!(!match_wildcard("*so*body*", "sbody"));
+        assert!(match_wildcard("so*body", "something body"));
+        assert!(match_wildcard("so*bo*", "somebody"));
+        assert!(match_wildcard("*", "Alice and Others"));
+        assert!(!match_wildcard("", "Alice and Others"));
+        assert!(match_wildcard("", ""));
+        assert!(match_wildcard("* and Others", "Alice and Others"));
+        assert!(!match_wildcard("* and Others", "Aliceand Others"));
+        assert!(match_wildcard("* and *", "Alice and Others"));
+        assert!(!match_wildcard("* and *", "Aliceand Others"));
+        assert!(!match_wildcard("* and *", "Alice andOthers"));
+        assert!(match_wildcard("*?and *", "Aliceand Others"));
+        assert!(match_wildcard("* and?*", "Alice andOthers"));
+        assert!(!match_wildcard("*?and *", "Aliceund Others"));
+        assert!(!match_wildcard("* and?*", "Alice undOthers"));
+        assert!(match_wildcard("lu*na*Xna*Y", "lulu and nanaXnaY"));
     }
 }
