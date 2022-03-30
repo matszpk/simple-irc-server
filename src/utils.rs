@@ -431,6 +431,7 @@ mod test {
         assert!(!match_wildcard("somebody", "somebod"));
         assert!(!match_wildcard("somebody", "somebodyis"));
         assert!(match_wildcard("so*body", "somebody"));
+        assert!(match_wildcard("so**body", "somebody"));
         assert!(match_wildcard("so*body", "sobody"));
         assert!(match_wildcard("so*body*", "sobody"));
         assert!(match_wildcard("*so*body*", "sobody"));
@@ -441,11 +442,16 @@ mod test {
         assert!(match_wildcard("*", "Alice and Others"));
         assert!(!match_wildcard("", "Alice and Others"));
         assert!(match_wildcard("", ""));
+        assert!(match_wildcard("*", ""));
+        assert!(match_wildcard("***", ""));
         assert!(match_wildcard("* and Others", "Alice and Others"));
         assert!(!match_wildcard("* and Others", "Aliceand Others"));
         assert!(match_wildcard("* and *", "Alice and Others"));
+        assert!(match_wildcard("*** and **", "Alice and Others"));
         assert!(!match_wildcard("* and *", "Aliceand Others"));
         assert!(!match_wildcard("* and *", "Alice andOthers"));
+        assert!(!match_wildcard("*** and ***", "Aliceand Others"));
+        assert!(!match_wildcard("*** and ***", "Alice andOthers"));
         assert!(match_wildcard("*?and *", "Aliceand Others"));
         assert!(match_wildcard("* and?*", "Alice andOthers"));
         assert!(!match_wildcard("*?and *", "Aliceund Others"));
@@ -457,5 +463,12 @@ mod test {
                 "lulululuYlululuXlululuWluluZluluAluluB"));
         assert!(match_wildcard("*lu*Xlu*Wlu*Zlu*B*",
                 "XXXlulululuYlululuXlululuWluluZluluAluluBlululu"));
+        assert!(match_wildcard("la*la", "labulabela"));
+        assert!(!match_wildcard("la*la", "labulabele"));
+        assert!(match_wildcard("la*la*la", "labulalabela"));
+        assert!(!match_wildcard("la*la*la", "labulalabele"));
+        assert!(match_wildcard("la*l?", "labulabela"));
+        assert!(!match_wildcard("la*?a", "labulabele"));
+        assert!(!match_wildcard("la*l?", "labulabeka"));
     }
 }
