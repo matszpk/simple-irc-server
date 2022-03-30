@@ -445,6 +445,7 @@ mod test {
         assert!(match_wildcard("*", ""));
         assert!(match_wildcard("***", ""));
         assert!(match_wildcard("* and Others", "Alice and Others"));
+        assert!(!match_wildcard("* and Others", "Alice and others"));
         assert!(!match_wildcard("* and Others", "Aliceand Others"));
         assert!(match_wildcard("* and *", "Alice and Others"));
         assert!(match_wildcard("*** and **", "Alice and Others"));
@@ -470,5 +471,8 @@ mod test {
         assert!(match_wildcard("la*l?", "labulabela"));
         assert!(!match_wildcard("la*?a", "labulabele"));
         assert!(!match_wildcard("la*l?", "labulabeka"));
+        assert!(match_wildcard("greg*@somehere*", "greg-guru@somehere.net"));
+        assert!(match_wildcard("greg*@somehere*", "greg@@@@somehere@@@"));
+        assert!(!match_wildcard("greg*@somehere*", "greg.somehere@@@"));
     }
 }
