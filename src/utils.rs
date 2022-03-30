@@ -222,28 +222,32 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
     let mut t = text;
     let mut asterisk = false;
     while pat.len()!=0 {
-        let (newpat, m) = if let Some(i) = pat.find('*') {
-            (&pat[i+1..], &pat[..i])
+        let (newpat, m, cur_ast) = if let Some(i) = pat.find('*') {
+            (&pat[i+1..], &pat[..i], true)
         } else {
-            (&pat[pat.len()..pat.len()], pat)
+            (&pat[pat.len()..pat.len()], pat, false)
         };
-        
-        //println!("'{}' '{}': '{}' '{}' '{}'", pattern, text, newpat, m, t);
         
         if m.len() != 0 {
             if !asterisk {
                 // if first match
                 if !starts_single_wilcards(m, t) { return false; }
                 t = &t[m.len()..];
-            } else {
-                // after asterisk
+            } else if cur_ast || newpat.len() != 0 {
+                // after asterisk. only if some rest in pattern and
+                // if last current character is asterisk
                 let mut i = 0;
                 // find first single wildcards occurrence.
                 while i <= t.len()-m.len() && !starts_single_wilcards(m, &t[i..]) {
                     i += 1; }
                 if i <= t.len()-m.len() { // if found
-                    t = &t[i+m.len()..]
+                    t = &t[i+m.len()..];
                 } else { return false; }
+            } else {
+                // if last pattern is not asterisk
+                if !starts_single_wilcards(m, &t[t.len()-m.len()..]) {
+                    return false; }
+                t = &t[t.len()..t.len()];
             }
         }
         
@@ -447,5 +451,11 @@ mod test {
         assert!(!match_wildcard("*?and *", "Aliceund Others"));
         assert!(!match_wildcard("* and?*", "Alice undOthers"));
         assert!(match_wildcard("lu*na*Xna*Y", "lulu and nanaXnaY"));
+        assert!(match_wildcard("lu*Xlu*Wlu*Zlu*B",
+                "lulululuYlululuXlululuWluluZluluAluluB"));
+        assert!(match_wildcard("lu*?lu*?lu*?lu*?",
+                "lulululuYlululuXlululuWluluZluluAluluB"));
+        assert!(match_wildcard("*lu*Xlu*Wlu*Zlu*B*",
+                "XXXlulululuYlululuXlululuWluluZluluAluluBlululu"));
     }
 }
