@@ -45,7 +45,7 @@ struct UserModifiable {
     name: Option<String>,
     realname: Option<String>,
     nick: Option<String>,
-    source: Option<String>, // IRC source for mask matching
+    source: String, // IRC source for mask matching
     modes: UserModes,
     away: Option<String>,
     // user state
@@ -66,9 +66,9 @@ impl UserModifiable {
         }
         s.push('@');
         s.push_str(&u.hostname);
-        self.source = Some(s);
+        self.source = s;
     }
-
+    
     fn set_name(&mut self, name: String, u: &User) {
         self.name = Some(name);
         self.update_source(u);
@@ -91,6 +91,10 @@ impl User {
         if let Some(ref n) = modifiable.nick { &n }
         else if let Some(ref n) = modifiable.name { &n }
         else { &self.hostname }
+    }
+    
+    fn match_mask(&self, mask: &str) -> bool {
+        match_wildcard(&self.modifiable.borrow().source, mask)
     }
 }
 
@@ -390,6 +394,18 @@ impl MainState {
                 conn_state.caps_negotation = false;
                 Ok(()) }
         }?;
+        Ok(())
+    }
+    
+    async fn authenticate(&mut self, conn_state: &mut ConnState)
+        -> Result<(), Box<dyn Error>> {
+        if !conn_state.caps_negotation {
+            let modifiable = conn_state.user.modifiable.borrow();
+            if let Some(ref nick) = modifiable.nick {
+                if let Some(ref name) = modifiable.name {
+                }
+            }
+        }
         Ok(())
     }
     
