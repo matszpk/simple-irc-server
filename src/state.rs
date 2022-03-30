@@ -45,12 +45,38 @@ struct UserModifiable {
     name: Option<String>,
     realname: Option<String>,
     nick: Option<String>,
+    source: Option<String>, // IRC source for mask matching
     modes: UserModes,
     away: Option<String>,
     // user state
     operator: bool,
     channels: HashMap<String, Weak<Channel>>,
     password: Option<String>,
+}
+
+impl UserModifiable {
+    fn update_source(&mut self, u: &User) {
+        let mut s = String::new();
+        if let Some(ref nick) = self.nick {
+            s.push_str(&nick);
+        }
+        if let Some(ref name) = self.name {
+            s.push('!');
+            s.push_str(&name);
+        }
+        s.push('@');
+        s.push_str(&u.hostname);
+        self.source = Some(s);
+    }
+
+    fn set_name(&mut self, name: String, u: &User) {
+        self.name = Some(name);
+        self.update_source(u);
+    }
+    fn set_nick(&mut self, nick: String, u: &User) {
+        self.nick = Some(nick);
+        self.update_source(u);
+    }
 }
 
 struct User {
