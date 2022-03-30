@@ -183,7 +183,9 @@ impl VolatileState {
 
 pub(crate) struct MainState {
     config: MainConfig,
+    // key is user name
     user_config_idxs: HashMap<String, usize>,
+    // key is oper name
     oper_config_idxs: HashMap<String, usize>,
     state: RwLock<VolatileState>,
 }
@@ -413,6 +415,33 @@ impl MainState {
             let modifiable = conn_state.user.modifiable.borrow();
             if let Some(ref nick) = modifiable.nick {
                 if let Some(ref name) = modifiable.name {
+                    let password_opt = if let Some(uidx) = self.user_config_idxs.get(name) {
+                        // match user mask
+                        if let Some(ref users) = self.config.users {
+                            if let Some(ref mask) = users[*uidx].mask {
+                                if match_wildcard(&mask, &modifiable.source) {
+                                    users[*uidx].password.as_ref()
+                                } else {
+                                    self.feed_msg(&mut conn_state.stream,
+                                        "ERROR: user mask doesn't match").await?;
+                                    return Ok(());
+                                }
+                            } else { users[*uidx].password.as_ref() }
+                        } else { None }
+                    } else { None }
+                        .or(self.config.password.as_ref());
+                    
+                    if let Some(password) = password_opt {
+                        let good = if let Some(ref entered_pwd) = modifiable.password {
+                            *entered_pwd == *password
+                        } else { false };
+                        
+                        if good {
+                            // welcome
+                        } else {
+                            // error
+                        }
+                    }
                 }
             }
         }

@@ -198,7 +198,7 @@ pub(crate) struct UserConfig {
     #[validate(custom = "validate_username")]
     pub(crate) nick: String,
     #[validate(length(min = 6))]
-    pub(crate) password: String,
+    pub(crate) password: Option<String>,
     pub(crate) mask: Option<String>,
 }
 
@@ -442,7 +442,7 @@ no_external_messages = false
             ]),
             users: Some(vec![
                 UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
-                    password: "luckyluke".to_string(), mask: None }
+                    password: Some("luckyluke".to_string()), mask: None }
             ]),
             channels: Some(vec![
                 ChannelConfig{
@@ -513,7 +513,7 @@ no_external_messages = false
             ]),
             users: Some(vec![
                 UserConfig{ name: "lucas".to_string(), nick: "luckboy".to_string(),
-                    password: "luckyluke".to_string(), mask: None }
+                    password: Some("luckyluke".to_string()), mask: None }
             ]),
             channels: Some(vec![
                 ChannelConfig{
