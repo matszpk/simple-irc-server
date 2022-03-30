@@ -209,6 +209,48 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
     })
 }
 
+fn starts_single_wilcards<'a>(pattern: &'a str, text: &'a str) -> bool {
+    if pattern.len() <= text.len() {
+        pattern.bytes().enumerate().all(|(i,c)| {
+            c == b'?' || c == text.as_bytes()[i]
+        })
+    } else { false }
+}
+
+pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
+    let mut pat = pattern;
+    let mut t = text;
+    let mut asterisk = false;
+    while pat.len()!=0 {
+        let (newpat, m) = if let Some(i) = pat.find('*') {
+            (&pat[i+1..], &pat[..i])
+        } else {
+            (&pat[pat.len()..pat.len()], pat)
+        };
+        
+        if m.len() != 0 {
+            if !asterisk {
+                // if first match
+                if !starts_single_wilcards(m, t) { return false; }
+                t = &t[m.len()..];
+            } else {
+                // after asterisk
+                let mut i = 0;
+                // find first single wildcards occurrence.
+                while i < t.len()-m.len() && !starts_single_wilcards(m, &t[i..]) {
+                    i += 1; }
+                if i < t.len()-m.len() { // if found
+                    t = &t[i+m.len()..]
+                } else { return false; }
+            }
+        }
+        
+        asterisk = true;
+        pat = newpat;
+    }
+    t.len() == 0
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -371,5 +413,14 @@ mod test {
             validate_channelmodes("#xchan", &vec![
                 ("+ot", vec!["b,arry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
                     .map_err(|e| e.to_string()));
+    }
+    
+    #[test]
+    fn test_match_wildcard() {
+        assert!(match_wildcard("somebody", "somebody"));
+        assert!(!match_wildcard("somebody", "somebady"));
+        assert!(match_wildcard("s?meb?dy", "samebady"));
+        assert!(!match_wildcard("somebody", "somebod"));
+        assert!(!match_wildcard("somebody", "somebodyis"));;
     }
 }

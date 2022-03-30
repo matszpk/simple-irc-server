@@ -42,17 +42,18 @@ use crate::utils::*;
 use Reply::*;
 
 struct UserModifiable {
+    name: Option<String>,
+    realname: Option<String>,
     nick: Option<String>,
     modes: UserModes,
     away: Option<String>,
     // user state
     operator: bool,
     channels: HashMap<String, Weak<Channel>>,
+    password: Option<String>,
 }
 
 struct User {
-    name: Option<String>,
-    realname: String,
     ip_addr: IpAddr,
     hostname: String,
     sender: UnboundedSender<String>,
@@ -62,7 +63,7 @@ struct User {
 impl User {
     fn client_name<'a>(&'a self, modifiable: &'a UserModifiable) -> &'a str {
         if let Some(ref n) = modifiable.nick { &n }
-        else if let Some(ref n) = self.name { &n }
+        else if let Some(ref n) = modifiable.name { &n }
         else { &self.hostname }
     }
 }
