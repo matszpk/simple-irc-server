@@ -26,6 +26,7 @@ use std::rc::{Rc,Weak};
 use std::sync::Arc;
 use std::net::{IpAddr};
 use std::error::Error;
+use std::convert::TryFrom;
 use tokio::sync::{Mutex,RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
@@ -582,6 +583,25 @@ impl MainState {
                 if let Some(max_joins) = self.config.max_joins {
                     tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
                     tokens.push(format!("MAXCHANNELS={}", max_joins));
+                }
+                let inf_range = 0 as u32..;
+                inf_range.map_while(|i| {
+                    let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
+                    t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+                let inf_range = 0 as u32..;
+                inf_range.map_while(|i| {
+                    let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
+                    t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+                let inf_range = 0 as u32..;
+                inf_range.map_while(|i| {
+                    let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
+                    t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
+                
+                tokens.sort();
+                
+                for toks in tokens.chunks(10) {
+                    self.feed_msg(&mut conn_state.stream,
+                        RplISupport005{ client, tokens: &toks.join(" ") }).await?;
                 }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
