@@ -603,6 +603,9 @@ impl MainState {
                     self.feed_msg(&mut conn_state.stream,
                         RplISupport005{ client, tokens: &toks.join(" ") }).await?;
                 }
+                
+                self.process_lusers(conn_state).await?;
+                self.process_motd(conn_state, None).await?;
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
