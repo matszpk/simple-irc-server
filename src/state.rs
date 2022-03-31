@@ -497,6 +497,9 @@ impl MainState {
             }
             CapCommand::END => {
                 conn_state.caps_negotation = false;
+                if !conn_state.user_state.authenticated {
+                    self.authenticate(conn_state).await?;
+                }
                 Ok(()) }
         }?;
         Ok(())
