@@ -43,41 +43,21 @@ use crate::utils::*;
 use Reply::*;
 
 struct UserModifiable {
-    name: Option<String>,
-    realname: Option<String>,
-    nick: Option<String>,
+    name: String,
+    realname: String,
+    nick: String,
     source: String, // IRC source for mask matching
     modes: UserModes,
     away: Option<String>,
     // user state
     operator: bool,
     channels: HashMap<String, Weak<Channel>>,
-    password: Option<String>,
-    authenticated: bool,
 }
 
 impl UserModifiable {
-    fn update_source(&mut self, u: &User) {
-        let mut s = String::new();
-        if let Some(ref nick) = self.nick {
-            s.push_str(&nick);
-        }
-        if let Some(ref name) = self.name {
-            s.push('!');
-            s.push_str(&name);
-        }
-        s.push('@');
-        s.push_str(&u.hostname);
-        self.source = s;
-    }
-    
-    fn set_name(&mut self, name: String, u: &User) {
-        self.name = Some(name);
-        self.update_source(u);
-    }
-    fn set_nick(&mut self, nick: String, u: &User) {
-        self.nick = Some(nick);
-        self.update_source(u);
+    fn update_nick(&mut self, user_state: &ConnUserState) {
+        if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
+        self.source = user_state.source.clone();
     }
 }
 
@@ -86,18 +66,6 @@ struct User {
     hostname: String,
     sender: UnboundedSender<String>,
     modifiable: RefCell<UserModifiable>,
-}
-
-impl User {
-    fn client_name<'a>(&'a self, modifiable: &'a UserModifiable) -> &'a str {
-        if let Some(ref n) = modifiable.nick { &n }
-        else if let Some(ref n) = modifiable.name { &n }
-        else { &self.hostname }
-    }
-    
-    fn match_mask(&self, mask: &str) -> bool {
-        match_wildcard(&self.modifiable.borrow().source, mask)
-    }
 }
 
 enum OperatorType {
@@ -154,10 +122,58 @@ impl CapState {
     }
 }
 
+pub(crate) struct ConnUserState {
+    ip_addr: IpAddr,
+    hostname: String,
+    name: Option<String>,
+    realname: Option<String>,
+    nick: Option<String>,
+    source: String, // IRC source for mask matching
+    password: Option<String>,
+    authenticated: bool,
+}
+
+impl ConnUserState {
+    fn client_name<'a>(&'a self) -> &'a str {
+        if let Some(ref n) = self.nick { &n }
+        else if let Some(ref n) = self.name { &n }
+        else { &self.hostname }
+    }
+    
+    fn match_mask(&self, mask: &str) -> bool {
+        match_wildcard(&self.source, mask)
+    }
+    
+    fn update_source(&mut self) {
+        let mut s = String::new();
+        if let Some(ref nick) = self.nick {
+            s.push_str(&nick);
+        }
+        if let Some(ref name) = self.name {
+            s.push('!');
+            s.push_str(&name);
+        }
+        s.push('@');
+        s.push_str(&self.hostname);
+        self.source = s;
+    }
+    
+    fn set_name(&mut self, name: String) {
+        self.name = Some(name);
+        self.update_source();
+    }
+    fn set_nick(&mut self, nick: String) {
+        self.nick = Some(nick);
+        self.update_source();
+    }
+}
+
 pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
-    user: Arc<User>,
     receiver: UnboundedReceiver<String>,
+    
+    user_state: ConnUserState,
+    
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
     quit: bool,
@@ -258,8 +274,7 @@ impl MainState {
                     Ok(cmd) => cmd,
                     Err(e) => {
                         use crate::CommandError::*;
-                        let modifiable = conn_state.user.modifiable.borrow();
-                        let client = conn_state.user.client_name(modifiable.deref());
+                        let client = conn_state.user_state.client_name();
                         match e {
                             UnknownCommand(ref cmd_name) => {
                                 self.feed_msg(&mut conn_state.stream,
@@ -417,14 +432,15 @@ impl MainState {
         -> Result<(), Box<dyn Error>> {
         let auth_opt = { 
             if !conn_state.caps_negotation {
-                let mut modifiable = conn_state.user.modifiable.borrow_mut();
-                if let Some(ref nick) = modifiable.nick {
-                    if let Some(ref name) = modifiable.name {
-                        let password_opt = if let Some(uidx) = self.user_config_idxs.get(name) {
+                let user_state = &mut conn_state.user_state;
+                if let Some(ref nick) = user_state.nick {
+                    if let Some(ref name) = user_state.name {
+                        let password_opt = if let Some(uidx) =
+                                    self.user_config_idxs.get(name) {
                             // match user mask
                             if let Some(ref users) = self.config.users {
                                 if let Some(ref mask) = users[*uidx].mask {
-                                    if match_wildcard(&mask, &modifiable.source) {
+                                    if match_wildcard(&mask, &user_state.source) {
                                         users[*uidx].password.as_ref()
                                     } else {
                                         self.feed_msg(&mut conn_state.stream,
@@ -437,11 +453,11 @@ impl MainState {
                             .or(self.config.password.as_ref());
                         
                         if let Some(password) = password_opt {
-                            let good = if let Some(ref entered_pwd) = modifiable.password {
+                            let good = if let Some(ref entered_pwd) = user_state.password {
                                 *entered_pwd == *password
                             } else { false };
                             
-                            modifiable.authenticated = good;
+                            user_state.authenticated = good;
                             Some(good)
                         } else { Some(true) }
                     } else { None }
@@ -450,15 +466,15 @@ impl MainState {
         };
         
         if let Some(good) = auth_opt {
-            let modifiable = conn_state.user.modifiable.borrow();
-            let client = conn_state.user.client_name(modifiable.deref());
+            let user_state = &conn_state.user_state;
+            let client = user_state.client_name();
             if good {
                 // welcome
                 self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
                     networkname: &self.config.network,
-                            nick: modifiable.name.as_deref().unwrap_or_default(),
-                            user: modifiable.name.as_deref().unwrap_or_default(),
-                            host: &conn_state.user.hostname }).await?;
+                            nick: user_state.name.as_deref().unwrap_or_default(),
+                            user: user_state.name.as_deref().unwrap_or_default(),
+                            host: &user_state.hostname }).await?;
                 self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,
                         servername: &self.config.name,
                         version: concat!(env!("CARGO_PKG_NAME"), "-",
@@ -481,8 +497,7 @@ impl MainState {
     
     async fn process_authenticate(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
-        let modifiable = conn_state.user.modifiable.borrow();
-        let client = conn_state.user.client_name(modifiable.deref());
+        let client = conn_state.user_state.client_name();
         
         self.feed_msg(&mut conn_state.stream, ErrUnknownCommand421{ client,
                 command: "AUTHENTICATE" }).await?;
@@ -561,8 +576,7 @@ impl MainState {
     
     async fn process_motd<'a>(&mut self, conn_state: &mut ConnState, target: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
-        let modifiable = conn_state.user.modifiable.borrow();
-        let client = conn_state.user.client_name(modifiable.deref());
+        let client = conn_state.user_state.client_name();
         
         self.feed_msg(&mut conn_state.stream, RplMotdStart375{ client,
                 server: &self.config.name }).await?;
@@ -615,8 +629,7 @@ impl MainState {
     
     async fn process_info(&mut self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
-        let modifiable = conn_state.user.modifiable.borrow();
-        let client = conn_state.user.client_name(modifiable.deref());
+        let client = conn_state.user_state.client_name();
         
         self.feed_msg(&mut conn_state.stream, RplInfo371{ client, info:
             concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION")) }).await?;
