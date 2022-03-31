@@ -217,7 +217,6 @@ pub(crate) struct MainConfig {
     pub(crate) password: Option<String>,
     pub(crate) max_connections: Option<usize>,
     pub(crate) max_joins: Option<usize>,
-    pub(crate) max_nickname_len: usize,
     pub(crate) ping_timeout: usize,
     pub(crate) pong_timeout: usize,
     pub(crate) dns_lookup: bool,
@@ -284,7 +283,7 @@ impl MainConfig {
     
     fn validate_nicknames(&self) -> bool {
         if let Some(ref users) = self.users {
-            users.iter().find(|u| u.nick.len() > self.max_nickname_len).is_none()
+            users.iter().find(|u| u.nick.len() > 200).is_none()
         } else { true }
     }
 }
@@ -302,7 +301,6 @@ impl Default for MainConfig {
             motd: "Hello, world!".to_string(),
             max_connections: None,
             max_joins: None,
-            max_nickname_len: 20,
             ping_timeout: 120,
             pong_timeout: 20,
             dns_lookup: false,
@@ -357,7 +355,6 @@ password = "bambambam"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 motd = "Hello, guys!"
@@ -426,7 +423,6 @@ no_external_messages = false
             network: "IRCInetwork".to_string(),
             max_connections: Some(4000),
             max_joins: Some(10),
-            max_nickname_len: 20,
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: false,
@@ -497,7 +493,6 @@ no_external_messages = false
             network: "SomeNetwork".to_string(),
             max_connections: Some(4000),
             max_joins: Some(10),
-            max_nickname_len: 20,
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: true,
@@ -569,7 +564,6 @@ listen = "127.0.0.1"
 port = 6667
 motd = "Hello, guys!"
 network = "IRCInetwork"
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
@@ -618,7 +612,6 @@ no_external_messages = false
             network: "IRCInetwork".to_string(),
             max_connections: None,
             max_joins: None,
-            max_nickname_len: 20,
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: false,
@@ -672,7 +665,6 @@ motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
@@ -745,7 +737,6 @@ motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
@@ -815,7 +806,6 @@ motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
@@ -885,7 +875,6 @@ motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
@@ -956,7 +945,6 @@ motd = "Hello, guys!"
 network = "IRCInetwork"
 max_connections = 4000
 max_joins = 10
-max_nickname_len = 20
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false

@@ -34,6 +34,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
 use futures::SinkExt;
 use chrono::prelude::*;
+use const_table::const_table;
 
 use crate::config::*;
 use crate::reply::*;
@@ -41,6 +42,46 @@ use crate::command::*;
 use crate::utils::*;
 
 use Reply::*;
+
+#[const_table]
+pub(crate) enum SupportTokenInt {
+    SupportTokenIntValue{ name: &'static str, value: usize },
+    AWAYLEN = SupportTokenIntValue{ name: "AWAYLEN", value: 1000 },
+    CHANNELLEN = SupportTokenIntValue{ name: "CHANNELLEN", value: 1000 },
+    HOSTLEN = SupportTokenIntValue{ name: "HOSTLEN", value: 1000 },
+    KEYLEN = SupportTokenIntValue{ name: "KEYLEN", value: 1000 },
+    KICKLEN = SupportTokenIntValue{ name: "KICKLEN", value: 1000 },
+    LINELEN = SupportTokenIntValue{ name: "LINELEN", value: 2000 },
+    MAXNICKLEN = SupportTokenIntValue{ name: "MAXNICKLEN", value: 200 },
+    MAXPARA = SupportTokenIntValue{ name: "MAXPARA", value: 500 },
+    MAXTARGETS = SupportTokenIntValue{ name: "MAXTARGETS", value: 500 },
+    MODES = SupportTokenIntValue{ name: "MODES", value: 500 },
+    NICKLEN = SupportTokenIntValue{ name: "NICKLEN", value: 200 },
+    TOPICLEN = SupportTokenIntValue{ name: "TOPICLEN", value: 1000 },
+    USERLEN = SupportTokenIntValue{ name: "USERLEN", value: 200 },
+}
+
+#[const_table]
+pub(crate) enum SupportTokenString {
+    SupportTokenStringValue{ name: &'static str, value: &'static str },
+    CASEMAPPING = SupportTokenStringValue{ name: "CASEMAPPING", value: "ascii" },
+    CHANLIMIT = SupportTokenStringValue{ name: "CHANLIMIT", value: "&#:1000" },
+    CHANMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Ibehiklmnopstv" },
+    CHANTYPES = SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
+    EXCEPTS = SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
+    INVEX = SupportTokenStringValue{ name: "INVEX", value: "I" },
+    PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(ohv)@%+" },
+    STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "@%+" },
+    USERMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Oiorw" },
+}
+
+#[const_table]
+pub(crate) enum SupportTokenBool {
+    SupportTokenBoolValue{ name: &'static str },
+    FNC = SupportTokenBoolValue{ name: "FNC" },
+    NAMESX = SupportTokenBoolValue{ name: "NAMESX" },
+    SAFELIST = SupportTokenBoolValue{ name: "SAFELIST" },
+}
 
 struct UserModifiable {
     name: String,
