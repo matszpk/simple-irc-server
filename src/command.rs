@@ -113,6 +113,7 @@ pub(crate) enum CommandId {
     NICKId = CommandName{ name: "NICK" },
     USERId = CommandName{ name: "USER" },
     PINGId = CommandName{ name: "PING" },
+    PONGId = CommandName{ name: "PONG" },
     OPERId = CommandName{ name: "OPER" },
     QUITId = CommandName{ name: "QUIT" },
     JOINId = CommandName{ name: "JOIN" },
@@ -203,6 +204,7 @@ pub(crate) enum Command<'a> {
     NICK{ nickname: &'a str },
     USER{ username: &'a str, hostname: &'a str, servername: &'a str, realname: &'a str },
     PING{ token: &'a str },
+    PONG{ token: &'a str },
     OPER{ name: &'a str, password: &'a str },
     QUIT{ },
     JOIN{ channels: Vec<&'a str>, keys: Option<Vec<&'a str>> },
@@ -298,6 +300,12 @@ impl<'a> Command<'a> {
                     Ok(PING{ token: message.params[0] })
                 } else {
                     Err(NeedMoreParams(PINGId)) }
+            }
+            "PONG" => {
+                if message.params.len() >= 1 {
+                    Ok(PONG{ token: message.params[0] })
+                } else {
+                    Err(NeedMoreParams(PONGId)) }
             }
             "OPER" => {
                 if message.params.len() >= 2 {
@@ -1088,6 +1096,13 @@ mod test {
         assert_eq!(Ok(HELP{ subject: "PING Message" }),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![ "PING Message" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Err("Command 'HELP' needs more parameters".to_string()),
+            Command::from_message(&Message{ source: None, command: "HELP",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(HELP{ subject: "PONG Message" }),
+            Command::from_message(&Message{ source: None, command: "HELP",
+                params: vec![ "PONG Message" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'HELP' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![] }).map_err(|e| e.to_string()));

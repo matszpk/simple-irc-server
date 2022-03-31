@@ -402,6 +402,7 @@ impl MainState {
                         self.process_user(conn_state, username, hostname,
                                 servername, realname).await,
                     PING{ token } => self.process_ping(conn_state, token).await,
+                    PONG{ token } => self.process_pong(conn_state, token).await,
                     OPER{ name, password } =>
                         self.process_oper(conn_state, name, password).await,
                     QUIT{ } => self.process_quit(conn_state).await,
@@ -618,6 +619,11 @@ impl MainState {
             -> Result<(), Box<dyn Error>> {
         self.feed_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
                     token)).await?;
+        Ok(())
+    }
+    
+    async fn process_pong<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
+            -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
