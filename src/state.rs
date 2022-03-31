@@ -216,10 +216,6 @@ impl ConnUserState {
         else { &self.hostname }
     }
     
-    fn match_mask(&self, mask: &str) -> bool {
-        match_wildcard(&self.source, mask)
-    }
-    
     fn update_source(&mut self) {
         let mut s = String::new();
         if let Some(ref nick) = self.nick {
@@ -615,13 +611,12 @@ impl MainState {
                 self.process_motd(conn_state, None).await?;
                 
                 // mode
-                let user_state = &conn_state.user_state;
-                let client = user_state.client_name();
+                let client = conn_state.user_state.client_name();
                 self.feed_msg(&mut conn_state.stream,
                         RplUModeIs221{ client, user_modes: &user_modes }).await?;
             } else {
-                let user_state = &conn_state.user_state;
-                let client = user_state.client_name();
+                let client = conn_state.user_state.client_name();
+                conn_state.quit = true;
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
         }
@@ -639,17 +634,52 @@ impl MainState {
     
     async fn process_pass<'a>(&mut self, conn_state: &mut ConnState, pass: &'a str)
             -> Result<(), Box<dyn Error>> {
+        if !conn_state.user_state.authenticated {
+            conn_state.user_state.password = Some(pass.to_string());
+            self.authenticate(conn_state).await?;
+        } else {
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, ErrAlreadyRegistered462{ client }).await?;
+        }
         Ok(())
     }
     
     async fn process_nick<'a>(&mut self, conn_state: &mut ConnState, nick: &'a str)
             -> Result<(), Box<dyn Error>> {
+        if !conn_state.user_state.authenticated {
+            conn_state.user_state.set_nick(nick.to_string());
+            self.authenticate(conn_state).await?;
+        } else {
+            let mut state = self.state.write().await;
+            let old_nick = conn_state.user_state.nick.as_ref().unwrap().to_string();
+            if nick != old_nick {
+                let nick_str = nick.to_string();
+                if !state.users.get(&nick_str).is_some() {
+                    let user = state.users.remove(&old_nick).unwrap();
+                    conn_state.user_state.set_nick(nick_str.clone());
+                    user.modifiable.borrow_mut().update_nick(&conn_state.user_state);
+                    state.users.insert(nick_str, user);
+                } else {    // if nick in use
+                    let client = conn_state.user_state.client_name();
+                    self.feed_msg(&mut conn_state.stream,
+                            ErrNicknameInUse433{ client, nick }).await?;
+                }
+            }
+        }
         Ok(())
     }
     
     async fn process_user<'a>(&mut self, conn_state: &mut ConnState, username: &'a str,
-            hostname: &'a str, servername: &'a str, realname: &'a str)
+            _: &'a str, _: &'a str, realname: &'a str)
             -> Result<(), Box<dyn Error>> {
+        if !conn_state.user_state.authenticated {
+            conn_state.user_state.set_name(username.to_string());
+            conn_state.user_state.realname = Some(realname.to_string());
+            self.authenticate(conn_state).await?;
+        } else {
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, ErrAlreadyRegistered462{ client }).await?;
+        }
         Ok(())
     }
     
