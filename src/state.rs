@@ -549,64 +549,79 @@ impl MainState {
         };
         
         if let Some(good) = auth_opt {
-            let user_state = &conn_state.user_state;
-            let client = user_state.client_name();
             if good {
-                {   // add new user to hash map
+                let user_modes = {   // add new user to hash map
+                    let user_state = &conn_state.user_state;
                     let mut state = self.state.write().await;
+                    let user = Rc::new(User::new(&self.config, &user_state, registered,
+                                conn_state.sender.take().unwrap()));
                     state.users.insert(user_state.nick.as_ref().unwrap().clone(),
-                        Rc::new(User::new(&self.config, &user_state, registered,
-                        conn_state.sender.take().unwrap())));
-                }
-                // welcome
-                self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
-                    networkname: &self.config.network,
-                            nick: user_state.name.as_deref().unwrap_or_default(),
-                            user: user_state.name.as_deref().unwrap_or_default(),
-                            host: &user_state.hostname }).await?;
-                self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,
-                        servername: &self.config.name,
-                        version: concat!(env!("CARGO_PKG_NAME"), "-",
-                                env!("CARGO_PKG_VERSION")) }).await?;
-                self.feed_msg(&mut conn_state.stream, RplCreated003{ client,
-                        datetime: &self.created }).await?;
-                self.feed_msg(&mut conn_state.stream, RplMyInfo004{ client,
-                        servername: &self.config.name,
-                        version: concat!(env!("CARGO_PKG_NAME"), "-",
-                                env!("CARGO_PKG_VERSION")),
-                        avail_user_modes: "Oiorw",
-                        avail_chmodes: "Ibehiklmnopstv",
-                        avail_chmodes_with_params: None }).await?;
+                        user.clone());
+                    let umode_str = user.modifiable.borrow().modes.to_string();
+                    umode_str
+                };
                 
-                // support tokens
-                let mut tokens = vec![ format!("NETWORK={}", self.config.network) ];
-                if let Some(max_joins) = self.config.max_joins {
-                    tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
-                    tokens.push(format!("MAXCHANNELS={}", max_joins));
-                }
-                let inf_range = 0 as u32..;
-                inf_range.map_while(|i| {
-                    let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
-                    t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-                let inf_range = 0 as u32..;
-                inf_range.map_while(|i| {
-                    let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
-                    t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-                let inf_range = 0 as u32..;
-                inf_range.map_while(|i| {
-                    let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
-                    t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
-                
-                tokens.sort();
-                
-                for toks in tokens.chunks(10) {
-                    self.feed_msg(&mut conn_state.stream,
-                        RplISupport005{ client, tokens: &toks.join(" ") }).await?;
+                {
+                    let user_state = &conn_state.user_state;
+                    let client = user_state.client_name();
+                    // welcome
+                    self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
+                        networkname: &self.config.network,
+                                nick: user_state.name.as_deref().unwrap_or_default(),
+                                user: user_state.name.as_deref().unwrap_or_default(),
+                                host: &user_state.hostname }).await?;
+                    self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,
+                            servername: &self.config.name,
+                            version: concat!(env!("CARGO_PKG_NAME"), "-",
+                                    env!("CARGO_PKG_VERSION")) }).await?;
+                    self.feed_msg(&mut conn_state.stream, RplCreated003{ client,
+                            datetime: &self.created }).await?;
+                    self.feed_msg(&mut conn_state.stream, RplMyInfo004{ client,
+                            servername: &self.config.name,
+                            version: concat!(env!("CARGO_PKG_NAME"), "-",
+                                    env!("CARGO_PKG_VERSION")),
+                            avail_user_modes: "Oiorw",
+                            avail_chmodes: "Ibehiklmnopstv",
+                            avail_chmodes_with_params: None }).await?;
+                    
+                    // support tokens
+                    let mut tokens = vec![ format!("NETWORK={}", self.config.network) ];
+                    if let Some(max_joins) = self.config.max_joins {
+                        tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
+                        tokens.push(format!("MAXCHANNELS={}", max_joins));
+                    }
+                    let inf_range = 0 as u32..;
+                    inf_range.map_while(|i| {
+                        let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
+                        t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+                    let inf_range = 0 as u32..;
+                    inf_range.map_while(|i| {
+                        let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
+                        t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+                    let inf_range = 0 as u32..;
+                    inf_range.map_while(|i| {
+                        let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
+                        t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
+                    
+                    tokens.sort();
+                    
+                    for toks in tokens.chunks(10) {
+                        self.feed_msg(&mut conn_state.stream,
+                            RplISupport005{ client, tokens: &toks.join(" ") }).await?;
+                    }
                 }
                 
                 self.process_lusers(conn_state).await?;
                 self.process_motd(conn_state, None).await?;
+                
+                // mode
+                let user_state = &conn_state.user_state;
+                let client = user_state.client_name();
+                self.feed_msg(&mut conn_state.stream,
+                        RplUModeIs221{ client, user_modes: &user_modes }).await?;
             } else {
+                let user_state = &conn_state.user_state;
+                let client = user_state.client_name();
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
         }
