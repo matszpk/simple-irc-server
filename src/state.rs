@@ -685,8 +685,8 @@ impl MainState {
     
     async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
-        self.feed_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
-                    token)).await?;
+        self.feed_msg(&mut conn_state.stream, format!("PONG {} {} :{}", self.config.name,
+                    self.config.name, token)).await?;
         Ok(())
     }
     
