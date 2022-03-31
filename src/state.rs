@@ -61,25 +61,42 @@ pub(crate) enum SupportTokenInt {
     USERLEN = SupportTokenIntValue{ name: "USERLEN", value: 200 },
 }
 
+impl ToString for SupportTokenIntValue {
+    fn to_string(&self) -> String {
+        let mut s = self.name.to_string();
+        s.push('=');
+        s.push_str(&self.value.to_string());
+        s
+    }
+}
+
 #[const_table]
 pub(crate) enum SupportTokenString {
     SupportTokenStringValue{ name: &'static str, value: &'static str },
     CASEMAPPING = SupportTokenStringValue{ name: "CASEMAPPING", value: "ascii" },
-    CHANLIMIT = SupportTokenStringValue{ name: "CHANLIMIT", value: "&#:1000" },
     CHANMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Ibehiklmnopstv" },
     CHANTYPES = SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
     EXCEPTS = SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
     INVEX = SupportTokenStringValue{ name: "INVEX", value: "I" },
+    MAXLIST = SupportTokenStringValue{ name: "MAXLISt", value: "beI:1000" },
     PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(ohv)@%+" },
     STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "@%+" },
     USERMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Oiorw" },
+}
+
+impl ToString for SupportTokenStringValue {
+    fn to_string(&self) -> String {
+        let mut s = self.name.to_string();
+        s.push('=');
+        s.push_str(&self.value);
+        s
+    }
 }
 
 #[const_table]
 pub(crate) enum SupportTokenBool {
     SupportTokenBoolValue{ name: &'static str },
     FNC = SupportTokenBoolValue{ name: "FNC" },
-    NAMESX = SupportTokenBoolValue{ name: "NAMESX" },
     SAFELIST = SupportTokenBoolValue{ name: "SAFELIST" },
 }
 
@@ -558,6 +575,13 @@ impl MainState {
                         avail_user_modes: "Oiorw",
                         avail_chmodes: "Ibehiklmnopstv",
                         avail_chmodes_with_params: None }).await?;
+                
+                // support tokens
+                let mut tokens = vec![ format!("NETWORK={}", self.config.network) ];
+                if let Some(max_joins) = self.config.max_joins {
+                    tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
+                    tokens.push(format!("MAXCHANNELS={}", max_joins));
+                }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
