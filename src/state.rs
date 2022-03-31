@@ -68,6 +68,22 @@ struct User {
     modifiable: RefCell<UserModifiable>,
 }
 
+impl User {
+    fn new(config: &MainConfig, user_state: &ConnUserState, registered: bool,
+            sender: UnboundedSender<String>) -> User {
+        let mut user_modes = config.default_user_modes;
+        user_modes.registered = registered;
+        User{ ip_addr: user_state.ip_addr, hostname: user_state.hostname.clone(),
+                sender, modifiable: RefCell::new(UserModifiable{
+                    name: user_state.name.as_ref().unwrap().clone(),
+                    realname: user_state.realname.as_ref().unwrap().clone(),
+                    nick: user_state.name.as_ref().unwrap().clone(),
+                    source: user_state.source.clone(),
+                    modes: user_modes, operator: false, away: None,
+                    channels: HashMap::new() }) }
+    }
+}
+
 enum OperatorType {
     NoOper,
     Oper,
@@ -131,6 +147,7 @@ pub(crate) struct ConnUserState {
     source: String, // IRC source for mask matching
     password: Option<String>,
     authenticated: bool,
+    registered: bool,
 }
 
 impl ConnUserState {
@@ -170,6 +187,7 @@ impl ConnUserState {
 
 pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
+    sender: Option<UnboundedSender<String>>,
     receiver: UnboundedReceiver<String>,
     
     user_state: ConnUserState,
@@ -430,24 +448,29 @@ impl MainState {
     
     async fn authenticate(&mut self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
-        let auth_opt = { 
+        let (auth_opt, registered) = {
             if !conn_state.caps_negotation {
                 let user_state = &mut conn_state.user_state;
                 if let Some(ref nick) = user_state.nick {
                     if let Some(ref name) = user_state.name {
+                        let mut registered = false;
                         let password_opt = if let Some(uidx) =
                                     self.user_config_idxs.get(name) {
                             // match user mask
                             if let Some(ref users) = self.config.users {
                                 if let Some(ref mask) = users[*uidx].mask {
                                     if match_wildcard(&mask, &user_state.source) {
+                                        registered = true;
                                         users[*uidx].password.as_ref()
                                     } else {
                                         self.feed_msg(&mut conn_state.stream,
                                             "ERROR: user mask doesn't match").await?;
                                         return Ok(());
                                     }
-                                } else { users[*uidx].password.as_ref() }
+                                } else {
+                                    registered = true;
+                                    users[*uidx].password.as_ref()
+                                }
                             } else { None }
                         } else { None }
                             .or(self.config.password.as_ref());
@@ -458,17 +481,23 @@ impl MainState {
                             } else { false };
                             
                             user_state.authenticated = good;
-                            Some(good)
-                        } else { Some(true) }
-                    } else { None }
-                } else { None }
-            } else { None }
+                            (Some(good), registered)
+                        } else { (Some(true), registered) }
+                    } else { (None, false) }
+                } else { (None, false) }
+            } else { (None, false) }
         };
         
         if let Some(good) = auth_opt {
             let user_state = &conn_state.user_state;
             let client = user_state.client_name();
             if good {
+                {   // add new user to hash map
+                    let mut state = self.state.write().await;
+                    state.users.insert(user_state.nick.as_ref().unwrap().clone(),
+                        Rc::new(User::new(&self.config, &user_state, registered,
+                        conn_state.sender.take().unwrap())));
+                }
                 // welcome
                 self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
                     networkname: &self.config.network,
