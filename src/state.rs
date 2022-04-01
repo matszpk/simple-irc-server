@@ -24,11 +24,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::net::IpAddr;
 use std::error::Error;
 use std::time::Duration;
 use std::convert::TryFrom;
-use tokio::sync::{Mutex,RwLock};
+use tokio::sync::{Mutex, RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
@@ -252,10 +253,8 @@ pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
     sender: Option<UnboundedSender<String>>,
     receiver: UnboundedReceiver<String>,
-    // ping interval to handle pings to client
-    ping_interval: Interval,
     // sender and receiver used for sending ping task for 
-    ping_sender: UnboundedSender<()>,
+    ping_sender: Option<UnboundedSender<()>>,
     ping_receiver: UnboundedReceiver<()>,
     pong_interval: Option<Sleep>,
     ping_token: Option<String>,
@@ -264,7 +263,8 @@ pub(crate) struct ConnState {
     
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
-    quit: bool,
+    quit: Arc<AtomicI32>,
+    pinged: bool,
 }
 
 impl ConnState {
@@ -274,9 +274,20 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
-            ping_interval: interval(Duration::from_secs(config.ping_timeout)),
-            ping_sender, ping_receiver, pong_interval: None, ping_token: None,
-            caps_negotation: false, caps: CapState::default(), quit: false }
+            ping_sender: Some(ping_sender), ping_receiver,
+            pong_interval: None, ping_token: None,
+            caps_negotation: false, caps: CapState::default(),
+            quit: Arc::new(AtomicI32::new(0)),
+            pinged: false }
+    }
+}
+
+async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedSender<()>) {
+    sleep(d).await;
+    let mut intv = interval(d);
+    while quit.load(Ordering::SeqCst) == 0 {
+        intv.tick().await;
+        sender.send(()).unwrap();
     }
 }
 
@@ -341,6 +352,11 @@ impl MainState {
                 conn_state.stream.feed(msg).await?;
                 Ok(())
             },
+            Some(_) = conn_state.ping_receiver.recv() => {
+                self.feed_msg(&mut conn_state.stream, "PING :LALAL").await?;
+                conn_state.pinged = true;
+                Ok(())
+            }
             msg_str_res = conn_state.stream.next() => {
                 
                 let msg = match msg_str_res {
@@ -647,7 +663,7 @@ impl MainState {
                         RplUModeIs221{ client, user_modes: &user_modes }).await?;
             } else {
                 let client = conn_state.user_state.client_name();
-                conn_state.quit = true;
+                conn_state.quit.store(1, Ordering::SeqCst);
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
             }
         }
@@ -723,6 +739,7 @@ impl MainState {
     
     async fn process_pong<'a>(&self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
+        conn_state.pinged = false; // pong arrived, reset pinged
         Ok(())
     }
     
@@ -733,7 +750,7 @@ impl MainState {
     
     async fn process_quit(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
-        conn_state.quit = true;
+        conn_state.quit.store(1, Ordering::SeqCst);
         self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
     }
