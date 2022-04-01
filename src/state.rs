@@ -274,7 +274,7 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
-            ping_interval: interval(Duration::from_secs(config.ping_timeout as u64)),
+            ping_interval: interval(Duration::from_secs(config.ping_timeout)),
             ping_sender, ping_receiver, pong_interval: None, ping_token: None,
             caps_negotation: false, caps: CapState::default(), quit: false }
     }
