@@ -327,14 +327,14 @@ impl MainState {
                 created: Local::now().to_rfc2822() }
     }
     
-    pub(crate) async fn process(&mut self, conn_state: &mut ConnState)
+    pub(crate) async fn process(&self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
         let res = self.process_internal(conn_state).await;
         conn_state.stream.flush().await?;
         res
     }
 
-    async fn process_internal(&mut self, conn_state: &mut ConnState)
+    async fn process_internal(&self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
         tokio::select! {
             Some(msg) = conn_state.receiver.recv() => {
@@ -498,7 +498,7 @@ impl MainState {
         stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
-    async fn process_cap<'a>(&mut self, conn_state: &mut ConnState, subcommand: CapCommand,
+    async fn process_cap<'a>(&self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
         match subcommand {
             CapCommand::LS => {
@@ -533,7 +533,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn authenticate(&mut self, conn_state: &mut ConnState)
+    async fn authenticate(&self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
         let (auth_opt, registered) = {
             if !conn_state.caps_negotation {
@@ -654,7 +654,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_authenticate(&mut self, conn_state: &mut ConnState)
+    async fn process_authenticate(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
@@ -663,7 +663,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_pass<'a>(&mut self, conn_state: &mut ConnState, pass: &'a str)
+    async fn process_pass<'a>(&self, conn_state: &mut ConnState, pass: &'a str)
             -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
             conn_state.user_state.password = Some(pass.to_string());
@@ -675,7 +675,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_nick<'a>(&mut self, conn_state: &mut ConnState, nick: &'a str)
+    async fn process_nick<'a>(&self, conn_state: &mut ConnState, nick: &'a str)
             -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
             conn_state.user_state.set_nick(nick.to_string());
@@ -700,7 +700,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_user<'a>(&mut self, conn_state: &mut ConnState, username: &'a str,
+    async fn process_user<'a>(&self, conn_state: &mut ConnState, username: &'a str,
             _: &'a str, _: &'a str, realname: &'a str)
             -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
@@ -714,66 +714,66 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_ping<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
+    async fn process_ping<'a>(&self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
         self.feed_msg(&mut conn_state.stream, format!("PONG {} {} :{}", self.config.name,
                     self.config.name, token)).await?;
         Ok(())
     }
     
-    async fn process_pong<'a>(&mut self, conn_state: &mut ConnState, token: &'a str)
+    async fn process_pong<'a>(&self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_oper<'a>(&mut self, conn_state: &mut ConnState, nick: &'a str,
+    async fn process_oper<'a>(&self, conn_state: &mut ConnState, nick: &'a str,
             password: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_quit(&mut self, conn_state: &mut ConnState)
+    async fn process_quit(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         conn_state.quit = true;
         self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
     }
     
-    async fn process_join<'a>(&mut self, conn_state: &mut ConnState, channels: Vec<&'a str>,
+    async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             keys: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_part<'a>(&mut self, conn_state: &mut ConnState, channels: Vec<&'a str>,
+    async fn process_part<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             reason: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_topic<'a>(&mut self, conn_state: &mut ConnState, channel: &'a str,
+    async fn process_topic<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
             topic: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_names<'a>(&mut self, conn_state: &mut ConnState, channels: Vec<&'a str>)
+    async fn process_names<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_list<'a>(&mut self, conn_state: &mut ConnState, channels: Vec<&'a str>,
+    async fn process_list<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_invite<'a>(&mut self, conn_state: &mut ConnState, nickname: &'a str,
+    async fn process_invite<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             channel: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_kick<'a>(&mut self, conn_state: &mut ConnState, channel: &'a str,
+    async fn process_kick<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
             user: &'a str, comment: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_motd<'a>(&mut self, conn_state: &mut ConnState, target: Option<&'a str>)
+    async fn process_motd<'a>(&self, conn_state: &mut ConnState, target: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
@@ -785,48 +785,48 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_version<'a>(&mut self, conn_state: &mut ConnState,
+    async fn process_version<'a>(&self, conn_state: &mut ConnState,
             target: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_admin<'a>(&mut self, conn_state: &mut ConnState,
+    async fn process_admin<'a>(&self, conn_state: &mut ConnState,
             target: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_connect<'a>(&mut self, conn_state: &mut ConnState, target_server: &'a str,
+    async fn process_connect<'a>(&self, conn_state: &mut ConnState, target_server: &'a str,
             port: Option<u16>, remote_server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_lusers(&mut self, conn_state: &mut ConnState)
+    async fn process_lusers(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_time<'a>(&mut self, conn_state: &mut ConnState, server: Option<&'a str>)
+    async fn process_time<'a>(&self, conn_state: &mut ConnState, server: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_stats<'a>(&mut self, conn_state: &mut ConnState, query: char,
+    async fn process_stats<'a>(&self, conn_state: &mut ConnState, query: char,
             server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_links<'a>(&mut self, conn_state: &mut ConnState,
+    async fn process_links<'a>(&self, conn_state: &mut ConnState,
             remote_server: Option<&'a str>, server_mask: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_help<'a>(&mut self, conn_state: &mut ConnState, nick: &'a str)
+    async fn process_help<'a>(&self, conn_state: &mut ConnState, nick: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_info(&mut self, conn_state: &mut ConnState)
+    async fn process_info(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
@@ -836,67 +836,67 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_mode<'a>(&mut self, conn_state: &mut ConnState, target: &'a str,
+    async fn process_mode<'a>(&self, conn_state: &mut ConnState, target: &'a str,
             modes: Vec<(&'a str, Vec<&'a str>)>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_privmsg<'a>(&mut self, conn_state: &mut ConnState, targets: Vec<&'a str>,
+    async fn process_privmsg<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
             text: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_notice<'a>(&mut self, conn_state: &mut ConnState, targets: Vec<&'a str>,
+    async fn process_notice<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
             text: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_who<'a>(&mut self, conn_state: &mut ConnState, mask: &'a str)
+    async fn process_who<'a>(&self, conn_state: &mut ConnState, mask: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_whois<'a>(&mut self, conn_state: &mut ConnState, target: Option<&'a str>,
+    async fn process_whois<'a>(&self, conn_state: &mut ConnState, target: Option<&'a str>,
             nickmasks: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_whowas<'a>(&mut self, conn_state: &mut ConnState, nickname: &'a str,
+    async fn process_whowas<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             count: Option<usize>, server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_kill<'a>(&mut self, conn_state: &mut ConnState, nickname: &'a str,
+    async fn process_kill<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             comment: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_rehash(&mut self, conn_state: &mut ConnState)
+    async fn process_rehash(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_restart(&mut self, conn_state: &mut ConnState)
+    async fn process_restart(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_squit<'a>(&mut self, conn_state: &mut ConnState, server: &'a str,
+    async fn process_squit<'a>(&self, conn_state: &mut ConnState, server: &'a str,
             comment: &'a str) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_away<'a>(&mut self, conn_state: &mut ConnState, server: Option<&'a str>)
+    async fn process_away<'a>(&self, conn_state: &mut ConnState, server: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_userhost<'a>(&mut self, conn_state: &mut ConnState,
+    async fn process_userhost<'a>(&self, conn_state: &mut ConnState,
             nicknames: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_wallops<'a>(&mut self, conn_state: &mut ConnState, text: &'a str)
+    async fn process_wallops<'a>(&self, conn_state: &mut ConnState, text: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
