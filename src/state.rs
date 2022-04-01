@@ -22,17 +22,18 @@ use std::cell::{RefCell};
 use std::pin::Pin;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::{Rc,Weak};
+use std::rc::{Rc, Weak};
 use std::sync::Arc;
-use std::net::{IpAddr};
+use std::net::IpAddr;
 use std::error::Error;
+use std::time::Duration;
 use std::convert::TryFrom;
 use tokio::sync::{Mutex,RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
-use tokio::time::{Interval, Sleep};
+use tokio::time::{interval, sleep, Interval, Sleep};
 use futures::SinkExt;
 use chrono::prelude::*;
 use const_table::const_table;
@@ -121,7 +122,6 @@ impl UserModifiable {
 }
 
 struct User {
-    ip_addr: IpAddr,
     hostname: String,
     sender: UnboundedSender<String>,
     modifiable: RefCell<UserModifiable>,
@@ -132,8 +132,8 @@ impl User {
             sender: UnboundedSender<String>) -> User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
-        User{ ip_addr: user_state.ip_addr, hostname: user_state.hostname.clone(),
-                sender, modifiable: RefCell::new(UserModifiable{
+        User{ hostname: user_state.hostname.clone(), sender,
+                modifiable: RefCell::new(UserModifiable{
                     name: user_state.name.as_ref().unwrap().clone(),
                     realname: user_state.realname.as_ref().unwrap().clone(),
                     nick: user_state.name.as_ref().unwrap().clone(),
@@ -210,6 +210,14 @@ pub(crate) struct ConnUserState {
 }
 
 impl ConnUserState {
+    fn new(ip_addr: IpAddr) -> ConnUserState {
+        let mut source = "@".to_string();
+        source.push_str(&ip_addr.to_string());
+        ConnUserState{ ip_addr, hostname: ip_addr.to_string(),
+            name: None, realname: None, nick: None, source, password: None,
+            authenticated: false, registered: false }
+    }
+    
     fn client_name<'a>(&'a self) -> &'a str {
         if let Some(ref n) = self.nick { &n }
         else if let Some(ref n) = self.name { &n }
@@ -249,8 +257,8 @@ pub(crate) struct ConnState {
     // sender and receiver used for sending ping task for 
     ping_sender: UnboundedSender<()>,
     ping_receiver: UnboundedReceiver<()>,
-    pong_interval: Sleep,
-    ping_token: String,
+    pong_interval: Option<Sleep>,
+    ping_token: Option<String>,
     
     user_state: ConnUserState,
     
@@ -260,11 +268,16 @@ pub(crate) struct ConnState {
 }
 
 impl ConnState {
-//     fn new(ipaddr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
-//         let (sender, receiver) = unbounded_channel();
-//         ConnState{ stream, sender: Some(sender), receiver,
-//             user_state: 
-//     }
+    fn new(config: &MainConfig, ip_addr: IpAddr,
+        stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
+        let (sender, receiver) = unbounded_channel();
+        let (ping_sender, ping_receiver) = unbounded_channel();
+        ConnState{ stream, sender: Some(sender), receiver,
+            user_state: ConnUserState::new(ip_addr),
+            ping_interval: interval(Duration::from_secs(config.ping_timeout as u64)),
+            ping_sender, ping_receiver, pong_interval: None, ping_token: None,
+            caps_negotation: false, caps: CapState::default(), quit: false }
+    }
 }
 
 struct VolatileState {
