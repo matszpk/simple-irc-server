@@ -31,8 +31,8 @@ use tokio::sync::{Mutex,RwLock};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{UnboundedReceiver,UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
+use tokio::time::{Interval, Sleep};
 use futures::SinkExt;
 use chrono::prelude::*;
 use const_table::const_table;
@@ -244,12 +244,27 @@ pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
     sender: Option<UnboundedSender<String>>,
     receiver: UnboundedReceiver<String>,
+    // ping interval to handle pings to client
+    ping_interval: Interval,
+    // sender and receiver used for sending ping task for 
+    ping_sender: UnboundedSender<()>,
+    ping_receiver: UnboundedReceiver<()>,
+    pong_interval: Sleep,
+    ping_token: String,
     
     user_state: ConnUserState,
     
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
     quit: bool,
+}
+
+impl ConnState {
+//     fn new(ipaddr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
+//         let (sender, receiver) = unbounded_channel();
+//         ConnState{ stream, sender: Some(sender), receiver,
+//             user_state: 
+//     }
 }
 
 struct VolatileState {
