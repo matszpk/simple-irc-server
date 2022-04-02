@@ -258,7 +258,6 @@ pub(crate) struct ConnState {
     ping_receiver: UnboundedReceiver<()>,
     timeout_sender: Arc<UnboundedSender<()>>,
     timeout_receiver: UnboundedReceiver<()>,
-    ping_token: Option<String>,
     pong_notifier: Option<oneshot::Sender<()>>,
     
     user_state: ConnUserState,
@@ -266,7 +265,6 @@ pub(crate) struct ConnState {
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
     quit: Arc<AtomicI32>,
-    pinged: bool,
 }
 
 impl ConnState {
@@ -278,9 +276,9 @@ impl ConnState {
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
-            ping_token: None, pong_notifier: None,
+            pong_notifier: None,
             caps_negotation: false, caps: CapState::default(),
-            quit: Arc::new(AtomicI32::new(0)), pinged: false }
+            quit: Arc::new(AtomicI32::new(0)) }
     }
     
     fn run_ping_waker(&mut self, config: &MainConfig) {
@@ -383,7 +381,6 @@ impl MainState {
             Some(_) = conn_state.ping_receiver.recv() => {
                 self.feed_msg(&mut conn_state.stream, "PING :LALAL").await?;
                 conn_state.run_pong_timeout(&self.config);
-                conn_state.pinged = true;
                 Ok(())
             }
             Some(_) = conn_state.timeout_receiver.recv() => {
@@ -780,7 +777,6 @@ impl MainState {
         if let Some(notifier) = conn_state.pong_notifier.take() {
             notifier.send(()).map_err(|_| "pong notifier error".to_string())?;
         }
-        conn_state.pinged = false; // pong arrived, reset pinged
         Ok(())
     }
     
