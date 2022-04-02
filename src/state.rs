@@ -30,6 +30,7 @@ use std::error::Error;
 use std::time::Duration;
 use std::convert::TryFrom;
 use tokio::sync::{Mutex, RwLock};
+use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
@@ -256,6 +257,8 @@ pub(crate) struct ConnState {
     // sender and receiver used for sending ping task for 
     ping_sender: Option<UnboundedSender<()>>,
     ping_receiver: UnboundedReceiver<()>,
+    pong_sender: Arc<UnboundedSender<()>>,
+    pong_receiver: UnboundedReceiver<()>,
     pong_interval: Option<Sleep>,
     ping_token: Option<String>,
     
@@ -268,17 +271,31 @@ pub(crate) struct ConnState {
 }
 
 impl ConnState {
-    fn new(config: &MainConfig, ip_addr: IpAddr,
-        stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
+    fn new(ip_addr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
+        let (pong_sender, pong_receiver) = unbounded_channel();
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
+            pong_sender: Arc::new(pong_sender), pong_receiver,
             pong_interval: None, ping_token: None,
             caps_negotation: false, caps: CapState::default(),
-            quit: Arc::new(AtomicI32::new(0)),
-            pinged: false }
+            quit: Arc::new(AtomicI32::new(0)), pinged: false }
+    }
+    
+    fn run_ping_waker(&mut self, config: &MainConfig) {
+        if self.ping_sender.is_some() {
+            tokio::spawn(ping_client_waker(Duration::from_secs(config.ping_timeout),
+                    self.quit.clone(), self.ping_sender.take().unwrap()));
+        } else {
+            panic!("Ping waker ran!");
+        }
+    }
+    
+    fn run_pong_timeout(&mut self, config: &MainConfig) {
+        tokio::spawn(pong_client_timeout(Duration::from_secs(config.pong_timeout),
+                    self.quit.clone(), self.pong_sender.clone()));
     }
 }
 
@@ -287,6 +304,14 @@ async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedS
     let mut intv = interval(d);
     while quit.load(Ordering::SeqCst) == 0 {
         intv.tick().await;
+        sender.send(()).unwrap();
+    }
+}
+
+async fn pong_client_timeout(d: Duration, quit: Arc<AtomicI32>,
+                    sender: Arc<UnboundedSender<()>>) {
+    sleep(d).await;
+    if quit.load(Ordering::SeqCst) == 0 {
         sender.send(()).unwrap();
     }
 }
@@ -355,6 +380,12 @@ impl MainState {
             Some(_) = conn_state.ping_receiver.recv() => {
                 self.feed_msg(&mut conn_state.stream, "PING :LALAL").await?;
                 conn_state.pinged = true;
+                Ok(())
+            }
+            Some(_) = conn_state.pong_receiver.recv() => {
+                self.feed_msg(&mut conn_state.stream,
+                            "ERROR :Pong timeout, connection will be closed.").await?;
+                conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
             msg_str_res = conn_state.stream.next() => {
