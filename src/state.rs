@@ -22,8 +22,7 @@ use std::cell::{RefCell};
 use std::pin::Pin;
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::{Rc, Weak};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::net::IpAddr;
 use std::error::Error;
@@ -125,7 +124,8 @@ impl UserModifiable {
 struct User {
     hostname: String,
     sender: UnboundedSender<String>,
-    modifiable: RefCell<UserModifiable>,
+    // FIXME: Use non mutex wrapper
+    modifiable: Mutex<UserModifiable>,
 }
 
 impl User {
@@ -134,7 +134,7 @@ impl User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
         User{ hostname: user_state.hostname.clone(), sender,
-                modifiable: RefCell::new(UserModifiable{
+                modifiable: Mutex::new(UserModifiable{
                     name: user_state.name.as_ref().unwrap().clone(),
                     realname: user_state.realname.as_ref().unwrap().clone(),
                     nick: user_state.name.as_ref().unwrap().clone(),
@@ -158,8 +158,9 @@ struct ChannelUserMode {
 }
 
 struct ChannelUser {
-    user: Rc<User>,
-    mode: RefCell<ChannelUserMode>,
+    user: Arc<User>,
+    // FIXME: Use non mutex wrapper
+    mode: Mutex<ChannelUserMode>,
 }
 
 struct Channel {
@@ -268,7 +269,8 @@ pub(crate) struct ConnState {
 }
 
 impl ConnState {
-    fn new(ip_addr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
+    pub(crate) fn new(ip_addr: IpAddr,
+            stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
@@ -279,6 +281,10 @@ impl ConnState {
             pong_notifier: None,
             caps_negotation: false, caps: CapState::default(),
             quit: Arc::new(AtomicI32::new(0)) }
+    }
+    
+    pub(crate) fn is_quit(&self) -> bool {
+        self.quit.load(Ordering::SeqCst) != 0
     }
     
     fn run_ping_waker(&mut self, config: &MainConfig) {
@@ -318,8 +324,8 @@ async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
 }
 
 struct VolatileState {
-    users: HashMap<String, Rc<User>>,
-    channels: HashMap<String, Rc<Channel>>,
+    users: HashMap<String, Arc<User>>,
+    channels: HashMap<String, Arc<Channel>>,
 }
 
 impl VolatileState {
@@ -327,7 +333,7 @@ impl VolatileState {
         let mut channels = HashMap::new();
         if let Some(ref cfg_channels) = config.channels {
             cfg_channels.iter().for_each(|c| {
-                channels.insert(c.name.clone(), Rc::new(Channel{ name: c.name.clone(), 
+                channels.insert(c.name.clone(), Arc::new(Channel{ name: c.name.clone(), 
                     topic: c.topic.clone(), modes: c.modes.clone(),
                     users: HashMap::new() }));
             });
@@ -348,7 +354,7 @@ pub(crate) struct MainState {
 }
 
 impl MainState {
-    fn new_from_config(config: MainConfig) -> MainState {
+    pub(crate) fn new_from_config(config: MainConfig) -> MainState {
         let mut user_config_idxs = HashMap::new();
         if let Some(ref users) = config.users {
             users.iter().enumerate().for_each(|(i,u)| { 
@@ -366,9 +372,10 @@ impl MainState {
     
     pub(crate) async fn process(&self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
-        let res = self.process_internal(conn_state).await;
+        // FIXME: return result from this statement
+        self.process_internal(conn_state).await;
         conn_state.stream.flush().await?;
-        res
+        Ok(())
     }
 
     async fn process_internal(&self, conn_state: &mut ConnState)
@@ -628,11 +635,11 @@ impl MainState {
                 let user_modes = {   // add new user to hash map
                     let user_state = &conn_state.user_state;
                     let mut state = self.state.write().await;
-                    let user = Rc::new(User::new(&self.config, &user_state, registered,
+                    let user = Arc::new(User::new(&self.config, &user_state, registered,
                                 conn_state.sender.take().unwrap()));
                     state.users.insert(user_state.nick.as_ref().unwrap().clone(),
                         user.clone());
-                    let umode_str = user.modifiable.borrow().modes.to_string();
+                    let umode_str = user.modifiable.lock().await.modes.to_string();
                     umode_str
                 };
                 
@@ -739,7 +746,7 @@ impl MainState {
                 if !state.users.get(&nick_str).is_some() {
                     let user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
-                    user.modifiable.borrow_mut().update_nick(&conn_state.user_state);
+                    user.modifiable.lock().await.update_nick(&conn_state.user_state);
                     state.users.insert(nick_str, user);
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
