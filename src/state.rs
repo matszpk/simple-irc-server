@@ -29,14 +29,12 @@ use std::net::IpAddr;
 use std::error::Error;
 use std::time::Duration;
 use std::convert::TryFrom;
-use tokio::sync::{Mutex, RwLock};
-use tokio::task::JoinHandle;
+use tokio::sync::{Mutex, RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
-use tokio::sync::oneshot;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
-use tokio::time::{interval, sleep, Interval, Sleep, timeout, Timeout};
+use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
 use const_table::const_table;
@@ -298,22 +296,22 @@ impl ConnState {
         let (pong_notifier, pong_receiver) = oneshot::channel();
         self.pong_notifier = Some(pong_notifier);
         tokio::spawn(pong_client_timeout(
-                timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
+                time::timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
                     self.quit.clone(), self.timeout_sender.clone()));
     }
 }
 
 async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedSender<()>) {
-    sleep(d).await;
-    let mut intv = interval(d);
+    time::sleep(d).await;
+    let mut intv = time::interval(d);
     while quit.load(Ordering::SeqCst) == 0 {
         intv.tick().await;
         sender.send(()).unwrap();
     }
 }
 
-async fn pong_client_timeout(tmo: Timeout<oneshot::Receiver<()>>, quit: Arc<AtomicI32>,
-                    sender: Arc<UnboundedSender<()>>) {
+async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
+                    quit: Arc<AtomicI32>, sender: Arc<UnboundedSender<()>>) {
     if let Err(_) = tmo.await {
         if quit.load(Ordering::SeqCst) == 0 {
             sender.send(()).unwrap();
