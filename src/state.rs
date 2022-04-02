@@ -34,8 +34,9 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
+use tokio::sync::oneshot;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
-use tokio::time::{interval, sleep, Interval, Sleep};
+use tokio::time::{interval, sleep, Interval, Sleep, timeout, Timeout};
 use futures::SinkExt;
 use chrono::prelude::*;
 use const_table::const_table;
@@ -257,10 +258,10 @@ pub(crate) struct ConnState {
     // sender and receiver used for sending ping task for 
     ping_sender: Option<UnboundedSender<()>>,
     ping_receiver: UnboundedReceiver<()>,
-    pong_sender: Arc<UnboundedSender<()>>,
-    pong_receiver: UnboundedReceiver<()>,
-    pong_interval: Option<Sleep>,
+    timeout_sender: Arc<UnboundedSender<()>>,
+    timeout_receiver: UnboundedReceiver<()>,
     ping_token: Option<String>,
+    pong_notifier: Option<oneshot::Sender<()>>,
     
     user_state: ConnUserState,
     
@@ -274,12 +275,12 @@ impl ConnState {
     fn new(ip_addr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
-        let (pong_sender, pong_receiver) = unbounded_channel();
+        let (timeout_sender, timeout_receiver) = unbounded_channel();
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
-            pong_sender: Arc::new(pong_sender), pong_receiver,
-            pong_interval: None, ping_token: None,
+            timeout_sender: Arc::new(timeout_sender), timeout_receiver,
+            ping_token: None, pong_notifier: None,
             caps_negotation: false, caps: CapState::default(),
             quit: Arc::new(AtomicI32::new(0)), pinged: false }
     }
@@ -294,8 +295,11 @@ impl ConnState {
     }
     
     fn run_pong_timeout(&mut self, config: &MainConfig) {
-        tokio::spawn(pong_client_timeout(Duration::from_secs(config.pong_timeout),
-                    self.quit.clone(), self.pong_sender.clone()));
+        let (pong_notifier, pong_receiver) = oneshot::channel();
+        self.pong_notifier = Some(pong_notifier);
+        tokio::spawn(pong_client_timeout(
+                timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
+                    self.quit.clone(), self.timeout_sender.clone()));
     }
 }
 
@@ -308,11 +312,12 @@ async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedS
     }
 }
 
-async fn pong_client_timeout(d: Duration, quit: Arc<AtomicI32>,
+async fn pong_client_timeout(tmo: Timeout<oneshot::Receiver<()>>, quit: Arc<AtomicI32>,
                     sender: Arc<UnboundedSender<()>>) {
-    sleep(d).await;
-    if quit.load(Ordering::SeqCst) == 0 {
-        sender.send(()).unwrap();
+    if let Err(_) = tmo.await {
+        if quit.load(Ordering::SeqCst) == 0 {
+            sender.send(()).unwrap();
+        }
     }
 }
 
@@ -379,10 +384,11 @@ impl MainState {
             },
             Some(_) = conn_state.ping_receiver.recv() => {
                 self.feed_msg(&mut conn_state.stream, "PING :LALAL").await?;
+                conn_state.run_pong_timeout(&self.config);
                 conn_state.pinged = true;
                 Ok(())
             }
-            Some(_) = conn_state.pong_receiver.recv() => {
+            Some(_) = conn_state.timeout_receiver.recv() => {
                 self.feed_msg(&mut conn_state.stream,
                             "ERROR :Pong timeout, connection will be closed.").await?;
                 conn_state.quit.store(1, Ordering::SeqCst);
@@ -692,6 +698,9 @@ impl MainState {
                 let client = conn_state.user_state.client_name();
                 self.feed_msg(&mut conn_state.stream,
                         RplUModeIs221{ client, user_modes: &user_modes }).await?;
+                
+                // run ping waker for this connection
+                conn_state.run_ping_waker(&self.config);
             } else {
                 let client = conn_state.user_state.client_name();
                 conn_state.quit.store(1, Ordering::SeqCst);
@@ -770,6 +779,9 @@ impl MainState {
     
     async fn process_pong<'a>(&self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
+        if let Some(notifier) = conn_state.pong_notifier.take() {
+            notifier.send(()).map_err(|_| "pong notifier error".to_string())?;
+        }
         conn_state.pinged = false; // pong arrived, reset pinged
         Ok(())
     }
