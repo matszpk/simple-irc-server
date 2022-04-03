@@ -102,7 +102,9 @@ pub(crate) enum SupportTokenBool {
     SAFELIST = SupportTokenBoolValue{ name: "SAFELIST" },
 }
 
-struct UserModifiable {
+struct User {
+    hostname: String,
+    sender: UnboundedSender<String>,
     name: String,
     realname: String,
     nick: String,
@@ -114,33 +116,23 @@ struct UserModifiable {
     channels: HashSet<String>,
 }
 
-impl UserModifiable {
-    fn update_nick(&mut self, user_state: &ConnUserState) {
-        if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
-        self.source = user_state.source.clone();
-    }
-}
-
-struct User {
-    hostname: String,
-    sender: UnboundedSender<String>,
-    // FIXME: Use non mutex wrapper
-    modifiable: UserModifiable,
-}
-
 impl User {
     fn new(config: &MainConfig, user_state: &ConnUserState, registered: bool,
             sender: UnboundedSender<String>) -> User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
         User{ hostname: user_state.hostname.clone(), sender,
-                modifiable: UserModifiable{
-                    name: user_state.name.as_ref().unwrap().clone(),
-                    realname: user_state.realname.as_ref().unwrap().clone(),
-                    nick: user_state.name.as_ref().unwrap().clone(),
-                    source: user_state.source.clone(),
-                    modes: user_modes, operator: false, away: None,
-                    channels: HashSet::new() } }
+                name: user_state.name.as_ref().unwrap().clone(),
+                realname: user_state.realname.as_ref().unwrap().clone(),
+                nick: user_state.name.as_ref().unwrap().clone(),
+                source: user_state.source.clone(),
+                modes: user_modes, operator: false, away: None,
+                channels: HashSet::new() }
+    }
+    
+    fn update_nick(&mut self, user_state: &ConnUserState) {
+        if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
+        self.source = user_state.source.clone();
     }
 }
 
@@ -365,11 +357,11 @@ impl MainState {
     }
     
     pub(crate) async fn process(&self, conn_state: &mut ConnState)
-                -> Result<(), Box<dyn Error>> {
-        // FIXME: return result from this statement
-        self.process_internal(conn_state).await;
-        conn_state.stream.flush().await?;
-        Ok(())
+                -> Result<(), String> {
+        // use conversion error to string to avoid problems with thread safety
+        let res = self.process_internal(conn_state).await.map_err(|e| e.to_string());
+        conn_state.stream.flush().await.map_err(|e| e.to_string())?;
+        res
     }
 
     async fn process_internal(&self, conn_state: &mut ConnState)
@@ -631,7 +623,7 @@ impl MainState {
                     let mut state = self.state.write().await;
                     let user = User::new(&self.config, &user_state, registered,
                                 conn_state.sender.take().unwrap());
-                    let umode_str = user.modifiable.modes.to_string();
+                    let umode_str = user.modes.to_string();
                     state.users.insert(user_state.nick.as_ref().unwrap().clone(),
                         user);
                     umode_str
@@ -740,7 +732,7 @@ impl MainState {
                 if !state.users.get(&nick_str).is_some() {
                     let mut user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
-                    user.modifiable.update_nick(&conn_state.user_state);
+                    user.update_nick(&conn_state.user_state);
                     state.users.insert(nick_str, user);
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
