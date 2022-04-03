@@ -18,11 +18,9 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 use std::ops::Deref;
-use std::cell::{RefCell};
-use std::pin::Pin;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::net::IpAddr;
 use std::error::Error;
