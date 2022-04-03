@@ -20,7 +20,7 @@
 use std::ops::Deref;
 use std::cell::{RefCell};
 use std::pin::Pin;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::{Arc, Weak};
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -111,7 +111,7 @@ struct UserModifiable {
     away: Option<String>,
     // user state
     operator: bool,
-    channels: HashMap<String, Weak<Channel>>,
+    channels: HashSet<String>,
 }
 
 impl UserModifiable {
@@ -140,7 +140,7 @@ impl User {
                     nick: user_state.name.as_ref().unwrap().clone(),
                     source: user_state.source.clone(),
                     modes: user_modes, operator: false, away: None,
-                    channels: HashMap::new() } }
+                    channels: HashSet::new() } }
     }
 }
 
@@ -319,7 +319,7 @@ async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
 
 struct VolatileState {
     users: HashMap<String, User>,
-    channels: HashMap<String, Arc<Channel>>,
+    channels: HashMap<String, Channel>,
 }
 
 impl VolatileState {
@@ -327,9 +327,9 @@ impl VolatileState {
         let mut channels = HashMap::new();
         if let Some(ref cfg_channels) = config.channels {
             cfg_channels.iter().for_each(|c| {
-                channels.insert(c.name.clone(), Arc::new(Channel{ name: c.name.clone(), 
+                channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
                     topic: c.topic.clone(), modes: c.modes.clone(),
-                    users: HashMap::new() }));
+                    users: HashMap::new() });
             });
         }
         
