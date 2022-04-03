@@ -17,11 +17,11 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::ops::Deref;
+use std::ops::{Deref, Drop};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::net::IpAddr;
 use std::error::Error;
 use std::time::Duration;
@@ -250,11 +250,12 @@ pub(crate) struct ConnState {
     caps_negotation: bool,  // if caps negotation process
     caps: CapState,
     quit: Arc<AtomicI32>,
+    conns_count: Arc<AtomicUsize>
 }
 
 impl ConnState {
-    pub(crate) fn new(ip_addr: IpAddr,
-            stream: Framed<TcpStream, IRCLinesCodec>) -> ConnState {
+    fn new(ip_addr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>,
+            conns_count: Arc<AtomicUsize>) -> ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
@@ -264,7 +265,8 @@ impl ConnState {
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
             pong_notifier: None,
             caps_negotation: false, caps: CapState::default(),
-            quit: Arc::new(AtomicI32::new(0)) }
+            quit: Arc::new(AtomicI32::new(0)),
+            conns_count }
     }
     
     pub(crate) fn is_quit(&self) -> bool {
@@ -286,6 +288,12 @@ impl ConnState {
         tokio::spawn(pong_client_timeout(
                 time::timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
                     self.quit.clone(), self.timeout_sender.clone()));
+    }
+}
+
+impl Drop for ConnState {
+    fn drop(&mut self) {
+        self.conns_count.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -333,6 +341,7 @@ pub(crate) struct MainState {
     user_config_idxs: HashMap<String, usize>,
     // key is oper name
     oper_config_idxs: HashMap<String, usize>,
+    conns_count: Arc<AtomicUsize>,
     state: RwLock<VolatileState>,
     created: String,
 }
@@ -351,7 +360,23 @@ impl MainState {
         }
         let state = RwLock::new(VolatileState::new_from_config(&config));
         MainState{ config, user_config_idxs, oper_config_idxs, state,
+                conns_count: Arc::new(AtomicUsize::new(0)),
                 created: Local::now().to_rfc2822() }
+    }
+    
+    pub(crate) fn register_conn_state(&self, ip_addr: IpAddr,
+                    stream: Framed<TcpStream, IRCLinesCodec>) -> Option<ConnState> {
+        if let Some(max_conns) = self.config.max_connections {
+            if self.conns_count.fetch_add(1, Ordering::SeqCst) < max_conns {
+                Some(ConnState::new(ip_addr, stream, self.conns_count.clone()))
+            } else {
+                self.conns_count.fetch_sub(1, Ordering::SeqCst);
+                eprintln!("Too many connections");
+                None
+            }
+        } else {
+            Some(ConnState::new(ip_addr, stream, self.conns_count.clone()))
+        }
     }
     
     pub(crate) async fn process(&self, conn_state: &mut ConnState)

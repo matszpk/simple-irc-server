@@ -41,10 +41,11 @@ use state::*;
 
 async fn user_state_process(main_state: Arc<MainState>, stream: TcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new());
-    let mut conn_state = ConnState::new(addr.ip(), line_stream);
-    while !conn_state.is_quit() {
-        if let Err(e) = main_state.process(&mut conn_state).await {
-            eprintln!("Error: {}" , e);
+    if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
+        while !conn_state.is_quit() {
+            if let Err(e) = main_state.process(&mut conn_state).await {
+                eprintln!("Error: {}" , e);
+            }
         }
     }
 }
@@ -55,6 +56,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let config = MainConfig::new(cli)?;
     let listener = TcpListener::bind((config.listen, config.port)).await?;
     let main_state = Arc::new(MainState::new_from_config(config));
+    
     loop {
         let (stream, addr) = listener.accept().await?;
         tokio::spawn(user_state_process(main_state.clone(), stream, addr));
