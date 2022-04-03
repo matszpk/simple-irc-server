@@ -375,6 +375,7 @@ impl MainState {
                 None
             }
         } else {
+            self.conns_count.fetch_add(1, Ordering::SeqCst);
             Some(ConnState::new(ip_addr, stream, self.conns_count.clone()))
         }
     }
