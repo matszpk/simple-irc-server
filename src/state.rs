@@ -28,7 +28,7 @@ use std::net::IpAddr;
 use std::error::Error;
 use std::time::Duration;
 use std::convert::TryFrom;
-use tokio::sync::{Mutex, RwLock, oneshot};
+use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
@@ -125,7 +125,7 @@ struct User {
     hostname: String,
     sender: UnboundedSender<String>,
     // FIXME: Use non mutex wrapper
-    modifiable: Mutex<UserModifiable>,
+    modifiable: UserModifiable,
 }
 
 impl User {
@@ -134,13 +134,13 @@ impl User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
         User{ hostname: user_state.hostname.clone(), sender,
-                modifiable: Mutex::new(UserModifiable{
+                modifiable: UserModifiable{
                     name: user_state.name.as_ref().unwrap().clone(),
                     realname: user_state.realname.as_ref().unwrap().clone(),
                     nick: user_state.name.as_ref().unwrap().clone(),
                     source: user_state.source.clone(),
                     modes: user_modes, operator: false, away: None,
-                    channels: HashMap::new() }) }
+                    channels: HashMap::new() } }
     }
 }
 
@@ -157,17 +157,11 @@ struct ChannelUserMode {
     oper_type: OperatorType,
 }
 
-struct ChannelUser {
-    user: Arc<User>,
-    // FIXME: Use non mutex wrapper
-    mode: Mutex<ChannelUserMode>,
-}
-
 struct Channel {
     name: String,
     topic: String,
     modes: ChannelModes,
-    users: HashMap<String, ChannelUser>,
+    users: HashMap<String, ChannelUserMode>,
 }
 
 #[derive(Copy, Clone)]
@@ -324,7 +318,7 @@ async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
 }
 
 struct VolatileState {
-    users: HashMap<String, Arc<User>>,
+    users: HashMap<String, User>,
     channels: HashMap<String, Arc<Channel>>,
 }
 
@@ -635,11 +629,11 @@ impl MainState {
                 let user_modes = {   // add new user to hash map
                     let user_state = &conn_state.user_state;
                     let mut state = self.state.write().await;
-                    let user = Arc::new(User::new(&self.config, &user_state, registered,
-                                conn_state.sender.take().unwrap()));
+                    let user = User::new(&self.config, &user_state, registered,
+                                conn_state.sender.take().unwrap());
+                    let umode_str = user.modifiable.modes.to_string();
                     state.users.insert(user_state.nick.as_ref().unwrap().clone(),
-                        user.clone());
-                    let umode_str = user.modifiable.lock().await.modes.to_string();
+                        user);
                     umode_str
                 };
                 
@@ -744,9 +738,9 @@ impl MainState {
             if nick != old_nick {
                 let nick_str = nick.to_string();
                 if !state.users.get(&nick_str).is_some() {
-                    let user = state.users.remove(&old_nick).unwrap();
+                    let mut user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
-                    user.modifiable.lock().await.update_nick(&conn_state.user_state);
+                    user.modifiable.update_nick(&conn_state.user_state);
                     state.users.insert(nick_str, user);
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
