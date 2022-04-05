@@ -134,12 +134,14 @@ impl User {
     }
 }
 
+#[derive(Copy, Clone)]
 enum OperatorType {
     NoOper,
     Oper,
     HalfOper,
 }
 
+#[derive(Copy, Clone)]
 struct ChannelUserMode {
     founder: bool,
     protected: bool,
@@ -147,11 +149,25 @@ struct ChannelUserMode {
     oper_type: OperatorType,
 }
 
+impl Default for ChannelUserMode {
+    fn default() -> Self {
+        ChannelUserMode{ founder: false, protected: false, voice: false,
+                oper_type: OperatorType::NoOper }
+    }
+}
+
 struct Channel {
     name: String,
     topic: String,
     modes: ChannelModes,
     users: HashMap<String, ChannelUserMode>,
+}
+
+impl Channel {
+    fn new(name: String) -> Channel {
+        Channel{ name, topic: String::new(), modes: ChannelModes::default(),
+            users: HashMap::new() }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -479,6 +495,17 @@ impl MainState {
                 };
                 
                 use crate::Command::*;
+                // if user not authenticated
+                match cmd {
+                    CAP{ .. } | AUTHENTICATE{ } | PASS{ .. } | NICK{ .. } |
+                            USER{ .. } | QUIT{ } => {},
+                    _ => {
+                        self.feed_msg(&mut conn_state.stream, ErrNotRegistered451{         
+                                    client: conn_state.user_state.client_name() }).await?;
+                        return Ok(())
+                    }
+                }
+                
                 match cmd {
                     CAP{ subcommand, caps, version } =>
                         self.process_cap(conn_state, subcommand, caps, version).await,
@@ -811,6 +838,23 @@ impl MainState {
     
     async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             keys: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        for chname_str in channels.iter() {
+            let chname  = chname_str.to_string();
+            if let Some(channel) = state.channels.get_mut(&chname.clone()) {
+                channel.users.insert(user_nick.clone(), ChannelUserMode::default());
+            } else {
+                let mut channel = Channel::new(chname.clone());
+                channel.users.insert(user_nick.clone(), ChannelUserMode::default());
+                state.channels.insert(chname, channel);
+            }
+        }
+        let user = state.users.get_mut(user_nick).unwrap();
+        for chname_str in channels.iter() {
+            let chname  = chname_str.to_string();
+            user.channels.insert(chname.clone());
+        }
         Ok(())
     }
     
