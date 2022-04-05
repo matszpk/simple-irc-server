@@ -110,7 +110,6 @@ struct User {
     modes: UserModes,
     away: Option<String>,
     // user state
-    operator: bool,
     channels: HashSet<String>,
 }
 
@@ -124,7 +123,7 @@ impl User {
                 realname: user_state.realname.as_ref().unwrap().clone(),
                 nick: user_state.name.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
-                modes: user_modes, operator: false, away: None,
+                modes: user_modes, away: None,
                 channels: HashSet::new() }
     }
     
@@ -826,6 +825,29 @@ impl MainState {
     
     async fn process_oper<'a>(&self, conn_state: &mut ConnState, nick: &'a str,
             password: &'a str) -> Result<(), Box<dyn Error>> {
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let mut user = state.users.get_mut(user_nick).unwrap();
+        let client = conn_state.user_state.client_name();
+        
+        if let Some(oper_idx) = self.oper_config_idxs.get(nick) {
+            let op_cfg_opt = self.config.operators.as_ref().unwrap().get(*oper_idx);
+            let op_config = op_cfg_opt.as_ref().unwrap();
+            
+            if op_config.password != password {
+                self.feed_msg(&mut conn_state.stream,
+                        ErrPasswdMismatch464{ client }).await?;
+            }
+            if let Some(ref op_mask) = op_config.mask {
+                if match_wildcard(&op_mask, &conn_state.user_state.source) {
+                    self.feed_msg(&mut conn_state.stream,
+                            ErrNoOperhost491{ client }).await?;
+                }
+            }
+            user.modes.oper = true;
+        } else {
+            self.feed_msg(&mut conn_state.stream, ErrNoOperhost491{ client }).await?;
+        }
         Ok(())
     }
     
