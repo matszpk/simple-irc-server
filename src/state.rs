@@ -848,12 +848,12 @@ impl MainState {
             if let Some(ref op_mask) = op_config.mask {
                 if match_wildcard(&op_mask, &conn_state.user_state.source) {
                     self.feed_msg(&mut conn_state.stream,
-                            ErrNoOperhost491{ client }).await?;
+                            ErrNoOperHost491{ client }).await?;
                 }
             }
             user.modes.oper = true;
         } else {
-            self.feed_msg(&mut conn_state.stream, ErrNoOperhost491{ client }).await?;
+            self.feed_msg(&mut conn_state.stream, ErrNoOperHost491{ client }).await?;
         }
         Ok(())
     }
