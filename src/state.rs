@@ -31,6 +31,7 @@ use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
+use tokio::sync::mpsc::error::SendError;
 use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
@@ -131,6 +132,11 @@ impl User {
     fn update_nick(&mut self, user_state: &ConnUserState) {
         if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
         self.source = user_state.source.clone();
+    }
+    
+    fn send_message<'a, 'b>(&self, msg: &Message<'a>, source: &'b str)
+                -> Result<(), SendError<String>> {
+        self.sender.send(msg.to_string_with_source(source))
     }
 }
 

@@ -102,30 +102,26 @@ impl<'a> Message<'a> {
             Err(MessageError::Empty)
         }
     }
-}
-
-impl<'a> fmt::Display for Message<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(src) = self.source {
-            f.write_str(":")?;
-            f.write_str(src)?;
-            f.write_str(" ")?;
-        }
-        f.write_str(self.command)?;
+    
+    pub(crate) fn to_string_with_source<'b>(&self, source: &'b str) -> String {
+        let mut out = ":".to_string();
+        out += source;
+        out.push(' ');
+        out += self.command;
         if self.params.len() >= 1 {
-            self.params[..self.params.len()-1].iter().try_for_each(|s| {
-                f.write_str(" ")?;
-                f.write_str(s)
-            })?;
+            self.params[..self.params.len()-1].iter().for_each(|s| {
+                out.push(' ');
+                out += s;
+            });
             let last = self.params[self.params.len()-1];
             if last.find([':', ' ', '\t']).is_some() {
-                f.write_str(" :")?;
+                out += " :";
             } else {
-                f.write_str(" ")?;
+                out.push(' ');
             }
-            f.write_str(last)?;
+            out += last;
         }
-        Ok(())
+        out
     }
 }
 
@@ -1457,11 +1453,12 @@ mod test {
     
     #[test]
     fn test_message_format() {
-        assert_eq!("USER guest 0 * :Ronnie Reagan".to_string(),
+        assert_eq!(":buru USER guest 0 * :Ronnie Reagan".to_string(),
                 Message{ source: None, command: "USER",
-                    params: vec!["guest", "0", "*", "Ronnie Reagan"] }.to_string());
-        assert_eq!("INVITE mati1 #xxx".to_string(),
-                Message{ source: None, command: "INVITE",
-                    params: vec!["mati1", "#xxx"] }.to_string());
+                    params: vec!["guest", "0", "*", "Ronnie Reagan"] }
+                            .to_string_with_source("buru"));
+        assert_eq!(":sonny INVITE mati1 #xxx".to_string(),
+                Message{ source: Some("xxxx"), command: "INVITE",
+                    params: vec!["mati1", "#xxx"] }.to_string_with_source("sonny"));
     }
 }
