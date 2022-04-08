@@ -111,6 +111,7 @@ struct User {
     away: Option<String>,
     // user state
     channels: HashSet<String>,
+    invited_to: HashSet<String>,    // invited in channels
 }
 
 impl User {
@@ -124,7 +125,7 @@ impl User {
                 nick: user_state.name.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
-                channels: HashSet::new() }
+                channels: HashSet::new(), invited_to: HashSet::new() }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -902,6 +903,17 @@ impl MainState {
     
     async fn process_invite<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             channel: &'a str) -> Result<(), Box<dyn Error>> {
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get_mut(user_nick).unwrap();
+        let client = conn_state.user_state.client_name();
+        
+        if user.channels.contains(channel) {
+            let chanobj = state.channels.get(channel);
+        } else {
+            self.feed_msg(&mut conn_state.stream,
+                                ErrNotOnChannel442{ client, channel }).await?;
+        }
         Ok(())
     }
     

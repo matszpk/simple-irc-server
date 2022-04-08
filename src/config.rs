@@ -107,7 +107,7 @@ pub(crate) struct ChannelModes {
     pub(crate) operators: Option<HashSet<String>>,
     pub(crate) half_operators: Option<HashSet<String>>,
     pub(crate) voices: Option<HashSet<String>>,
-    pub(crate) invite: bool,
+    pub(crate) invite_only: bool,
     pub(crate) private: bool,
     pub(crate) moderated: bool,
     pub(crate) secret: bool,
@@ -119,7 +119,7 @@ impl Default for ChannelModes {
     fn default() -> Self {
         ChannelModes{ ban: None, exception: None, invite_exception: None,
             client_limit: None, key: None, operators: None, half_operators: None,
-            voices: None, invite: false, private: false, moderated: false,
+            voices: None, invite_only: false, private: false, moderated: false,
             secret: false, protected_topic: false, no_external_messages: false }
     }
 }
@@ -127,7 +127,7 @@ impl Default for ChannelModes {
 impl fmt::Display for ChannelModes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = '+'.to_string();
-        if self.invite { s.push('i'); }
+        if self.invite_only { s.push('i'); }
         if self.private { s.push('p'); }
         if self.moderated { s.push('m'); }
         if self.secret { s.push('s'); }
@@ -382,7 +382,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = false
 protected_topic = false
@@ -403,7 +403,7 @@ exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 operators = [ "banny", "rorry" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -450,7 +450,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
-                        invite: false,
+                        invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: false, no_external_messages: false },
                 },
@@ -466,7 +466,7 @@ no_external_messages = false
                         operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
                         half_operators: None, voices: None,
                         client_limit: Some(200),
-                        invite: true,
+                        invite_only: true,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -520,7 +520,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
-                        invite: false,
+                        invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: false, no_external_messages: false },
                 },
@@ -536,7 +536,7 @@ no_external_messages = false
                         operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
                         half_operators: None, voices: None,
                         client_limit: Some(200),
-                        invite: true,
+                        invite_only: true,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -582,7 +582,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = true
 protected_topic = false
@@ -594,7 +594,7 @@ topic = "Some topic 2"
 [channels.modes]
 moderated = true
 secret = false
-invite = false
+invite_only = false
 private = false
 protected_topic = true
 no_external_messages = false
@@ -632,7 +632,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
-                        invite: false,
+                        invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
                         private: true, no_external_messages: false },
                 },
@@ -645,7 +645,7 @@ no_external_messages = false
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
                         client_limit: None,
-                        invite: false,
+                        invite_only: false,
                         moderated: true, secret: false, protected_topic: true,
                         private: false, no_external_messages: false },
                 },
@@ -691,7 +691,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = false
 protected_topic = false
@@ -711,7 +711,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -764,7 +764,7 @@ ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
 secret = false
-invite = false
+invite_only = false
 private = false
 protected_topic = false
 no_external_messages = false
@@ -783,7 +783,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -832,7 +832,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = false
 protected_topic = false
@@ -852,7 +852,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -901,7 +901,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = false
 protected_topic = false
@@ -921,7 +921,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -971,7 +971,7 @@ topic = "Some topic"
 ban = [ 'baddi@*', 'baddi2@*' ]
 exception = [ 'bobby@*', 'mati@*' ]
 moderated = false
-invite = false
+invite_only = false
 secret = false
 private = false
 protected_topic = false
@@ -991,7 +991,7 @@ ban = []
 exception = []
 invite_exception = [ "nomi@buru.com", "pampam@zerox.net" ]
 moderated = true
-invite = true
+invite_only = true
 client_limit = 200
 secret = false
 private = false
@@ -1024,7 +1024,7 @@ no_external_messages = false
                     operators: Some(["expert".to_string()].into()),
                     half_operators: None,
                     voices: None,
-                    invite: true, private: true, moderated: false, secret: false,
+                    invite_only: true, private: true, moderated: false, secret: false,
                     protected_topic: true, no_external_messages: true }.to_string());
         assert_eq!("+pstk password +b somebody +b somebody2 +o expert +h spec".to_string(),
             ChannelModes{ ban: Some(vec!["somebody".to_string(), "somebody2".to_string()]),
@@ -1034,7 +1034,7 @@ no_external_messages = false
                     operators: Some(["expert".to_string()].into()),
                     half_operators: Some(["spec".to_string()].into()),
                     voices: None,
-                    invite: false, private: true, moderated: false, secret: true,
+                    invite_only: false, private: true, moderated: false, secret: true,
                     protected_topic: true, no_external_messages: false }.to_string());
         let chm_str = ChannelModes{ ban: None,
                     exception: None,
@@ -1043,7 +1043,7 @@ no_external_messages = false
                     operators: None,
                     half_operators: None,
                     voices: Some(["guy1".to_string(), "guy2".to_string()].into()),
-                    invite: true, private: false, moderated: true, secret: false,
+                    invite_only: true, private: false, moderated: true, secret: false,
                     protected_topic: false, no_external_messages: true }.to_string();
         assert!("+imn +I somebody +v guy1 +v guy2".to_string() == chm_str ||
                 "+imn +I somebody +v guy2 +v guy1".to_string() == chm_str);
