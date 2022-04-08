@@ -134,7 +134,7 @@ impl User {
         self.source = user_state.source.clone();
     }
     
-    fn send_message<'a, 'b>(&self, msg: &Message<'a>, source: &'b str)
+    fn send_message(&self, msg: &Message<'_>, source: &str)
                 -> Result<(), SendError<String>> {
         self.sender.send(msg.to_string_with_source(source))
     }
@@ -540,7 +540,7 @@ impl MainState {
                     LIST{ channels, server } =>
                         self.process_list(conn_state, channels, server).await,
                     INVITE{ nickname, channel } =>
-                        self.process_invite(conn_state, nickname, channel).await,
+                        self.process_invite(conn_state, nickname, channel, &msg).await,
                     KICK{ channel, user, comment } =>
                         self.process_kick(conn_state, channel, user, comment).await,
                     MOTD{ target } =>
@@ -904,14 +904,33 @@ impl MainState {
     
     async fn process_list<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
+        let client = conn_state.user_state.client_name();
+        
+        self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
+        let mut count = 0;
+        for ch in channels.iter().filter_map(|ch| {
+                state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
+            }) {
+            self.feed_msg(&mut conn_state.stream, RplList322{ client, channel: &ch.name,
+                    client_count: ch.users.len(), topic: &ch.topic }).await?;
+            count += 1;
+        }
+        if count == 0 {
+            for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
+                self.feed_msg(&mut conn_state.stream, RplList322{ client, channel: &ch.name,
+                    client_count: ch.users.len(), topic: &ch.topic }).await?;
+            }
+        }
+        self.feed_msg(&mut conn_state.stream, RplListEnd323{ client }).await?;
         Ok(())
     }
     
     async fn process_invite<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
-            channel: &'a str) -> Result<(), Box<dyn Error>> {
+            channel: &'a str, msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get_mut(user_nick).unwrap();
+        let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
         let do_invite = if user.channels.contains(channel) {
@@ -943,7 +962,7 @@ impl MainState {
                 invited.invited_to.insert(channel.to_string());
                 self.feed_msg(&mut conn_state.stream, RplInviting341{ client,
                                 nick: nickname, channel }).await?;
-                //invited.sender.send()?;
+                invited.send_message(msg, &conn_state.user_state.source)?;
             } else {
                 self.feed_msg(&mut conn_state.stream,
                                 ErrNoSuchNick401{ client, nick: nickname }).await?;
