@@ -832,12 +832,12 @@ impl MainState {
     
     async fn process_oper<'a>(&self, conn_state: &mut ConnState, nick: &'a str,
             password: &'a str) -> Result<(), Box<dyn Error>> {
-        let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let mut user = state.users.get_mut(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
         if let Some(oper_idx) = self.oper_config_idxs.get(nick) {
+            let mut state = self.state.write().await;
+            let mut user = state.users.get_mut(user_nick).unwrap();
             let op_cfg_opt = self.config.operators.as_ref().unwrap().get(*oper_idx);
             let op_config = op_cfg_opt.as_ref().unwrap();
             
@@ -893,7 +893,11 @@ impl MainState {
     }
     
     async fn process_topic<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
-            topic: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+            topic_opt: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        if let Some(topic) = topic_opt {
+        } else {
+            let state = self.state.read().await;
+        }
         Ok(())
     }
     
@@ -904,13 +908,13 @@ impl MainState {
     
     async fn process_list<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
-        let state = self.state.read().await;
         let client = conn_state.user_state.client_name();
         
         if server.is_some() {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "LIST", subcommand: None, info: "Server unsupported" }).await?;
         } else {
+            let state = self.state.read().await;
             self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
             let mut count = 0;
             for ch in channels.iter().filter_map(|ch| {
