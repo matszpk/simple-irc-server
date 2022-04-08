@@ -908,11 +908,40 @@ impl MainState {
         let user = state.users.get_mut(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
-        if user.channels.contains(channel) {
-            let chanobj = state.channels.get(channel);
+        let do_invite = if user.channels.contains(channel) {
+            if let Some(ref chanobj) = state.channels.get(channel) {
+                if chanobj.modes.invite_only {
+                    let if_op = if let Some(ref ops) = chanobj.modes.operators {
+                        ops.contains(user_nick)
+                    } else { false };
+                    if !if_op {
+                        self.feed_msg(&mut conn_state.stream,
+                                    ErrChanOpPrivsNeeded482{ client, channel }).await?;
+                        false
+                    } else { true }
+                } else { true }
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchChannel403{ client, channel }).await?;
+                false
+            }
         } else {
             self.feed_msg(&mut conn_state.stream,
                                 ErrNotOnChannel442{ client, channel }).await?;
+            false
+        };
+        
+        if do_invite {
+            // check user
+            if let Some(invited) = state.users.get_mut(nickname) {
+                invited.invited_to.insert(channel.to_string());
+                self.feed_msg(&mut conn_state.stream, RplInviting341{ client,
+                                nick: nickname, channel }).await?;
+                //invited.sender.send()?;
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchNick401{ client, nick: nickname }).await?;
+            }
         }
         Ok(())
     }

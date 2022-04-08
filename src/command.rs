@@ -104,6 +104,31 @@ impl<'a> Message<'a> {
     }
 }
 
+impl<'a> fmt::Display for Message<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(src) = self.source {
+            f.write_str(":")?;
+            f.write_str(src)?;
+            f.write_str(" ")?;
+        }
+        f.write_str(self.command)?;
+        if self.params.len() >= 1 {
+            self.params[..self.params.len()-1].iter().try_for_each(|s| {
+                f.write_str(" ")?;
+                f.write_str(s)
+            })?;
+            let last = self.params[self.params.len()-1];
+            if last.find([':', ' ', '\t']).is_some() {
+                f.write_str(" :")?;
+            } else {
+                f.write_str(" ")?;
+            }
+            f.write_str(last)?;
+        }
+        Ok(())
+    }
+}
+
 #[const_table]
 pub(crate) enum CommandId {
     CommandName{ pub(crate) name: &'static str },
@@ -1428,5 +1453,15 @@ mod test {
         assert_eq!(Ok(RESTART{}),
             Command::from_message(&Message{ source: None, command: "reStaRt",
                 params: vec![] }).map_err(|e| e.to_string()));
+    }
+    
+    #[test]
+    fn test_message_format() {
+        assert_eq!("USER guest 0 * :Ronnie Reagan".to_string(),
+                Message{ source: None, command: "USER",
+                    params: vec!["guest", "0", "*", "Ronnie Reagan"] }.to_string());
+        assert_eq!("INVITE mati1 #xxx".to_string(),
+                Message{ source: None, command: "INVITE",
+                    params: vec!["mati1", "#xxx"] }.to_string());
     }
 }
