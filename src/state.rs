@@ -907,22 +907,29 @@ impl MainState {
         let state = self.state.read().await;
         let client = conn_state.user_state.client_name();
         
-        self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
-        let mut count = 0;
-        for ch in channels.iter().filter_map(|ch| {
-                state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
-            }) {
-            self.feed_msg(&mut conn_state.stream, RplList322{ client, channel: &ch.name,
-                    client_count: ch.users.len(), topic: &ch.topic }).await?;
-            count += 1;
-        }
-        if count == 0 {
-            for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
-                self.feed_msg(&mut conn_state.stream, RplList322{ client, channel: &ch.name,
-                    client_count: ch.users.len(), topic: &ch.topic }).await?;
+        if server.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "LIST", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
+            let mut count = 0;
+            for ch in channels.iter().filter_map(|ch| {
+                    state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
+                }) {
+                self.feed_msg(&mut conn_state.stream, RplList322{ client,
+                        channel: &ch.name, client_count: ch.users.len(),
+                        topic: &ch.topic }).await?;
+                count += 1;
             }
+            if count == 0 {
+                for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
+                    self.feed_msg(&mut conn_state.stream, RplList322{ client,
+                        channel: &ch.name, client_count: ch.users.len(),
+                        topic: &ch.topic }).await?;
+                }
+            }
+            self.feed_msg(&mut conn_state.stream, RplListEnd323{ client }).await?;
         }
-        self.feed_msg(&mut conn_state.stream, RplListEnd323{ client }).await?;
         Ok(())
     }
     
