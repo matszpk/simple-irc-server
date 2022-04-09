@@ -162,11 +162,15 @@ impl Default for ChannelUserMode {
     }
 }
 
-struct ChannelTopic{ topic: String, set_time: u64 }
+struct ChannelTopic{
+    topic: String,
+    nick: String,
+    set_time: u64
+}
 
 impl ChannelTopic{
     fn new(topic: String) -> Self {
-        ChannelTopic{ topic,
+        ChannelTopic{ topic, nick: String::new(),
             set_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
     }
 }
@@ -907,13 +911,66 @@ impl MainState {
         
         if let Some(topic) = topic_opt {
             let mut state = self.state.write().await;
-            if let Some(chanobj) = state.channels.get_mut(channel) {
+            let do_change_topic = if let Some(chanobj) = state.channels.get(channel) {
+                let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+                let user = state.users.get(user_nick).unwrap();
+                
+                if user.channels.contains(channel) {
+                    let if_op = if let Some(ref ops) = chanobj.modes.operators {
+                        ops.contains(user_nick)
+                    } else { false };
+                    
+                    if !chanobj.modes.protected_topic || if_op {
+                        true
+                    } else {
+                        self.feed_msg(&mut conn_state.stream,
+                                    ErrChanOpPrivsNeeded482{ client, channel }).await?;
+                        false
+                    }
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                                ErrNotOnChannel442{ client, channel }).await?;
+                    false
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchChannel403{ client, channel }).await?;
+                false
+            };
+            
+            if do_change_topic {
+                let chanobj = state.channels.get_mut(channel).unwrap();
+                if topic.len() != 0 {
+                    chanobj.topic = Some(ChannelTopic::new(topic.to_string()));
+                } else {
+                    chanobj.topic = None
+                }
+            }
+        } else {
+            // read
+            let state = self.state.read().await;
+            if let Some(chanobj) = state.channels.get(channel) {
+                let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+                let user = state.users.get(user_nick).unwrap();
+                
+                if user.channels.contains(channel) {
+                    if let Some(ref topic) = chanobj.topic {
+                        self.feed_msg(&mut conn_state.stream, RplTopic332{ client,
+                            channel, topic: &topic.topic }).await?;
+                        self.feed_msg(&mut conn_state.stream, RplTopicWhoTime333{ client,
+                            channel, nick: &topic.nick, setat: topic.set_time }).await?;
+                    } else {
+                        self.feed_msg(&mut conn_state.stream, RplNoTopic331{ client,
+                            channel }).await?;
+                    }
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                                ErrNotOnChannel442{ client, channel }).await?;
+                }
             } else {
                 self.feed_msg(&mut conn_state.stream,
                                 ErrNoSuchChannel403{ client, channel }).await?;
             }
-        } else {
-            let state = self.state.read().await;
         }
         Ok(())
     }
