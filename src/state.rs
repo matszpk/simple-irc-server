@@ -24,7 +24,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::net::IpAddr;
 use std::error::Error;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::convert::TryFrom;
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
@@ -162,9 +162,18 @@ impl Default for ChannelUserMode {
     }
 }
 
+struct ChannelTopic{ topic: String, set_time: u64 }
+
+impl ChannelTopic{
+    fn new(topic: String) -> Self {
+        ChannelTopic{ topic,
+            set_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
+    }
+}
+
 struct Channel {
     name: String,
-    topic: Option<String>,
+    topic: Option<ChannelTopic>,
     modes: ChannelModes,
     users: HashMap<String, ChannelUserMode>,
 }
@@ -348,8 +357,8 @@ impl VolatileState {
         if let Some(ref cfg_channels) = config.channels {
             cfg_channels.iter().for_each(|c| {
                 channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
-                    topic: c.topic.as_ref().cloned(), modes: c.modes.clone(),
-                    users: HashMap::new() });
+                    topic: c.topic.as_ref().map(|x| ChannelTopic::new(x.clone())),
+                    modes: c.modes.clone(), users: HashMap::new() });
             });
         }
         
@@ -930,14 +939,16 @@ impl MainState {
                 }) {
                 self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
-                        topic: ch.topic.as_ref().unwrap_or(&String::new()) }).await?;
+                        topic: ch.topic.as_ref().map(|x| &x.topic)
+                            .unwrap_or(&String::new()) }).await?;
                 count += 1;
             }
             if count == 0 {
                 for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
-                        topic: ch.topic.as_ref().unwrap_or(&String::new()) }).await?;
+                        topic: ch.topic.as_ref().map(|x| &x.topic)
+                            .unwrap_or(&String::new()) }).await?;
                 }
             }
             self.feed_msg(&mut conn_state.stream, RplListEnd323{ client }).await?;
