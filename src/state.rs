@@ -173,6 +173,11 @@ impl ChannelTopic{
         ChannelTopic{ topic, nick: String::new(),
             set_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
     }
+    
+    fn new_with_nick(topic: String, nick: String) -> Self {
+        ChannelTopic{ topic, nick,
+            set_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
+    }
 }
 
 struct Channel {
@@ -911,8 +916,9 @@ impl MainState {
         
         if let Some(topic) = topic_opt {
             let mut state = self.state.write().await;
+            let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+            
             let do_change_topic = if let Some(chanobj) = state.channels.get(channel) {
-                let user_nick = conn_state.user_state.nick.as_ref().unwrap();
                 let user = state.users.get(user_nick).unwrap();
                 
                 if user.channels.contains(channel) {
@@ -941,7 +947,8 @@ impl MainState {
             if do_change_topic {
                 let chanobj = state.channels.get_mut(channel).unwrap();
                 if topic.len() != 0 {
-                    chanobj.topic = Some(ChannelTopic::new(topic.to_string()));
+                    chanobj.topic = Some(ChannelTopic::new_with_nick(
+                        topic.to_string(), user_nick.clone()));
                 } else {
                     chanobj.topic = None
                 }
