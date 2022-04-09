@@ -164,14 +164,14 @@ impl Default for ChannelUserMode {
 
 struct Channel {
     name: String,
-    topic: String,
+    topic: Option<String>,
     modes: ChannelModes,
     users: HashMap<String, ChannelUserMode>,
 }
 
 impl Channel {
     fn new(name: String) -> Channel {
-        Channel{ name, topic: String::new(), modes: ChannelModes::default(),
+        Channel{ name, topic: None, modes: ChannelModes::default(),
             users: HashMap::new() }
     }
 }
@@ -348,7 +348,7 @@ impl VolatileState {
         if let Some(ref cfg_channels) = config.channels {
             cfg_channels.iter().for_each(|c| {
                 channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
-                    topic: c.topic.clone(), modes: c.modes.clone(),
+                    topic: c.topic.as_ref().cloned(), modes: c.modes.clone(),
                     users: HashMap::new() });
             });
         }
@@ -894,7 +894,15 @@ impl MainState {
     
     async fn process_topic<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
             topic_opt: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
         if let Some(topic) = topic_opt {
+            let mut state = self.state.write().await;
+            if let Some(chanobj) = state.channels.get_mut(channel) {
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchChannel403{ client, channel }).await?;
+            }
         } else {
             let state = self.state.read().await;
         }
@@ -922,14 +930,14 @@ impl MainState {
                 }) {
                 self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
-                        topic: &ch.topic }).await?;
+                        topic: ch.topic.as_ref().unwrap_or(&String::new()) }).await?;
                 count += 1;
             }
             if count == 0 {
                 for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
-                        topic: &ch.topic }).await?;
+                        topic: ch.topic.as_ref().unwrap_or(&String::new()) }).await?;
                 }
             }
             self.feed_msg(&mut conn_state.stream, RplListEnd323{ client }).await?;

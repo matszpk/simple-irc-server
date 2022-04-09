@@ -186,7 +186,7 @@ impl fmt::Display for ChannelModes {
 pub(crate) struct ChannelConfig {
     #[validate(custom = "validate_channel")]
     pub(crate) name: String,
-    pub(crate) topic: String,
+    pub(crate) topic: Option<String>,
     #[validate]
     pub(crate) modes: ChannelModes,
 }
@@ -443,7 +443,7 @@ no_external_messages = false
             channels: Some(vec![
                 ChannelConfig{
                     name: "#channel1".to_string(),
-                    topic: "Some topic".to_string(),
+                    topic: Some("Some topic".to_string()),
                     modes: ChannelModes{ key: None,
                         ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
                         exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
@@ -456,7 +456,7 @@ no_external_messages = false
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
-                    topic: "Some topic 2".to_string(),
+                    topic: Some("Some topic 2".to_string()),
                     modes: ChannelModes{ key: Some("hokus pokus".to_string()),
                         ban: Some(vec![]),
                         exception: Some(vec![]),
@@ -513,7 +513,7 @@ no_external_messages = false
             channels: Some(vec![
                 ChannelConfig{
                     name: "#channel1".to_string(),
-                    topic: "Some topic".to_string(),
+                    topic: Some("Some topic".to_string()),
                     modes: ChannelModes{ key: None,
                         ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
                         exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
@@ -526,7 +526,7 @@ no_external_messages = false
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
-                    topic: "Some topic 2".to_string(),
+                    topic: Some("Some topic 2".to_string()),
                     modes: ChannelModes{ key: Some("hokus pokus".to_string()),
                         ban: Some(vec![]),
                         exception: Some(vec![]),
@@ -625,7 +625,7 @@ no_external_messages = false
             channels: Some(vec![
                 ChannelConfig{
                     name: "#channel1".to_string(),
-                    topic: "Some topic".to_string(),
+                    topic: Some("Some topic".to_string()),
                     modes: ChannelModes{ key: None,
                         ban: Some(vec![ "baddi@*".to_string(), "baddi2@*".to_string()]),
                         exception: Some(vec![ "bobby@*".to_string(), "mati@*".to_string() ]),
@@ -638,7 +638,7 @@ no_external_messages = false
                 },
                 ChannelConfig{
                     name: "#channel2".to_string(),
-                    topic: "Some topic 2".to_string(),
+                    topic: Some("Some topic 2".to_string()),
                     modes: ChannelModes{ key: None,
                         ban: None,
                         exception: None,
