@@ -939,23 +939,43 @@ impl MainState {
                     }
                 } else { true };
                 
-                let do_join = do_join && 
-                    (!channel.modes.ban.as_ref().map_or(false, |b| b.iter().any(
+                let do_join = do_join && {
+                    if !channel.modes.ban.as_ref().map_or(false, |b| b.iter().any(
                         |b| match_wildcard(&b, &conn_state.user_state.source))) ||
                     channel.modes.exception.as_ref().map_or(false, |e| e.iter().any(
-                        |e| match_wildcard(&e, &conn_state.user_state.source))));
+                        |e| match_wildcard(&e, &conn_state.user_state.source))) {
+                        true
+                    } else {
+                        self.feed_msg(&mut conn_state.stream, ErrBannedFromChan474{
+                            client, channel: chname_str }).await?;
+                        false
+                    }
+                };
                 
-                let do_join = do_join &&
-                     (!channel.modes.invite_only ||
+                let do_join = do_join && {
+                     if !channel.modes.invite_only ||
                         user.invited_to.contains(&channel.name) ||
                         channel.modes.invite_exception.as_ref().map_or(false,
                             |e| e.iter().any(|e|
-                                match_wildcard(&e, &conn_state.user_state.source))));
+                                match_wildcard(&e, &conn_state.user_state.source))) {
+                        true
+                    } else {
+                        self.feed_msg(&mut conn_state.stream, ErrBannedFromChan474{
+                            client, channel: chname_str }).await?;
+                        false
+                    }
+                };
                 
-                let do_join = do_join &&
-                    if let Some(client_limit) = channel.modes.client_limit {
+                let do_join = do_join && {
+                    let not_full = if let Some(client_limit) = channel.modes.client_limit {
                         channel.users.len() < client_limit
                     } else { true };
+                    if not_full { true } else {
+                        self.feed_msg(&mut conn_state.stream, ErrChannelIsFull471{
+                            client, channel: chname_str }).await?;
+                        false
+                    }
+                };
                 
                 if do_join { (true, false)
                 } else { (false, false) }
