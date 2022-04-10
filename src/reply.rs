@@ -23,14 +23,14 @@ use std::fmt;
 
 #[derive(Clone, Copy)]
 pub(crate) struct WhoIsChannelStruct<'a> {
-    prefix: Option<&'a str>,
-    channel: &'a str,
+    pub(crate) prefix: Option<&'a str>,
+    pub(crate) channel: &'a str,
 }
 
 #[derive(Clone)]
 pub(crate) struct NameReplyStruct<'a> {
-    prefix: String,
-    nick: &'a str,
+    pub(crate) prefix: String,
+    pub(crate) nick: &'a str,
 }
 
 pub(crate) enum Reply<'a> {

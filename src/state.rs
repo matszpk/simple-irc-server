@@ -994,27 +994,27 @@ impl MainState {
         let in_channel = channel.users.contains_key(&conn_user.nick);
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
-            let symbol = if channel.modes.secret { '=' } else { '@' };
+            let symbol = if channel.modes.secret { "=" } else { "@" };
             
-            //let mut prefixes = vec![];
-            //let mut name_chunk: [NameReplyStruct<'_>; NAMES_COUNT] =
-              //          [NameReplyStruct{ prefix: , nick: "" }; NAMES_COUNT];
+            let mut name_chunk = vec![];
+            name_chunk.reserve(NAMES_COUNT);
             
-//             let mut name_count = 0;
-//             for n in &channel.users {
-//                 let user = users.get(n.0.as_str()).unwrap();
-//                 if !user.modes.invisible || in_channel {
-//                     prefixes.push(n.1.to_string(&conn_state.caps));
-//                     name_chunk[name_count] = NameReplyStruct{
-//                         prefix: Some(&prefixes[name_count]), nick: &user.nick };
-//                     name_count += 1;
-//                 }
-//                 if name_count == NAMES_COUNT {
-//                 }
-//                     //self.feed_msg(&mut conn_state.stream,
-//                       //  RplNameReply353{ client, symbol, &channel.name,
-//                                 
-//             }
+            for n in &channel.users {
+                let user = users.get(n.0.as_str()).unwrap();
+                if !user.modes.invisible || in_channel {
+                    name_chunk.push(NameReplyStruct{
+                        prefix: n.1.to_string(&conn_state.caps), nick: &user.nick });
+                }
+                if name_chunk.len() == NAMES_COUNT {
+                    self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
+                                channel: &channel.name, replies: &name_chunk }).await?;
+                    name_chunk.clear();
+                }
+            }
+            if name_chunk.len() != 0 {   // last chunk
+                self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
+                                channel: &channel.name, replies: &name_chunk }).await?;
+            }
         }
         Ok(())
     }
@@ -1034,7 +1034,6 @@ impl MainState {
                 self.send_names_from_channel(conn_state, &c, &state.users, &user).await?;
             }
         }
-        
         Ok(())
     }
     
