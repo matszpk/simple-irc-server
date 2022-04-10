@@ -110,6 +110,7 @@ struct User {
     source: String, // IRC source for mask matching
     modes: UserModes,
     away: Option<String>,
+    channels: HashSet<String>,
     invited_to: HashSet<String>,    // invited in channels
 }
 
@@ -123,7 +124,8 @@ impl User {
                 realname: user_state.realname.as_ref().unwrap().clone(),
                 nick: user_state.name.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
-                modes: user_modes, away: None, invited_to: HashSet::new() }
+                modes: user_modes, away: None,
+                channels: HashSet::new(), invited_to: HashSet::new() }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -564,7 +566,7 @@ impl MainState {
                     PART{ channels, reason } =>
                         self.process_part(conn_state, channels, reason).await,
                     TOPIC{ channel, topic } =>
-                        self.process_topic(conn_state, channel, topic).await,
+                        self.process_topic(conn_state, channel, topic, &msg).await,
                     NAMES{ channels } =>
                         self.process_names(conn_state, channels).await,
                     LIST{ channels, server } =>
@@ -918,7 +920,7 @@ impl MainState {
     }
     
     async fn process_topic<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
-            topic_opt: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+            topic_opt: Option<&'a str>, msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
         if let Some(topic) = topic_opt {
@@ -955,6 +957,13 @@ impl MainState {
                         topic.to_string(), user_nick.clone()));
                 } else {
                     chanobj.topic = None
+                }
+            }
+            if do_change_topic {
+                let chanobj = state.channels.get(channel).unwrap();
+                for cu in &chanobj.users {
+                    state.users.get(cu.0).unwrap().send_message(msg,
+                                &conn_state.user_state.source)?;
                 }
             }
         } else {
