@@ -140,7 +140,7 @@ impl User {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 enum OperatorType {
     NoOper,
     Oper,
@@ -937,11 +937,8 @@ impl MainState {
                 let user = state.users.get(user_nick).unwrap();
                 
                 if user.channels.contains(channel) {
-                    let if_op = if let Some(ref ops) = chanobj.modes.operators {
-                        ops.contains(user_nick)
-                    } else { false };
-                    
-                    if !chanobj.modes.protected_topic || if_op {
+                    if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
+                                .unwrap().oper_type == OperatorType::Oper{
                         true
                     } else {
                         self.feed_msg(&mut conn_state.stream,
@@ -1084,13 +1081,11 @@ impl MainState {
         let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
-        let do_invite = if user.channels.contains(channel) {
-            if let Some(ref chanobj) = state.channels.get(channel) {
+        let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
+            if user.channels.contains(channel) {
                 if chanobj.modes.invite_only {
-                    let if_op = if let Some(ref ops) = chanobj.modes.operators {
-                        ops.contains(user_nick)
-                    } else { false };
-                    if !if_op {
+                    if !(chanobj.users.get(user_nick).unwrap().
+                                oper_type == OperatorType::Oper) {
                         self.feed_msg(&mut conn_state.stream,
                                     ErrChanOpPrivsNeeded482{ client, channel }).await?;
                         false
@@ -1098,12 +1093,12 @@ impl MainState {
                 } else { true }
             } else {
                 self.feed_msg(&mut conn_state.stream,
-                                ErrNoSuchChannel403{ client, channel }).await?;
+                                    ErrNotOnChannel442{ client, channel }).await?;
                 false
             }
         } else {
             self.feed_msg(&mut conn_state.stream,
-                                ErrNotOnChannel442{ client, channel }).await?;
+                            ErrNoSuchChannel403{ client, channel }).await?;
             false
         };
         
