@@ -920,14 +920,14 @@ impl MainState {
         let client = conn_state.user_state.client_name();
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick.as_str()).unwrap();
+        let mut join_count = state.users.get(user_nick).unwrap().channels.len();
         
-        //let mut joined_created = vec![];
-        
-        let mut join_count = 0;
+        let mut joined_created = vec![];
         
         for (i, chname_str) in channels.iter().enumerate() {
-            let (join, create) =
-                    if let Some(channel) = state.channels.get(&chname_str.to_string()) {
+            let (join, create) = if let Some(channel) =
+                                state.channels.get(&chname_str.to_string()) {
                 // if already created
                 let do_join = if let Some(key) = &channel.modes.key {
                     if let Some(ref keys) = keys_opt {
@@ -938,11 +938,36 @@ impl MainState {
                         false
                     }
                 } else { true };
+                
+                let do_join = do_join && 
+                    (!channel.modes.ban.as_ref().map_or(false, |b| b.iter().any(
+                        |b| match_wildcard(&b, &conn_state.user_state.source))) ||
+                    channel.modes.exception.as_ref().map_or(false, |e| e.iter().any(
+                        |e| match_wildcard(&e, &conn_state.user_state.source))));
+                
+                let do_join = do_join &&
+                     (!channel.modes.invite_only ||
+                        user.invited_to.contains(&channel.name) ||
+                        channel.modes.invite_exception.as_ref().map_or(false,
+                            |e| e.iter().any(|e|
+                                match_wildcard(&e, &conn_state.user_state.source))));
+                
+                let do_join = do_join &&
+                    if let Some(client_limit) = channel.modes.client_limit {
+                        channel.users.len() < client_limit
+                    } else { true };
+                
                 if do_join { (true, false)
                 } else { (false, false) }
             } else { // if new channel
                 (true, true)
             };
+            
+            let do_join = if let Some(max_joins) = self.config.max_joins {
+                join_count < max_joins
+            } else { true };
+            
+            if do_join { joined_created.push((join, create)); }
         }
         
         for (i, chname_str) in channels.iter().enumerate() {
