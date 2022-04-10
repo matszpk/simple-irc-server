@@ -830,14 +830,16 @@ impl MainState {
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
                     for ch in &user.channels {
-                        let mut channel = state.channels.get_mut(&ch.clone()).unwrap();
+                        let channel = state.channels.get_mut(&ch.clone()).unwrap();
                         let oldchumode = channel.users.remove(&old_nick).unwrap();
                         channel.users.insert(nick_str.clone(), oldchumode);
                     }
                     state.users.insert(nick_str, user);
                     
-                    for u in &state.users {
-                        u.1.send_message(msg, &conn_state.user_state.source)?;
+                    for (_,u) in &state.users {
+                        if !u.modes.invisible || u.nick == nick {
+                            u.send_message(msg, &conn_state.user_state.source)?;
+                        }
                     }
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
