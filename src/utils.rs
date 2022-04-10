@@ -194,7 +194,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                                         description: "Unexpected argument".to_string() });
                         }
                     }
-                    'i'|'m'|'t'|'n'|'s'|'p' => { },
+                    'i'|'m'|'t'|'n'|'s' => { },
                     c => { return Err(UnknownMode(param_idx, c)); }
                 }
                 Ok(())
@@ -378,15 +378,15 @@ mod test {
     #[test]
     fn test_validate_channelmodes() {
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
-            ("+ntp", vec![]), ("-sm", vec![])]).map_err(|e| e.to_string()));
+            ("+nt", vec![]), ("-sm", vec![])]).map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
-            ("+nltp", vec!["22"]), ("-s+km", vec!["xxyy"])])
+            ("+nlt", vec!["22"]), ("-s+km", vec!["xxyy"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
             ("+ibl-h", vec!["*dudu.com", "22", "derek"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
-            ("-nltp", vec![]), ("+s-km", vec![])]).map_err(|e| e.to_string()));
+            ("-nlt", vec![]), ("+s-km", vec![])]).map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
             ("+ot", vec!["barry"]), ("-nh", vec!["guru"]), ("+vm", vec!["jerry"])])
                 .map_err(|e| e.to_string()));
@@ -400,10 +400,10 @@ mod test {
             ("+tb", vec!["barry"]), ("-iI", vec!["guru"]), ("+es", vec!["eagle"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Unknown mode u in parameter 2".to_string()),
-            validate_channelmodes("#xchan", &vec![("+ntp", vec![]), ("-sum", vec![])])
+            validate_channelmodes("#xchan", &vec![("+nt", vec![]), ("-sum", vec![])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Invalid mode parameter: #xchan l  No argument".to_string()),
-            validate_channelmodes("#xchan", &vec![("+nltp", vec![]), ("-s+km", vec!["xxyy"])])
+            validate_channelmodes("#xchan", &vec![("+nlt", vec![]), ("-s+km", vec!["xxyy"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Invalid mode parameter: #xchan v jer:ry Validation error: Username \
                 must not contains '.', ',' or ':'. [{}]".to_string()),

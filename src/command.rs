@@ -1148,9 +1148,9 @@ mod test {
         assert_eq!(Err("Unknown umode flag in parameter 1".to_string()),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "teddy", "+otOr", "bbb" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Ok(MODE{ target: "#chasis", modes: vec![("+ntpsm", vec![])] }),
+        assert_eq!(Ok(MODE{ target: "#chasis", modes: vec![("+ntsm", vec![])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
-                params: vec![ "#chasis", "+ntpsm" ] }).map_err(|e| e.to_string()));
+                params: vec![ "#chasis", "+ntsm" ] }).map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "#chasis",
             modes: vec![("+b", vec![ "*@192.168.1.7" ])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
