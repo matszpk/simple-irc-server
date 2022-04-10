@@ -984,6 +984,10 @@ impl MainState {
             };
             
             let do_join = if let Some(max_joins) = self.config.max_joins {
+                if join_count >= max_joins {
+                    self.feed_msg(&mut conn_state.stream, ErrTooManyChannels405{
+                            client, channel: chname_str }).await?;
+                }
                 join_count < max_joins
             } else { true };
             
