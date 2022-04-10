@@ -162,6 +162,13 @@ impl Default for ChannelUserMode {
 }
 
 impl ChannelUserMode {
+    fn new_for_created_channel() -> Self {
+        ChannelUserMode{ founder: false, protected: false, voice: false,
+                oper_type: OperatorType::Oper }
+    }
+}
+
+impl ChannelUserMode {
     fn to_string(&self, cap_state: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
@@ -822,6 +829,11 @@ impl MainState {
                     let mut user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
+                    for ch in &user.channels {
+                        let mut channel = state.channels.get_mut(&ch.clone()).unwrap();
+                        let oldchumode = channel.users.remove(&old_nick).unwrap();
+                        channel.users.insert(nick_str.clone(), oldchumode);
+                    }
                     state.users.insert(nick_str, user);
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
@@ -898,18 +910,36 @@ impl MainState {
     }
     
     async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
-            keys: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
+            keys_opt: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        for chname_str in channels.iter() {
-            let chname  = chname_str.to_string();
-            if let Some(channel) = state.channels.get_mut(&chname.clone()) {
-                channel.users.insert(user_nick.clone(), ChannelUserMode::default());
-            } else {
-                let mut channel = Channel::new(chname.clone());
-                channel.users.insert(user_nick.clone(), ChannelUserMode::default());
-                state.channels.insert(chname, channel);
-            }
+        
+        //let mut joined_created = vec![];
+        
+        let mut join_count = 0;
+        
+        for (i, chname_str) in channels.iter().enumerate() {
+            let (join, create) =
+                    if let Some(channel) = state.channels.get(&chname_str.to_string()) {
+                // if already created
+                let do_join = if let Some(key) = &channel.modes.key {
+                    if let Some(ref keys) = keys_opt {
+                        key == keys[i]
+                    } else {
+                        self.feed_msg(&mut conn_state.stream, ErrBadChannelKey475{
+                            client, channel: chname_str }).await?;
+                        false
+                    }
+                } else { true };
+                if do_join { (true, false)
+                } else { (false, false) }
+            } else { // if new channel
+                (true, true)
+            };
+        }
+        
+        for (i, chname_str) in channels.iter().enumerate() {
         }
         Ok(())
     }
