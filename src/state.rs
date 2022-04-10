@@ -174,7 +174,7 @@ impl ChannelUserMode {
     }
 }
 
-struct ChannelTopic{
+struct ChannelTopic {
     topic: String,
     nick: String,
     set_time: u64
@@ -995,21 +995,26 @@ impl MainState {
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
             let symbol = if channel.modes.secret { '=' } else { '@' };
-            let mut name_chunk: [NameReplyStruct<'_>; NAMES_COUNT];
-            let mut name_count = 0;
-            for n in &channel.users {
-//                 let user = users.get(&n.0).unwrap();
-//                 if !user.unwrap().modes.invisible || in_channel {
+            
+            //let mut prefixes = vec![];
+            //let mut name_chunk: [NameReplyStruct<'_>; NAMES_COUNT] =
+              //          [NameReplyStruct{ prefix: , nick: "" }; NAMES_COUNT];
+            
+//             let mut name_count = 0;
+//             for n in &channel.users {
+//                 let user = users.get(n.0.as_str()).unwrap();
+//                 if !user.modes.invisible || in_channel {
+//                     prefixes.push(n.1.to_string(&conn_state.caps));
 //                     name_chunk[name_count] = NameReplyStruct{
-//                         prefix: Some(user.prefix_from_channel(channel)), nick: user.nick };
+//                         prefix: Some(&prefixes[name_count]), nick: &user.nick };
 //                     name_count += 1;
 //                 }
 //                 if name_count == NAMES_COUNT {
 //                 }
-//                     self.feed_msg(&mut conn_state.stream,
-//                         RplNameReply353{ client, symbol, &channel.name,
+//                     //self.feed_msg(&mut conn_state.stream,
+//                       //  RplNameReply353{ client, symbol, &channel.name,
 //                                 
-            }
+//             }
         }
         Ok(())
     }

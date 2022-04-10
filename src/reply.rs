@@ -21,13 +21,15 @@
 
 use std::fmt;
 
+#[derive(Clone, Copy)]
 pub(crate) struct WhoIsChannelStruct<'a> {
     prefix: Option<&'a str>,
     channel: &'a str,
 }
 
+#[derive(Clone)]
 pub(crate) struct NameReplyStruct<'a> {
-    prefix: Option<&'a str>,
+    prefix: String,
     nick: &'a str,
 }
 
@@ -311,10 +313,7 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "351 {} {} {} :{}", client, version, server, comments) }
             RplNameReply353{ client, symbol, channel, replies } => {
                 write!(f, "353 {} {} {} :{}", client, symbol, channel,
-                    replies.iter().map(|r| {
-                        if let Some(prefix) = r.prefix {
-                            prefix.to_string() + r.nick
-                        } else { r.nick.to_string() }
+                    replies.iter().map(|r| { r.prefix.to_string() + r.nick
                     }).collect::<Vec<_>>().join(" ")) }
             RplEndOfNames366{ client, channel } => {
                 write!(f, "366 {} {} :End of /NAMES list", client, channel) }
@@ -624,8 +623,8 @@ mod test {
         assert_eq!("353 <client> <symbol> <channel> :<prefix1><nick1> <nick2>",
             format!("{}", RplNameReply353{ client: "<client>", symbol: "<symbol>",
                 channel: "<channel>", replies: &vec![
-                    NameReplyStruct{ prefix: Some("<prefix1>"), nick: "<nick1>" },
-                    NameReplyStruct{ prefix: None, nick: "<nick2>" }] }));
+                    NameReplyStruct{ prefix: "<prefix1>".to_string(), nick: "<nick1>" },
+                    NameReplyStruct{ prefix: String::new(), nick: "<nick2>" }] }));
         assert_eq!("366 <client> <channel> :End of /NAMES list",
             format!("{}", RplEndOfNames366{ client: "<client>", channel: "<channel>" }));
         assert_eq!("367 <client> <channel> <mask> <who> 3894211355",
