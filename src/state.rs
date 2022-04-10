@@ -79,7 +79,7 @@ pub(crate) enum SupportTokenString {
     CHANTYPES = SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
     EXCEPTS = SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
     INVEX = SupportTokenStringValue{ name: "INVEX", value: "I" },
-    MAXLIST = SupportTokenStringValue{ name: "MAXLISt", value: "beI:1000" },
+    MAXLIST = SupportTokenStringValue{ name: "MAXLIST", value: "beI:1000" },
     PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(ohv)@%+" },
     STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "@%+" },
     USERMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Oiorw" },
@@ -110,8 +110,6 @@ struct User {
     source: String, // IRC source for mask matching
     modes: UserModes,
     away: Option<String>,
-    // user state
-    channels: HashSet<String>,
     invited_to: HashSet<String>,    // invited in channels
 }
 
@@ -125,8 +123,7 @@ impl User {
                 realname: user_state.realname.as_ref().unwrap().clone(),
                 nick: user_state.name.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
-                modes: user_modes, away: None,
-                channels: HashSet::new(), invited_to: HashSet::new() }
+                modes: user_modes, away: None, invited_to: HashSet::new() }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -912,11 +909,6 @@ impl MainState {
                 state.channels.insert(chname, channel);
             }
         }
-        let user = state.users.get_mut(user_nick).unwrap();
-        for chname_str in channels.iter() {
-            let chname  = chname_str.to_string();
-            user.channels.insert(chname.clone());
-        }
         Ok(())
     }
     
@@ -936,7 +928,7 @@ impl MainState {
             let do_change_topic = if let Some(chanobj) = state.channels.get(channel) {
                 let user = state.users.get(user_nick).unwrap();
                 
-                if user.channels.contains(channel) {
+                if chanobj.users.contains_key(user_nick) {
                     if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
                                 .unwrap().oper_type == OperatorType::Oper{
                         true
@@ -972,7 +964,7 @@ impl MainState {
                 let user_nick = conn_state.user_state.nick.as_ref().unwrap();
                 let user = state.users.get(user_nick).unwrap();
                 
-                if user.channels.contains(channel) {
+                if chanobj.users.contains_key(user_nick) {
                     if let Some(ref topic) = chanobj.topic {
                         self.feed_msg(&mut conn_state.stream, RplTopic332{ client,
                             channel, topic: &topic.topic }).await?;
@@ -999,7 +991,7 @@ impl MainState {
                 -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
-        let in_channel = conn_user.channels.contains(&channel.name);
+        let in_channel = channel.users.contains_key(&conn_user.nick);
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
             let symbol = if channel.modes.secret { '=' } else { '@' };
@@ -1082,7 +1074,7 @@ impl MainState {
         let client = conn_state.user_state.client_name();
         
         let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
-            if user.channels.contains(channel) {
+            if chanobj.users.contains_key(user_nick) {
                 if chanobj.modes.invite_only {
                     if !(chanobj.users.get(user_nick).unwrap().
                                 oper_type == OperatorType::Oper) {
