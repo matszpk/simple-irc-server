@@ -162,6 +162,21 @@ impl Default for ChannelUserMode {
     }
 }
 
+impl ChannelUserMode {
+    fn to_string(&self, cap_state: &CapState) -> String {
+        let mut out = String::new();
+        if self.founder { out.push('~'); }
+        if self.protected { out.push('&'); }
+        match self.oper_type {
+            OperatorType::Oper => out.push('@'),
+            OperatorType::HalfOper => out.push('%'),
+            _ => (),
+        };
+        if self.voice { out.push('+'); }
+        out
+    }
+}
+
 struct ChannelTopic{
     topic: String,
     nick: String,
@@ -982,8 +997,50 @@ impl MainState {
         Ok(())
     }
     
+    async fn send_names_from_channel(&self, conn_state: &mut ConnState,
+                channel: &Channel, users: &HashMap<String, User>, conn_user: &User)
+                -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
+        let in_channel = conn_user.channels.contains(&channel.name);
+        if !channel.modes.secret || in_channel {
+            const NAMES_COUNT: usize = 20;
+            let symbol = if channel.modes.secret { '=' } else { '@' };
+            let mut name_chunk: [NameReplyStruct<'_>; NAMES_COUNT];
+            let mut name_count = 0;
+            for n in &channel.users {
+//                 let user = users.get(&n.0).unwrap();
+//                 if !user.unwrap().modes.invisible || in_channel {
+//                     name_chunk[name_count] = NameReplyStruct{
+//                         prefix: Some(user.prefix_from_channel(channel)), nick: user.nick };
+//                     name_count += 1;
+//                 }
+//                 if name_count == NAMES_COUNT {
+//                 }
+//                     self.feed_msg(&mut conn_state.stream,
+//                         RplNameReply353{ client, symbol, &channel.name,
+//                                 
+            }
+        }
+        Ok(())
+    }
+    
     async fn process_names<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>)
             -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        
+        if channels.len() != 0 { 
+            for c in channels.iter().filter_map(|c| state.channels.get(c.clone())) {
+                self.send_names_from_channel(conn_state, &c, &state.users, &user).await?;
+            }
+        } else {
+            for c in state.channels.values() {
+                self.send_names_from_channel(conn_state, &c, &state.users, &user).await?;
+            }
+        }
+        
         Ok(())
     }
     
