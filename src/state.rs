@@ -559,7 +559,7 @@ impl MainState {
                     PASS{ password } =>
                         self.process_pass(conn_state, password).await,
                     NICK{ nickname } =>
-                        self.process_nick(conn_state, nickname).await,
+                        self.process_nick(conn_state, nickname, &msg).await,
                     USER{ username, hostname, servername, realname } =>
                         self.process_user(conn_state, username, hostname,
                                 servername, realname).await,
@@ -815,8 +815,8 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_nick<'a>(&self, conn_state: &mut ConnState, nick: &'a str)
-            -> Result<(), Box<dyn Error>> {
+    async fn process_nick<'a>(&self, conn_state: &mut ConnState, nick: &'a str,
+                msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
             conn_state.user_state.set_nick(nick.to_string());
             self.authenticate(conn_state).await?;
@@ -835,6 +835,10 @@ impl MainState {
                         channel.users.insert(nick_str.clone(), oldchumode);
                     }
                     state.users.insert(nick_str, user);
+                    
+                    for u in &state.users {
+                        u.1.send_message(msg, &conn_state.user_state.source)?;
+                    }
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
                     self.feed_msg(&mut conn_state.stream,
