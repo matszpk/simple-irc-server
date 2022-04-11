@@ -114,6 +114,14 @@ pub(crate) struct ChannelModes {
     pub(crate) no_external_messages: bool,
 }
 
+impl ChannelModes {
+    pub(crate) fn new_for_channel(user_nick: String) -> Self {
+        let mut def = ChannelModes::default();
+        def.operators = Some([ user_nick ].into());
+        def
+    }
+}
+
 impl Default for ChannelModes {
     fn default() -> Self {
         ChannelModes{ ban: None, exception: None, invite_exception: None,

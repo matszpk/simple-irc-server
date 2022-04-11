@@ -137,6 +137,11 @@ impl User {
                 -> Result<(), SendError<String>> {
         self.sender.send(msg.to_string_with_source(source))
     }
+    
+    fn send_msg_display<T: fmt::Display>(&self, source: &str, t :T)
+                -> Result<(), SendError<String>> {
+        self.sender.send(format!(":{} {}", source, t))
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -209,9 +214,11 @@ struct Channel {
 }
 
 impl Channel {
-    fn new(name: String) -> Channel {
-        Channel{ name, topic: None, modes: ChannelModes::default(),
-            users: HashMap::new() }
+    fn new(name: String, user_nick: String) -> Channel {
+        let mut users = HashMap::new();
+        users.insert(user_nick.clone(), ChannelUserMode::new_for_created_channel());
+        Channel{ name, topic: None,
+            modes: ChannelModes::new_for_channel(user_nick), users }
     }
 }
 
@@ -635,6 +642,12 @@ impl MainState {
         stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
+    async fn feed_msg_source<T: fmt::Display>(&self,
+            stream: &mut Framed<TcpStream, IRCLinesCodec>, source: &str, t: T)
+            -> Result<(), LinesCodecError> {
+        stream.feed(format!(":{} {}", source, t)).await
+    }
+    
     async fn process_cap<'a>(&self, conn_state: &mut ConnState, subcommand: CapCommand,
             caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
         match subcommand {
@@ -917,14 +930,15 @@ impl MainState {
     
     async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             keys_opt: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
-        let client = conn_state.user_state.client_name();
         let mut state = self.state.write().await;
-        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get(user_nick.as_str()).unwrap();
-        let mut join_count = state.users.get(user_nick).unwrap().channels.len();
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
+        let mut join_count = state.users.get(&user_nick).unwrap().channels.len();
         
         let mut joined_created = vec![];
         
+        {
+        let client = conn_state.user_state.client_name();
+        let user = state.users.get(user_nick.as_str()).unwrap();
         for (i, chname_str) in channels.iter().enumerate() {
             let (join, create) = if let Some(channel) =
                                 state.channels.get(&chname_str.to_string()) {
@@ -991,11 +1005,65 @@ impl MainState {
                 join_count < max_joins
             } else { true };
             
-            if do_join { joined_created.push((join, create)); }
+            if do_join {
+                joined_created.push((join, create));
+                join_count += 1;
+            }
+        }
+        }   //
+        
+        joined_created.iter().zip(channels.iter()).for_each(|((join, create), chname_str)| {
+            let chname = chname_str.to_string();
+            if *join {
+                if *create {
+                    state.channels.insert(chname.clone(), Channel::new(
+                                chname.clone(), user_nick.clone()));
+                } else {
+                    let chanobj = state.channels.get_mut(&chname).unwrap();
+                    chanobj.users.insert(user_nick.clone(), ChannelUserMode::default());
+                }
+            }
+        });
+        
+        {   // add to user channels
+            let user = state.users.get_mut(user_nick.as_str()).unwrap();
+            joined_created.iter().zip(channels.iter()).for_each(
+                        |((join, _), chname_str)| {
+                if *join {
+                    user.channels.insert(chname_str.to_string());
+                }
+            });
         }
         
-        for (i, chname_str) in channels.iter().enumerate() {
+        // sending messages
+        {
+        let user = state.users.get(user_nick.as_str()).unwrap();
+        for ((join, _), chname_str) in joined_created.iter().zip(channels.iter()) {
+            if *join {
+                let chanobj = state.channels.get(&chname_str.to_string()).unwrap();
+                let join_msg = "JOIN ".to_string() + chname_str;
+                {
+                    let client = conn_state.user_state.client_name();
+                    self.feed_msg_source(&mut conn_state.stream,
+                                &conn_state.user_state.source, join_msg.as_str()).await?;
+                    if let Some(ref topic) = chanobj.topic {
+                        self.feed_msg(&mut conn_state.stream, RplTopic332{ client,
+                                channel: chname_str, topic: &topic.topic }).await?;
+                    }
+                }
+                self.send_names_from_channel(conn_state, chanobj,
+                                &state.users, &user).await?;
+                
+                for (nick, _) in &chanobj.users {
+                    if nick != user_nick.as_str() {
+                        state.users.get(&nick.clone()).unwrap().send_msg_display(
+                            &conn_state.user_state.source, join_msg.as_str())?;
+                    }
+                }
+            }
         }
+        }
+        
         Ok(())
     }
     
