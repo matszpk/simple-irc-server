@@ -1063,12 +1063,55 @@ impl MainState {
             }
         }
         }
-        
         Ok(())
     }
     
     async fn process_part<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             reason: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
+        
+        let mut removed_from = vec![];
+        
+        for channel in &channels {
+            if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
+                if chanobj.users.contains_key(&user_nick) {
+                    chanobj.users.remove(&user_nick);
+                    removed_from.push(true);
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                                ErrNotOnChannel442{ client, channel }).await?;
+                    removed_from.push(false);
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchChannel403{ client, channel }).await?;
+                removed_from.push(false);
+            }
+        }
+        
+        for (remove, channel) in removed_from.iter().zip(channels.iter()) {
+            if *remove {
+                let chanobj = state.channels.get(&channel.to_string()).unwrap();
+                // send message
+                let part_msg = if let Some(r) = reason {
+                    format!("PART {} :{}", channel, r)
+                } else {
+                    format!("PART {}", channel)
+                };
+                for (nick, _) in &chanobj.users {
+                    state.users.get(&nick.clone()).unwrap().send_msg_display(
+                                &conn_state.user_state.source, part_msg.as_str())?;
+                }
+            }
+        }
+        
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
+        let user = state.users.get_mut(user_nick.as_str()).unwrap();
+        for channel in &channels {
+            user.channels.remove(&channel.to_string());
+        }
         Ok(())
     }
     
