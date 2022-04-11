@@ -1319,7 +1319,34 @@ impl MainState {
     }
     
     async fn process_kick<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
-            user: &'a str, comment: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+            kick_user: &'a str, comment: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        let client = conn_state.user_state.client_name();
+        
+        if let Some(chanobj) = state.channels.get_mut(channel) {
+            if chanobj.users.contains_key(user_nick) {
+                if chanobj.users.get(user_nick).unwrap().
+                            oper_type == OperatorType::Oper {
+                    if chanobj.users.contains_key(kick_user) {
+                        chanobj.users.remove(kick_user);
+                    } else {
+                        self.feed_msg(&mut conn_state.stream, ErrUserNotInChannel441{
+                                client, nick: kick_user, channel }).await?;
+                    }
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                                ErrChanOpPrivsNeeded482{ client, channel }).await?;
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                                ErrNotOnChannel442{ client, channel }).await?;
+            }
+        } else {
+            self.feed_msg(&mut conn_state.stream,
+                        ErrNoSuchChannel403{ client, channel }).await?;
+        }
         Ok(())
     }
     
