@@ -587,8 +587,8 @@ impl MainState {
                         self.process_list(conn_state, channels, server).await,
                     INVITE{ nickname, channel } =>
                         self.process_invite(conn_state, nickname, channel, &msg).await,
-                    KICK{ channel, user, comment } =>
-                        self.process_kick(conn_state, channel, user, comment).await,
+                    KICK{ channel, users, comment } =>
+                        self.process_kick(conn_state, channel, users, comment).await,
                     MOTD{ target } =>
                         self.process_motd(conn_state, target).await,
                     VERSION{ target } =>
@@ -1319,21 +1319,29 @@ impl MainState {
     }
     
     async fn process_kick<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
-            kick_user: &'a str, comment: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+            kick_users: Vec<&'a str>, comment: Option<&'a str>)
+            -> Result<(), Box<dyn Error>> {
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
+        let mut kicked = vec![];
+        
         if let Some(chanobj) = state.channels.get_mut(channel) {
             if chanobj.users.contains_key(user_nick) {
                 if chanobj.users.get(user_nick).unwrap().
-                            oper_type == OperatorType::Oper {
-                    if chanobj.users.contains_key(kick_user) {
-                        chanobj.users.remove(kick_user);
-                    } else {
-                        self.feed_msg(&mut conn_state.stream, ErrUserNotInChannel441{
-                                client, nick: kick_user, channel }).await?;
+                                oper_type == OperatorType::Oper {
+                    for kick_user in &kick_users {
+                        let ku = kick_user.to_string();
+                        if chanobj.users.contains_key(&ku) {
+                            
+                            chanobj.users.remove(&ku);
+                            kicked.push(kick_user);
+                        } else {
+                            self.feed_msg(&mut conn_state.stream, ErrUserNotInChannel441{
+                                    client, nick: kick_user, channel }).await?;
+                        }
                     }
                 } else {
                     self.feed_msg(&mut conn_state.stream,
@@ -1347,6 +1355,22 @@ impl MainState {
             self.feed_msg(&mut conn_state.stream,
                         ErrNoSuchChannel403{ client, channel }).await?;
         }
+        
+        {
+            let chanobj = state.channels.get(channel).unwrap();
+            for ku in &kicked {
+                let kick_msg = format!("KICK {} {} :{}", channel, ku,
+                                comment.unwrap_or("Kicked"));
+                for (nick, _) in &chanobj.users {
+                    state.users.get(&nick.to_string()).unwrap().send_msg_display(
+                            &conn_state.user_state.source, kick_msg.clone())?;
+                }
+            }
+        }
+        
+        kicked.iter().for_each(|ku| {
+            state.users.get_mut(&ku.to_string()).unwrap().channels
+                    .remove(&channel.to_string()); });
         Ok(())
     }
     

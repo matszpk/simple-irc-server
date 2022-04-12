@@ -234,7 +234,7 @@ pub(crate) enum Command<'a> {
     NAMES{ channels: Vec<&'a str> },
     LIST{ channels: Vec<&'a str>, server: Option<&'a str> },
     INVITE{ nickname: &'a str, channel: &'a str },
-    KICK{ channel: &'a str, user: &'a str, comment: Option<&'a str> },
+    KICK{ channel: &'a str, users: Vec<&'a str>, comment: Option<&'a str> },
     MOTD{ target: Option<&'a str> },
     VERSION{ target: Option<&'a str> },
     ADMIN{ target: Option<&'a str> },
@@ -395,9 +395,9 @@ impl<'a> Command<'a> {
                 if message.params.len() >= 2 {
                     let mut param_it = message.params.iter();
                     let channel = param_it.next().unwrap();
-                    let user = param_it.next().unwrap();
+                    let users = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let comment = param_it.next().map(|x| *x);
-                    Ok(KICK{ channel, user, comment })
+                    Ok(KICK{ channel, users, comment })
                 } else {
                     Err(NeedMoreParams(KICKId)) }
             }
@@ -626,10 +626,10 @@ impl<'a> Command<'a> {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(INVITEId, 1))
                 }
-            KICK{ channel, user, comment } => {
+            KICK{ channel, users, comment } => {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(KICKId, 0))?;
-                validate_username(user)
+                users.iter().try_for_each(|u| validate_username(u))
                     .map_err(|_| WrongParameter(KICKId, 1)) }
             MOTD{ target } => {
                 if let Some(t) = target {
