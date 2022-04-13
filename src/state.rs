@@ -176,13 +176,13 @@ impl ChannelUserModes {
 
 flags! {
     enum PrivMsgTargetType: u8 {
-        User,
-        Channel,
-        ChannelFounder,
-        ChannelProtected,
-        ChannelOper,
-        ChannelHalfOp,
-        ChannelVoice,
+        Channel = 0b1,
+        ChannelFounder = 0b10,
+        ChannelProtected = 0b100,
+        ChannelOper = 0b1000,
+        ChannelHalfOp = 0b10000,
+        ChannelVoice = 0b100000,
+        ChannelAll = 0b111111,
     }
 }
 
@@ -200,20 +200,34 @@ impl ChannelUserModes {
         out
     }
     
-//     fn get_usermode_char(target: &str) -> MembershipChar {
-//         use MembershipChar::*;
-//         let mut it = target.bytes();
-//         if let Some(f) = it.next() {
-//             match f {
-//                 b'~'|b'&'|b'@'|b'%'|b'+' => {
-//                     if let Some(b'#')|Some(b'&') = it.next() {
-//                         Some(f)
-//                     },
-//                 }
-//                 _ => None
-//             }
-//         } else { None }
-//     }
+}
+
+fn get_privmsg_target_type(target: &str) -> FlagSet<PrivMsgTargetType> {
+    use PrivMsgTargetType::*;
+    let mut out = FlagSet::<PrivMsgTargetType>::new_truncated(0);
+    let mut amp_count = 0;
+    let mut last_amp = false;
+    for (i,c) in target.bytes().enumerate() {
+        match c {
+            b'~' => out |= Channel|ChannelFounder,
+            b'&' => out |= Channel|ChannelProtected,
+            b'@' => out |= Channel|ChannelOper,
+            b'%' => out |= Channel|ChannelHalfOp,
+            b'+' => out |= Channel|ChannelVoice,
+            b'#' => {
+                if i+1 >= target.len() { out &= !ChannelAll; }
+                break;
+            }
+            _ => {
+                if last_amp {
+                    if amp_count < 2 { out &= !ChannelProtected; }
+                } else { out &= !ChannelAll; }
+                break;
+            }
+        }
+        last_amp = c == b'&';
+    }
+    out
 }
 
 struct ChannelTopic {
