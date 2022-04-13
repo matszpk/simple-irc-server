@@ -76,14 +76,14 @@ impl ToString for SupportTokenIntValue {
 pub(crate) enum SupportTokenString {
     SupportTokenStringValue{ name: &'static str, value: &'static str },
     CASEMAPPING = SupportTokenStringValue{ name: "CASEMAPPING", value: "ascii" },
-    CHANMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Ibehiklmnopstv" },
+    CHANMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Iabehiklmnopqstv" },
     CHANTYPES = SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
     EXCEPTS = SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
     INVEX = SupportTokenStringValue{ name: "INVEX", value: "I" },
     MAXLIST = SupportTokenStringValue{ name: "MAXLIST", value: "beI:1000" },
-    PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(ohv)@%+" },
-    STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "@%+" },
-    USERMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Oiorw" },
+    PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(qaohv)~&@%+" },
+    STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "~&@%+" },
+    USERMODES = SupportTokenStringValue{ name: "USERMODES", value: "Oiorw" },
 }
 
 impl ToString for SupportTokenStringValue {
@@ -803,7 +803,7 @@ impl MainState {
                             version: concat!(env!("CARGO_PKG_NAME"), "-",
                                     env!("CARGO_PKG_VERSION")),
                             avail_user_modes: "Oiorw",
-                            avail_chmodes: "Ibehiklmnopstv",
+                            avail_chmodes: "Iabehiklmnopqstv",
                             avail_chmodes_with_params: None }).await?;
                     
                     // support tokens
