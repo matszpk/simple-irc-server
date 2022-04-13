@@ -656,9 +656,9 @@ impl MainState {
                     MODE{ target, modes } =>
                         self.process_mode(conn_state, target, modes).await,
                     PRIVMSG{ targets, text } =>
-                        self.process_privmsg(conn_state, targets, text).await,
+                        self.process_privmsg(conn_state, targets, text, &msg).await,
                     NOTICE{ targets, text } =>
-                        self.process_notice(conn_state, targets, text).await,
+                        self.process_notice(conn_state, targets, text, &msg).await,
                     WHO{ mask } => self.process_who(conn_state, mask).await,
                     WHOIS{ target, nickmasks } =>
                         self.process_whois(conn_state, target, nickmasks).await,
@@ -1489,7 +1489,7 @@ impl MainState {
     }
     
     async fn process_privmsg_notice<'a>(&self, conn_state: &mut ConnState,
-            targets: Vec<&'a str>, text: &'a str,
+            targets: Vec<&'a str>, text: &'a str, msg: &'a Message<'a>,
             notice: bool) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
         let client = conn_state.user_state.client_name();
@@ -1509,13 +1509,59 @@ impl MainState {
                              chanuser_mode.map_or(false, |chum| chum.voice));
                     
                     if can_send {
-                        
+                        use PrivMsgTargetType::*;
+                        if !(target_type & ChannelAllSpecial).is_empty() {
+                            // to special
+                            if !(target_type & ChannelFounder).is_empty() {
+                                if let Some(ref founders) = chanobj.modes.founders {
+                                    founders.iter().try_for_each(|u|
+                                        state.users.get(u).unwrap().send_message(msg,
+                                                &conn_state.user_state.source))?;
+                                }
+                            }
+                            if !(target_type & ChannelProtected).is_empty() {
+                                if let Some(ref protecteds) = chanobj.modes.protecteds {
+                                    protecteds.iter().try_for_each(|u|
+                                        state.users.get(u).unwrap().send_message(msg,
+                                                &conn_state.user_state.source))?;
+                                }
+                            }
+                            if !(target_type & ChannelOper).is_empty() {
+                                if let Some(ref operators) = chanobj.modes.operators {
+                                    operators.iter().try_for_each(|u|
+                                        state.users.get(u).unwrap().send_message(msg,
+                                                &conn_state.user_state.source))?;
+                                }
+                            }
+                            if !(target_type & ChannelHalfOper).is_empty() {
+                                if let Some(ref half_ops) = chanobj.modes.half_operators {
+                                    half_ops.iter().try_for_each(|u|
+                                        state.users.get(u).unwrap().send_message(msg,
+                                                &conn_state.user_state.source))?;
+                                }
+                            }
+                            if !(target_type & ChannelVoice).is_empty() {
+                                if let Some(ref voices) = chanobj.modes.voices {
+                                    voices.iter().try_for_each(|u|
+                                        state.users.get(u).unwrap().send_message(msg,
+                                                &conn_state.user_state.source))?;
+                                }
+                            }
+                        } else {
+                            chanobj.users.keys().try_for_each(|u|
+                                state.users.get(u).unwrap().send_message(msg,
+                                    &conn_state.user_state.source))?
+                        }
                     }
                 } else {
-                    self.feed_msg(&mut conn_state.stream,
-                            ErrNoSuchChannel403{ client, channel: chan_str }).await?;
+                    if !notice {
+                        self.feed_msg(&mut conn_state.stream,
+                                ErrNoSuchChannel403{ client, channel: chan_str }).await?;
+                    }
                 }
             } else {    // to user
+                state.users.get(target).unwrap().send_message(msg,
+                                    &conn_state.user_state.source)?;
             }
         }
         
@@ -1523,13 +1569,13 @@ impl MainState {
     }
     
     async fn process_privmsg<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
-            text: &'a str) -> Result<(), Box<dyn Error>> {
-        self.process_privmsg_notice(conn_state, targets, text, false).await
+            text: &'a str, msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
+        self.process_privmsg_notice(conn_state, targets, text, msg, false).await
     }
     
     async fn process_notice<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
-            text: &'a str) -> Result<(), Box<dyn Error>> {
-        self.process_privmsg_notice(conn_state, targets, text, true).await
+            text: &'a str, msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
+        self.process_privmsg_notice(conn_state, targets, text, msg, true).await
     }
     
     async fn process_who<'a>(&self, conn_state: &mut ConnState, mask: &'a str)
