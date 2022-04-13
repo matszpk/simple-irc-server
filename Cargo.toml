@@ -24,6 +24,7 @@ clap = { version = "3.0.0", features = ["derive"] }
 validator = { version = "0.14", features = [ "derive" ] }
 bytes = "1.1.0"
 const-table = "0.1.0"
+flagset = { version = "0.4" }
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"

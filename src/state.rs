@@ -36,6 +36,7 @@ use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
 use const_table::const_table;
+use flagset::{flags, FlagSet};
 
 use crate::config::*;
 use crate::reply::*;
@@ -152,28 +153,40 @@ enum OperatorType {
 }
 
 #[derive(Copy, Clone)]
-struct ChannelUserMode {
+struct ChannelUserModes {
     founder: bool,
     protected: bool,
     voice: bool,
     oper_type: OperatorType,
 }
 
-impl Default for ChannelUserMode {
+impl Default for ChannelUserModes {
     fn default() -> Self {
-        ChannelUserMode{ founder: false, protected: false, voice: false,
+        ChannelUserModes{ founder: false, protected: false, voice: false,
                 oper_type: OperatorType::NoOper }
     }
 }
 
-impl ChannelUserMode {
+impl ChannelUserModes {
     fn new_for_created_channel() -> Self {
-        ChannelUserMode{ founder: false, protected: false, voice: false,
+        ChannelUserModes{ founder: false, protected: false, voice: false,
                 oper_type: OperatorType::Oper }
     }
 }
 
-impl ChannelUserMode {
+flags! {
+    enum PrivMsgTargetType: u8 {
+        User,
+        Channel,
+        ChannelFounder,
+        ChannelProtected,
+        ChannelOper,
+        ChannelHalfOp,
+        ChannelVoice,
+    }
+}
+
+impl ChannelUserModes {
     fn to_string(&self, cap_state: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
@@ -186,6 +199,21 @@ impl ChannelUserMode {
         if self.voice { out.push('+'); }
         out
     }
+    
+//     fn get_usermode_char(target: &str) -> MembershipChar {
+//         use MembershipChar::*;
+//         let mut it = target.bytes();
+//         if let Some(f) = it.next() {
+//             match f {
+//                 b'~'|b'&'|b'@'|b'%'|b'+' => {
+//                     if let Some(b'#')|Some(b'&') = it.next() {
+//                         Some(f)
+//                     },
+//                 }
+//                 _ => None
+//             }
+//         } else { None }
+//     }
 }
 
 struct ChannelTopic {
@@ -210,13 +238,13 @@ struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
     modes: ChannelModes,
-    users: HashMap<String, ChannelUserMode>,
+    users: HashMap<String, ChannelUserModes>,
 }
 
 impl Channel {
     fn new(name: String, user_nick: String) -> Channel {
         let mut users = HashMap::new();
-        users.insert(user_nick.clone(), ChannelUserMode::new_for_created_channel());
+        users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
         Channel{ name, topic: None,
             modes: ChannelModes::new_for_channel(user_nick), users }
     }
@@ -1020,7 +1048,7 @@ impl MainState {
                                 chname.clone(), user_nick.clone()));
                 } else {
                     let chanobj = state.channels.get_mut(&chname).unwrap();
-                    chanobj.users.insert(user_nick.clone(), ChannelUserMode::default());
+                    chanobj.users.insert(user_nick.clone(), ChannelUserModes::default());
                 }
             }
         });
@@ -1442,14 +1470,29 @@ impl MainState {
         Ok(())
     }
     
+    async fn process_privmsg_notice<'a>(&self, conn_state: &mut ConnState,
+            targets: Vec<&'a str>, text: &'a str,
+            notice: bool) -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
+        let client = conn_state.user_state.client_name();
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        
+        for target in targets {
+            
+        }
+        
+        Ok(())
+    }
+    
     async fn process_privmsg<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
             text: &'a str) -> Result<(), Box<dyn Error>> {
-        Ok(())
+        self.process_privmsg_notice(conn_state, targets, text, false).await
     }
     
     async fn process_notice<'a>(&self, conn_state: &mut ConnState, targets: Vec<&'a str>,
             text: &'a str) -> Result<(), Box<dyn Error>> {
-        Ok(())
+        self.process_privmsg_notice(conn_state, targets, text, true).await
     }
     
     async fn process_who<'a>(&self, conn_state: &mut ConnState, mask: &'a str)

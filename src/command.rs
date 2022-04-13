@@ -968,10 +968,14 @@ mod test {
             Command::from_message(&Message{ source: None, command: "INVITE",
                 params: vec![ "greg" ] }).map_err(|e| e.to_string()));
         
-        assert_eq!(Ok(KICK{ channel: "#toolkits", user: "mickey", comment: None }),
+        assert_eq!(Ok(KICK{ channel: "#toolkits", users: vec!["mickey"], comment: None }),
             Command::from_message(&Message{ source: None, command: "KICK",
                 params: vec![ "#toolkits", "mickey" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Ok(KICK{ channel: "#toolkits", user: "mickey",
+        assert_eq!(Ok(KICK{ channel: "#toolkits", users: vec!["mickey", "lola"],
+                comment: None }),
+            Command::from_message(&Message{ source: None, command: "KICK",
+                params: vec![ "#toolkits", "mickey,lola" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(KICK{ channel: "#toolkits", users: vec!["mickey"],
                 comment: Some("Mickey is not polite") }),
             Command::from_message(&Message{ source: None, command: "KICK",
                 params: vec![ "#toolkits", "mickey", "Mickey is not polite" ] })
@@ -1290,6 +1294,11 @@ mod test {
                 text: "Hello, cruel world!" }),
             Command::from_message(&Message{ source: None, command: "PRIVMSG",
                 params: vec![ "@#graphics,&&musics,jimmy" , "Hello, cruel world!" ] })
+                    .map_err(|e| e.to_string()));
+        assert_eq!(Ok(PRIVMSG{ targets: vec![ "@+#graphics", "&&musics", "jimmy" ],
+                text: "Hello, cruel world!" }),
+            Command::from_message(&Message{ source: None, command: "PRIVMSG",
+                params: vec![ "@+#graphics,&&musics,jimmy" , "Hello, cruel world!" ] })
                     .map_err(|e| e.to_string()));
         assert_eq!(Ok(PRIVMSG{ targets: vec![ "+#graphics", "+&musics", "jimmy" ],
                 text: "Hello, cruel world!" }),

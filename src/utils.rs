@@ -91,18 +91,21 @@ pub(crate) fn validate_server_mask<E: Error>(s: &str, e: E) -> Result<(), E>  {
 
 pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result<(), E> {
     if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') {
-        let cfirst = channel.as_bytes()[0];
-        if channel.len() >= 3 && cfirst==b'&' && (
-            channel.as_bytes()[1] == b'&' || channel.as_bytes()[1] == b'#') {
-            return Ok(());  // protected prefix
+        let mut is_channel = false;
+        let mut last_amp = false;
+        for (i,c) in channel.bytes().enumerate() {
+            match c {
+                b'~'|b'@'|b'%'|b'+' => (),
+                b'&' => last_amp = true,
+                b'#' => {
+                    is_channel = i+1 < channel.len();
+                    break; }
+                _ => {
+                    is_channel = last_amp && i+1 < channel.len();
+                    break; }
+            }
         }
-        let channel = if cfirst == b'~' || cfirst == b'@' || cfirst == b'%' ||
-                    cfirst == b'+' {
-            &channel[1..]
-        } else { channel };
-        let cfirst = channel.as_bytes()[0];
-        if cfirst == b'#' || cfirst == b'&' {
-            Ok(())
+        if is_channel { Ok(())
         } else { Err(e) }
     } else { Err(e) }
 }
