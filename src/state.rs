@@ -1376,9 +1376,14 @@ impl MainState {
                                 oper_type == OperatorType::Oper {
                     for kick_user in &kick_users {
                         let ku = kick_user.to_string();
-                        if chanobj.users.contains_key(&ku) {                            
-                            chanobj.users.remove(&ku);
-                            kicked.push(kick_user);
+                        if let Some(chum) = chanobj.users.get(&ku) {
+                            if !chum.protected {
+                                chanobj.users.remove(&ku);
+                                kicked.push(kick_user);
+                            } else {
+                                self.feed_msg(&mut conn_state.stream, ErrCannotDoCommand972{
+                                    client }).await?;
+                            }
                         } else {
                             self.feed_msg(&mut conn_state.stream, ErrUserNotInChannel441{
                                     client, nick: kick_user, channel }).await?;

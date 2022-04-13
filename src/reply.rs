@@ -174,6 +174,7 @@ pub(crate) enum Reply<'a> {
     ErrSaslAborted906{ client: &'a str },
     ErrSaslAlready907{ client: &'a str },
     RplSaslMechs908{ client: &'a str, mechanisms: &'a str },
+    ErrCannotDoCommand972{ client: &'a str },
 }
 
 use Reply::*;
@@ -454,6 +455,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "907 {} :You have already authenticated using SASL", client) }
             RplSaslMechs908{ client, mechanisms } => {
                 write!(f, "908 {} {} :are available SASL mechanisms", client, mechanisms) }
+            ErrCannotDoCommand972{ client } => {
+                write!(f, "972 {} :Can not do command", client) }
         }
     }
 }
@@ -785,5 +788,7 @@ mod test {
         assert_eq!("908 <client> <mechanisms> :are available SASL mechanisms",
             format!("{}", RplSaslMechs908{ client: "<client>",
                 mechanisms: "<mechanisms>" }));
+        assert_eq!("972 <client> :Can not do command",
+            format!("{}", ErrCannotDoCommand972{ client: "<client>" }));
     }
 }
