@@ -108,6 +108,8 @@ pub(crate) struct ChannelModes {
     pub(crate) operators: Option<HashSet<String>>,
     pub(crate) half_operators: Option<HashSet<String>>,
     pub(crate) voices: Option<HashSet<String>>,
+    pub(crate) founders: Option<HashSet<String>>,
+    pub(crate) protecteds: Option<HashSet<String>>,
     pub(crate) invite_only: bool,
     pub(crate) moderated: bool,
     pub(crate) secret: bool,
@@ -134,6 +136,7 @@ impl Default for ChannelModes {
     fn default() -> Self {
         ChannelModes{ ban: None, exception: None, invite_exception: None,
             client_limit: None, key: None, operators: None, half_operators: None,
+            founders: None, protecteds: None,
             voices: None, invite_only: false, moderated: false, secret: false,
             protected_topic: false, no_external_messages: false }
     }
@@ -174,6 +177,18 @@ impl fmt::Display for ChannelModes {
             });
         }
         
+        if let Some(ref founders) = self.founders {
+            founders.iter().for_each(|q| {
+                s += " +q ";
+                s += q;
+            });
+        }
+        if let Some(ref protecteds) = self.protecteds {
+            protecteds.iter().for_each(|a| {
+                s += " +a ";
+                s += a;
+            });
+        }
         if let Some(ref operators) = self.operators {
             operators.iter().for_each(|o| {
                 s += " +o ";
@@ -462,6 +477,7 @@ no_external_messages = false
                                 "mati@*".to_string() ].into()),
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: None,
                         invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
@@ -477,6 +493,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ].into()),
                         operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
                         half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: Some(200),
                         invite_only: true,
                         moderated: true, secret: false, protected_topic: true,
@@ -532,6 +549,7 @@ no_external_messages = false
                                 "mati@*".to_string() ].into()),
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: None,
                         invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
@@ -548,6 +566,7 @@ no_external_messages = false
                                 "pampam@zerox.net".to_string() ].into()),
                         operators: Some([ "banny".to_string(), "rorry".to_string() ].into()),
                         half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: Some(200),
                         invite_only: true,
                         moderated: true, secret: false, protected_topic: true,
@@ -643,6 +662,7 @@ no_external_messages = false
                                 "mati@*".to_string() ].into()),
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: None,
                         invite_only: false,
                         moderated: false, secret: false, protected_topic: false,
@@ -656,6 +676,7 @@ no_external_messages = false
                         exception: None,
                         invite_exception: None,
                         operators: None, half_operators: None, voices: None,
+                        founders: None, protecteds: None,
                         client_limit: None,
                         invite_only: false,
                         moderated: true, secret: false, protected_topic: true,
@@ -1024,8 +1045,8 @@ no_external_messages = false
                     invite_exception: Some(["somebody".to_string()].into()),
                     client_limit: Some(10), key: None,
                     operators: Some(["expert".to_string()].into()),
-                    half_operators: None,
-                    voices: None,
+                    half_operators: None, voices: None,
+                    founders: None, protecteds: None,
                     invite_only: true, moderated: false, secret: false,
                     protected_topic: true, no_external_messages: true }.to_string());
         let chm_str = ChannelModes{
@@ -1036,6 +1057,7 @@ no_external_messages = false
                     operators: Some(["expert".to_string()].into()),
                     half_operators: Some(["spec".to_string()].into()),
                     voices: None,
+                    founders: None, protecteds: None,
                     invite_only: false, moderated: false, secret: true,
                     protected_topic: true, no_external_messages: false }.to_string();
         assert!("+stk password +b somebody +b somebody2 +o expert +h spec" == chm_str ||
@@ -1046,10 +1068,37 @@ no_external_messages = false
                     client_limit: None, key: None,
                     operators: None,
                     half_operators: None,
+                    founders: None, protecteds: None,
                     voices: Some(["guy1".to_string(), "guy2".to_string()].into()),
                     invite_only: true, moderated: true, secret: false,
                     protected_topic: false, no_external_messages: true }.to_string();
         assert!("+imn +I somebody +v guy1 +v guy2".to_string() == chm_str ||
                 "+imn +I somebody +v guy2 +v guy1".to_string() == chm_str);
+        let chm_str = ChannelModes{ ban: None,
+                    exception: None,
+                    invite_exception: Some(["somebody".to_string()].into()),
+                    client_limit: None, key: None,
+                    operators: None,
+                    half_operators: None,
+                    founders: Some(["guy1".to_string(), "guy2".to_string()].into()),
+                    protecteds: None,
+                    voices: None,
+                    invite_only: true, moderated: true, secret: false,
+                    protected_topic: false, no_external_messages: true }.to_string();
+        assert!("+imn +I somebody +q guy1 +q guy2".to_string() == chm_str ||
+                "+imn +I somebody +q guy2 +q guy1".to_string() == chm_str);
+        let chm_str = ChannelModes{ ban: None,
+                    exception: None,
+                    invite_exception: Some(["somebody".to_string()].into()),
+                    client_limit: None, key: None,
+                    operators: None,
+                    half_operators: None,
+                    founders: None,
+                    protecteds: Some(["guy1".to_string(), "guy2".to_string()].into()),
+                    voices: None,
+                    invite_only: true, moderated: true, secret: false,
+                    protected_topic: false, no_external_messages: true }.to_string();
+        assert!("+imn +I somebody +a guy1 +a guy2".to_string() == chm_str ||
+                "+imn +I somebody +a guy2 +a guy1".to_string() == chm_str);
     }
 }

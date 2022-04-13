@@ -150,7 +150,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                         margs_it.next(); // consume argument
                         arg_param_idx += 1;
                     }
-                    'o'|'v'|'h' => {
+                    'o'|'v'|'h'|'q'|'a' => {
                         if let Some(arg) = margs_it.next() {
                             validate_username(arg).map_err(|e|
                                 InvalidModeParam{ target: target.to_string(),
@@ -402,6 +402,9 @@ mod test {
                 .map_err(|e| e.to_string()));
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
             ("+tb", vec!["barry"]), ("-iI", vec!["guru"]), ("+es", vec!["eagle"])])
+                .map_err(|e| e.to_string()));
+        assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
+            ("-to", vec!["barry"]), ("+an", vec!["guru"]), ("-mq", vec!["jerry"])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Unknown mode u in parameter 2".to_string()),
             validate_channelmodes("#xchan", &vec![("+nt", vec![]), ("-sum", vec![])])
