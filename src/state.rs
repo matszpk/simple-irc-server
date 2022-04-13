@@ -1590,12 +1590,18 @@ impl MainState {
                     }
                 }
             } else {    // to user
-                let cur_user = state.users.get(target).unwrap();
-                cur_user.send_message(msg, &conn_state.user_state.source)?;
-                if !notice {
-                    if let Some(ref away) = cur_user.away {
-                        self.feed_msg(&mut conn_state.stream, RplAway301{ client,
-                                    nick: target, message: &away }).await?;
+                if let Some(cur_user) = state.users.get(target) {
+                    cur_user.send_message(msg, &conn_state.user_state.source)?;
+                    if !notice {
+                        if let Some(ref away) = cur_user.away {
+                            self.feed_msg(&mut conn_state.stream, RplAway301{ client,
+                                        nick: target, message: &away }).await?;
+                        }
+                    }
+                } else {
+                    if !notice {
+                        self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
+                                        nick: target }).await?;
                     }
                 }
             }
