@@ -96,14 +96,15 @@ pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result
         for (i,c) in channel.bytes().enumerate() {
             match c {
                 b'~'|b'@'|b'%'|b'+' => (),
-                b'&' => last_amp = true,
+                b'&' => (),
                 b'#' => {
                     is_channel = i+1 < channel.len();
                     break; }
                 _ => {
-                    is_channel = last_amp && i+1 < channel.len();
+                    is_channel = last_amp;
                     break; }
             }
+            last_amp = c == b'&';
         }
         if is_channel { Ok(())
         } else { Err(e) }
