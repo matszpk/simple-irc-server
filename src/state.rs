@@ -1501,12 +1501,42 @@ impl MainState {
             if target_type.contains(PrivMsgTargetType::Channel) { // to channel
                 if let Some(chanobj) = state.channels.get(chan_str) {
                     let chanuser_mode = chanobj.users.get(user_nick);
-                    let can_send = ((!chanobj.modes.no_external_messages &&
+                    let can_send = {
+                        if ((!chanobj.modes.no_external_messages &&
                                     !chanobj.modes.secret) ||
-                                chanuser_mode.is_some()) &&
-                            !chanobj.modes.banned(&conn_state.user_state.source) &&
-                            (!chanobj.modes.moderated ||
-                             chanuser_mode.map_or(false, |chum| chum.voice));
+                                chanuser_mode.is_some()) {
+                            true
+                        } else {
+                            if !notice {
+                                self.feed_msg(&mut conn_state.stream, ErrCannotSendToChain404{
+                                        client, channel: chan_str }).await?;
+                            }
+                            false
+                        }
+                    };
+                    let can_send = can_send && {
+                        if !chanobj.modes.banned(&conn_state.user_state.source) {
+                            true
+                        } else {
+                            if !notice {
+                                self.feed_msg(&mut conn_state.stream, ErrCannotSendToChain404{
+                                        client, channel: chan_str }).await?;
+                            }
+                            false
+                        }
+                    };
+                    let can_send = can_send && {
+                        if (!chanobj.modes.moderated ||
+                            chanuser_mode.map_or(false, |chum| chum.voice)) {
+                            true
+                        } else {
+                            if !notice {
+                                self.feed_msg(&mut conn_state.stream, ErrCannotSendToChain404{
+                                        client, channel: chan_str }).await?;
+                            }
+                            false
+                        }
+                    };
                     
                     if can_send {
                         use PrivMsgTargetType::*;
@@ -1560,11 +1590,16 @@ impl MainState {
                     }
                 }
             } else {    // to user
-                state.users.get(target).unwrap().send_message(msg,
-                                    &conn_state.user_state.source)?;
+                let cur_user = state.users.get(target).unwrap();
+                cur_user.send_message(msg, &conn_state.user_state.source)?;
+                if !notice {
+                    if let Some(ref away) = cur_user.away {
+                        self.feed_msg(&mut conn_state.stream, RplAway301{ client,
+                                    nick: target, message: &away }).await?;
+                    }
+                }
             }
         }
-        
         Ok(())
     }
     
