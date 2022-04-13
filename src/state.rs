@@ -180,9 +180,10 @@ flags! {
         ChannelFounder = 0b10,
         ChannelProtected = 0b100,
         ChannelOper = 0b1000,
-        ChannelHalfOp = 0b10000,
+        ChannelHalfOper = 0b10000,
         ChannelVoice = 0b100000,
         ChannelAll = 0b111111,
+        ChannelAllSpecial = 0b111110,
     }
 }
 
@@ -199,35 +200,37 @@ impl ChannelUserModes {
         if self.voice { out.push('+'); }
         out
     }
-    
 }
 
-fn get_privmsg_target_type(target: &str) -> FlagSet<PrivMsgTargetType> {
+fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
     use PrivMsgTargetType::*;
     let mut out = FlagSet::<PrivMsgTargetType>::new_truncated(0);
     let mut amp_count = 0;
     let mut last_amp = false;
+    let mut out_str = "";
     for (i,c) in target.bytes().enumerate() {
         match c {
             b'~' => out |= Channel|ChannelFounder,
             b'&' => out |= Channel|ChannelProtected,
             b'@' => out |= Channel|ChannelOper,
-            b'%' => out |= Channel|ChannelHalfOp,
+            b'%' => out |= Channel|ChannelHalfOper,
             b'+' => out |= Channel|ChannelVoice,
             b'#' => {
-                if i+1 >= target.len() { out &= !ChannelAll; }
+                if i+1 < target.len() { out_str = &target[i..]; }
+                else { out &= !ChannelAll; }
                 break;
             }
             _ => {
                 if last_amp {
                     if amp_count < 2 { out &= !ChannelProtected; }
+                    out_str = &target[i-1..];
                 } else { out &= !ChannelAll; }
                 break;
             }
         }
         last_amp = c == b'&';
     }
-    out
+    (out, out_str)
 }
 
 struct ChannelTopic {
@@ -996,10 +999,7 @@ impl MainState {
                 } else { true };
                 
                 let do_join = do_join && {
-                    if !channel.modes.ban.as_ref().map_or(false, |b| b.iter().any(
-                        |b| match_wildcard(&b, &conn_state.user_state.source))) ||
-                    channel.modes.exception.as_ref().map_or(false, |e| e.iter().any(
-                        |e| match_wildcard(&e, &conn_state.user_state.source))) {
+                    if !channel.modes.banned(&conn_state.user_state.source) {
                         true
                     } else {
                         self.feed_msg(&mut conn_state.stream, ErrBannedFromChan474{
@@ -1376,8 +1376,7 @@ impl MainState {
                                 oper_type == OperatorType::Oper {
                     for kick_user in &kick_users {
                         let ku = kick_user.to_string();
-                        if chanobj.users.contains_key(&ku) {
-                            
+                        if chanobj.users.contains_key(&ku) {                            
                             chanobj.users.remove(&ku);
                             kicked.push(kick_user);
                         } else {
@@ -1493,7 +1492,26 @@ impl MainState {
         let user = state.users.get(user_nick).unwrap();
         
         for target in targets {
-            
+            let (target_type, chan_str) = get_privmsg_target_type(target);
+            if target_type.contains(PrivMsgTargetType::Channel) { // to channel
+                if let Some(chanobj) = state.channels.get(chan_str) {
+                    let chanuser_mode = chanobj.users.get(user_nick);
+                    let can_send = ((!chanobj.modes.no_external_messages &&
+                                    !chanobj.modes.secret) ||
+                                chanuser_mode.is_some()) &&
+                            !chanobj.modes.banned(&conn_state.user_state.source) &&
+                            (!chanobj.modes.moderated ||
+                             chanuser_mode.map_or(false, |chum| chum.voice));
+                    
+                    if can_send {
+                        
+                    }
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                            ErrNoSuchChannel403{ client, channel: chan_str }).await?;
+                }
+            } else {    // to user
+            }
         }
         
         Ok(())

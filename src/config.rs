@@ -32,6 +32,7 @@ use tokio;
 
 use crate::utils::validate_channel;
 use crate::utils::validate_username;
+use crate::utils::match_wildcard;
 
 #[derive(clap::Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
@@ -119,6 +120,13 @@ impl ChannelModes {
         let mut def = ChannelModes::default();
         def.operators = Some([ user_nick ].into());
         def
+    }
+    
+    pub(crate) fn banned(&self, source: &str) -> bool {
+        self.ban.as_ref().map_or(false, |b| b.iter().any(
+                |b| match_wildcard(&b, &source))) &&
+            (!self.exception.as_ref().map_or(false, |e| e.iter().any(
+                |e| match_wildcard(&e, &source))))
     }
 }
 
