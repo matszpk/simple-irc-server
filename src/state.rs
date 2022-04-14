@@ -255,6 +255,7 @@ impl ChannelTopic{
     }
 }
 
+// TODO: Add rename user in Channel
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
