@@ -729,6 +729,36 @@ impl MainState {
         Ok(())
     }
     
+    async fn send_isupport(&self, conn_state: &mut ConnState) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        // support tokens
+        let mut tokens = vec![ format!("NETWORK={}", self.config.network) ];
+        if let Some(max_joins) = self.config.max_joins {
+            tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
+            tokens.push(format!("MAXCHANNELS={}", max_joins));
+        }
+        let inf_range = 0 as u32..;
+        inf_range.map_while(|i| {
+            let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
+            t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+        let inf_range = 0 as u32..;
+        inf_range.map_while(|i| {
+            let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
+            t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
+        let inf_range = 0 as u32..;
+        inf_range.map_while(|i| {
+            let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
+            t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
+        
+        tokens.sort();
+        
+        for toks in tokens.chunks(10) {
+            self.feed_msg(&mut conn_state.stream,
+                RplISupport005{ client, tokens: &toks.join(" ") }).await?;
+        }
+        Ok(())
+    }
+    
     async fn authenticate(&self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
         let (auth_opt, registered) = {
@@ -807,31 +837,7 @@ impl MainState {
                             avail_chmodes: "Iabehiklmnopqstv",
                             avail_chmodes_with_params: None }).await?;
                     
-                    // support tokens
-                    let mut tokens = vec![ format!("NETWORK={}", self.config.network) ];
-                    if let Some(max_joins) = self.config.max_joins {
-                        tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
-                        tokens.push(format!("MAXCHANNELS={}", max_joins));
-                    }
-                    let inf_range = 0 as u32..;
-                    inf_range.map_while(|i| {
-                        let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
-                        t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-                    let inf_range = 0 as u32..;
-                    inf_range.map_while(|i| {
-                        let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
-                        t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-                    let inf_range = 0 as u32..;
-                    inf_range.map_while(|i| {
-                        let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
-                        t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
-                    
-                    tokens.sort();
-                    
-                    for toks in tokens.chunks(10) {
-                        self.feed_msg(&mut conn_state.stream,
-                            RplISupport005{ client, tokens: &toks.join(" ") }).await?;
-                    }
+                    self.send_isupport(conn_state).await?;
                 }
                 
                 self.process_lusers(conn_state).await?;
@@ -1425,21 +1431,44 @@ impl MainState {
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
-        self.feed_msg(&mut conn_state.stream, RplMotdStart375{ client,
-                server: &self.config.name }).await?;
-        self.feed_msg(&mut conn_state.stream, RplMotd372{ client,
-                motd: &self.config.motd }).await?;
-        self.feed_msg(&mut conn_state.stream, RplEndOfMotd376{ client }).await?;
+        if target.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "MOTD", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            self.feed_msg(&mut conn_state.stream, RplMotdStart375{ client,
+                    server: &self.config.name }).await?;
+            self.feed_msg(&mut conn_state.stream, RplMotd372{ client,
+                    motd: &self.config.motd }).await?;
+            self.feed_msg(&mut conn_state.stream, RplEndOfMotd376{ client }).await?;
+        }
         Ok(())
     }
     
     async fn process_version<'a>(&self, conn_state: &mut ConnState,
             target: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        if target.is_some() {
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "VERSION", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            self.send_isupport(conn_state).await?;
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, RplVersion351{ client,
+                version: concat!(env!("CARGO_PKG_NAME"), "-", env!("CARGO_PKG_VERSION")),
+                server: &self.config.name, comments: "simple IRC server" }).await?;
+        }
         Ok(())
     }
     
     async fn process_admin<'a>(&self, conn_state: &mut ConnState,
             target: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
+        if target.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "ADMIN", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+        }
         Ok(())
     }
     
@@ -1455,6 +1484,17 @@ impl MainState {
     
     async fn process_time<'a>(&self, conn_state: &mut ConnState, server: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
+        if server.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "TIME", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            let time = Local::now();
+            self.feed_msg(&mut conn_state.stream, RplTime391{ client,
+                server: &self.config.name, timestamp: time.timestamp() as u64,
+                    ts_offset: "", human_readable: time.to_rfc2822().as_str() }).await?;
+        }
         Ok(())
     }
     
@@ -1506,9 +1546,9 @@ impl MainState {
                 if let Some(chanobj) = state.channels.get(chan_str) {
                     let chanuser_mode = chanobj.users.get(user_nick);
                     let can_send = {
-                        if ((!chanobj.modes.no_external_messages &&
+                        if (!chanobj.modes.no_external_messages &&
                                     !chanobj.modes.secret) ||
-                                chanuser_mode.is_some()) {
+                                chanuser_mode.is_some() {
                             true
                         } else {
                             if !notice {
@@ -1530,8 +1570,8 @@ impl MainState {
                         }
                     };
                     let can_send = can_send && {
-                        if (!chanobj.modes.moderated ||
-                            chanuser_mode.map_or(false, |chum| chum.voice)) {
+                        if !chanobj.modes.moderated ||
+                            chanuser_mode.map_or(false, |chum| chum.voice) {
                             true
                         } else {
                             if !notice {
