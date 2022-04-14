@@ -441,6 +441,9 @@ async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
 struct VolatileState {
     users: HashMap<String, User>,
     channels: HashMap<String, Channel>,
+    invisible_users_count: usize,
+    operators_count: usize,
+    max_users_count: usize,
 }
 
 impl VolatileState {
@@ -454,7 +457,8 @@ impl VolatileState {
             });
         }
         
-        VolatileState{ users: HashMap::new(), channels }
+        VolatileState{ users: HashMap::new(), channels, invisible_users_count: 0,
+                operators_count: 0 , max_users_count: 0 }
     }
 }
 
@@ -1498,6 +1502,25 @@ impl MainState {
     
     async fn process_lusers(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
+        let client = conn_state.user_state.client_name();
+        self.feed_msg(&mut conn_state.stream, RplLUserClient251{ client, 
+                users_num: state.users.len() - state.invisible_users_count,
+                inv_users_num: state.invisible_users_count, servers_num: 1 }).await?;
+        self.feed_msg(&mut conn_state.stream, RplLUserOp252{ client,
+                ops_num: state.operators_count }).await?;
+        self.feed_msg(&mut conn_state.stream, RplLUserUnknown253{ client,
+                conns_num: 0 }).await?;
+        self.feed_msg(&mut conn_state.stream, RplLUserChannels254{ client,
+                channels_num: state.channels.len() }).await?;
+        self.feed_msg(&mut conn_state.stream, RplLUserMe255{ client,
+                clients_num: state.users.len(), servers_num: 1 }).await?;
+        self.feed_msg(&mut conn_state.stream, RplLocalUsers265{ client,
+                clients_num: state.users.len(),
+                max_clients_num: state.max_users_count }).await?;
+        self.feed_msg(&mut conn_state.stream, RplGlobalUsers266{ client,
+                clients_num: state.users.len(),
+                max_clients_num: state.max_users_count }).await?;
         Ok(())
     }
     
