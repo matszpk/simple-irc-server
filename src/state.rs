@@ -255,7 +255,6 @@ impl ChannelTopic{
     }
 }
 
-// TODO: Add rename user in Channel
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
@@ -269,6 +268,12 @@ impl Channel {
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
         Channel{ name, topic: None,
             modes: ChannelModes::new_for_channel(user_nick), users }
+    }
+    
+    fn rename_user(&mut self, old_nick: &String, nick: String) {
+        let oldchumode = self.users.remove(old_nick).unwrap();
+        self.users.insert(nick.clone(), oldchumode);
+        self.modes.rename_user(old_nick, nick.clone());
     }
 }
 
@@ -899,9 +904,8 @@ impl MainState {
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
                     for ch in &user.channels {
-                        let channel = state.channels.get_mut(&ch.clone()).unwrap();
-                        let oldchumode = channel.users.remove(&old_nick).unwrap();
-                        channel.users.insert(nick_str.clone(), oldchumode);
+                        state.channels.get_mut(&ch.clone()).unwrap().rename_user(
+                                    &old_nick, nick_str.clone());
                     }
                     state.users.insert(nick_str, user);
                     

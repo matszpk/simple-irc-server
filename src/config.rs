@@ -130,6 +130,29 @@ impl ChannelModes {
             (!self.exception.as_ref().map_or(false, |e| e.iter().any(
                 |e| match_wildcard(&e, &source))))
     }
+    
+    pub(crate) fn rename_user(&mut self, old_nick: &String, nick: String) {
+        if let Some(ref mut operators) = self.operators {
+            operators.remove(old_nick);
+            operators.insert(nick.clone());
+        }
+        if let Some(ref mut half_operators) = self.half_operators {
+            half_operators.remove(old_nick);
+            half_operators.insert(nick.clone());
+        }
+        if let Some(ref mut voices) = self.voices {
+            voices.remove(old_nick);
+            voices.insert(nick.clone());
+        }
+        if let Some(ref mut founders) = self.founders {
+            founders.remove(old_nick);
+            founders.insert(nick.clone());
+        }
+        if let Some(ref mut protecteds) = self.protecteds {
+            protecteds.remove(old_nick);
+            protecteds.insert(nick);
+        }
+    }
 }
 
 impl Default for ChannelModes {
