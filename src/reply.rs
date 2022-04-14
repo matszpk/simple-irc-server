@@ -62,7 +62,7 @@ pub(crate) enum Reply<'a> {
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
     RplUserHost302{ client: &'a str, replies: &'a [&'a str] },
     RplUnAway305{ client: &'a str },
-    RplNoAway306{ client: &'a str },
+    RplNowAway306{ client: &'a str },
     RplWhoReply352{ client: &'a str, channel: &'a str, username: &'a str, host: &'a str,
             server: &'a str, nick: &'a str, flags: &'a str,
             hopcount: usize, realname: &'a str },
@@ -104,6 +104,9 @@ pub(crate) enum Reply<'a> {
     RplNameReply353{ client: &'a str, symbol: &'a str, channel: &'a str,
             replies: &'a[NameReplyStruct<'a>] },
     RplEndOfNames366{ client: &'a str, channel: &'a str },
+    RplLinks364{ client: &'a str, mask: &'a str, server: &'a str, hop_count: u64,
+                server_info: &'a str },
+    RplEndOfLinks365{ client: &'a str, mask: &'a str },
     RplBanList367{ client: &'a str, channel: &'a str, mask: &'a str,
             who: &'a str, set_ts: u64 },
     RplEndOfBanList368{ client: &'a str, channel: &'a str },
@@ -243,7 +246,7 @@ impl<'a> fmt::Display for Reply<'a> {
                     .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
             RplUnAway305{ client } => {
                 write!(f, "305 {} :You are no longer marked as being away", client) }
-            RplNoAway306{ client } => {
+            RplNowAway306{ client } => {
                 write!(f, "306 {} :You have been marked as being away", client) }
             RplWhoReply352{ client, channel, username, host, server, nick, flags,
                     hopcount, realname } => {
@@ -316,6 +319,11 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "353 {} {} {} :{}", client, symbol, channel,
                     replies.iter().map(|r| { r.prefix.to_string() + r.nick
                     }).collect::<Vec<_>>().join(" ")) }
+            RplLinks364{ client, server, mask, hop_count, server_info } => {
+                write!(f, "364 {} {} {} :{} {}", client, server, mask,
+                        hop_count, server_info) }
+            RplEndOfLinks365{ client, mask } => {
+                write!(f, "365 {} {} :End of LINKS list", client, mask) },
             RplEndOfNames366{ client, channel } => {
                 write!(f, "366 {} {} :End of /NAMES list", client, channel) }
             RplBanList367{ client, channel, mask, who, set_ts } => {
@@ -537,7 +545,7 @@ mod test {
         assert_eq!("305 <client> :You are no longer marked as being away",
             format!("{}", RplUnAway305{ client: "<client>" }));
         assert_eq!("306 <client> :You have been marked as being away",
-            format!("{}", RplNoAway306{ client: "<client>" }));
+            format!("{}", RplNowAway306{ client: "<client>" }));
         assert_eq!("352 <client> <channel> <username> <host> <server> <nick> \
                 <flags> :2 <realname>",
             format!("{}", RplWhoReply352{ client: "<client>", channel: "<channel>",
@@ -628,6 +636,12 @@ mod test {
                 channel: "<channel>", replies: &vec![
                     NameReplyStruct{ prefix: "<prefix1>".to_string(), nick: "<nick1>" },
                     NameReplyStruct{ prefix: String::new(), nick: "<nick2>" }] }));
+        assert_eq!("364 <client> <server> <mask> :1 <server_info>",
+            format!("{}", RplLinks364{ client: "<client>",
+                server: "<server>", mask: "<mask>", hop_count: 1,
+                server_info: "<server_info>" }));
+        assert_eq!("365 <client> <mask> :End of LINKS list",
+            format!("{}", RplEndOfLinks365{ client: "<client>", mask: "<mask>" }));
         assert_eq!("366 <client> <channel> :End of /NAMES list",
             format!("{}", RplEndOfNames366{ client: "<client>", channel: "<channel>" }));
         assert_eq!("367 <client> <channel> <mask> <who> 3894211355",

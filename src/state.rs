@@ -1548,6 +1548,11 @@ impl MainState {
     async fn process_links<'a>(&self, conn_state: &mut ConnState,
             remote_server: Option<&'a str>, server_mask: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        self.feed_msg(&mut conn_state.stream, RplLinks364{ client,
+                server: &self.config.name, mask: &self.config.name, 
+                hop_count: 0, server_info: &self.config.info }).await?;
+        self.feed_msg(&mut conn_state.stream, RplEndOfLinks365{ client, mask: "*" }).await?;
         Ok(())
     }
     
@@ -1740,8 +1745,19 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_away<'a>(&self, conn_state: &mut ConnState, server: Option<&'a str>)
+    async fn process_away<'a>(&self, conn_state: &mut ConnState, text: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let mut user = state.users.get_mut(user_nick).unwrap();
+        if let Some(t) = text {
+            user.away = Some(t.to_string());
+            self.feed_msg(&mut conn_state.stream, RplNowAway306{ client }).await?;
+        } else {
+            user.away = None;
+            self.feed_msg(&mut conn_state.stream, RplUnAway305{ client }).await?;
+        }
         Ok(())
     }
     
