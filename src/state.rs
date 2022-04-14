@@ -229,7 +229,10 @@ fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
                 break;
             }
         }
-        last_amp = c == b'&';
+        if c == b'&' {
+            last_amp = true;
+            amp_count += 1;
+         } else { last_amp = false; }
     }
     (out, out_str)
 }
@@ -1463,11 +1466,22 @@ impl MainState {
     async fn process_admin<'a>(&self, conn_state: &mut ConnState,
             target: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        
         if target.is_some() {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "ADMIN", subcommand: None, info: "Server unsupported" }).await?;
         } else {
+            self.feed_msg(&mut conn_state.stream, RplAdminMe256{ client,
+                    server: &self.config.name }).await?;
+            self.feed_msg(&mut conn_state.stream, RplAdminLoc1257{ client,
+                    info: &self.config.admin_info }).await?;
+            if let Some(ref info2) = self.config.admin_info2 {
+                self.feed_msg(&mut conn_state.stream, RplAdminLoc2258{ client,
+                        info: info2 }).await?;
+            }
+            if let Some(ref email) = self.config.admin_email {
+                self.feed_msg(&mut conn_state.stream, RplAdminEmail259{ client,
+                        email: email }).await?;
+            }
         }
         Ok(())
     }
