@@ -339,7 +339,7 @@ impl ConnUserState {
             s.push_str(&nick);
         }
         if let Some(ref name) = self.name {
-            s.push('!');
+            s.push_str("!~");
             s.push_str(&name);
         }
         s.push('@');
