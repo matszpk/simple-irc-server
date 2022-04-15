@@ -690,7 +690,7 @@ impl MainState {
                     USERHOST{ nicknames } =>
                         self.process_userhost(conn_state, nicknames).await, 
                     WALLOPS{ text } =>
-                        self.process_wallops(conn_state, text).await,
+                        self.process_wallops(conn_state, text, &msg).await,
                 }
             },
         }
@@ -1783,10 +1783,19 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_wallops<'a>(&self, conn_state: &mut ConnState, text: &'a str)
-            -> Result<(), Box<dyn Error>> {
-        let client = conn_state.user_state.client_name();
+    async fn process_wallops<'a>(&self, conn_state: &mut ConnState, text: &'a str,
+            msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        
+        if user.modes.local_oper || user.modes.oper {
+            state.wallops_users.iter().try_for_each(|wu| state.users.get(wu).unwrap()
+                .send_message(msg, &conn_state.user_state.source))?;
+        } else {
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
+        }
         Ok(())
     }
 }
