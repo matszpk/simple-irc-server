@@ -1763,6 +1763,17 @@ impl MainState {
     
     async fn process_userhost<'a>(&self, conn_state: &mut ConnState,
             nicknames: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let state = self.state.read().await;
+        
+        for nicks in nicknames.chunks(20) {
+            let replies = nicks.iter().map(|nick| {
+                let user = state.users.get(&nick.to_string()).unwrap();
+                format!("{}=+~{}@{}", nick, user.name, user.hostname)
+            }).collect::<Vec<_>>();
+            self.feed_msg(&mut conn_state.stream, RplUserHost302{ client,
+                    replies: &replies }).await?;
+        }
         Ok(())
     }
     

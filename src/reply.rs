@@ -60,7 +60,7 @@ pub(crate) enum Reply<'a> {
     RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
     RplNone300{ },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
-    RplUserHost302{ client: &'a str, replies: &'a [&'a str] },
+    RplUserHost302{ client: &'a str, replies: &'a [String] },
     RplUnAway305{ client: &'a str },
     RplNowAway306{ client: &'a str },
     RplWhoReply352{ client: &'a str, channel: &'a str, username: &'a str, host: &'a str,
@@ -541,7 +541,8 @@ mod test {
             format!("{}", RplUserHost302{ client: "<client>", replies: &vec![] }));
         assert_eq!("302 <client> :<reply1> <reply2> <reply3>",
             format!("{}", RplUserHost302{ client: "<client>",
-                replies: &vec![ "<reply1>", "<reply2>", "<reply3>"] }));
+                replies: &vec![ "<reply1>".to_string(), "<reply2>".to_string(),
+                            "<reply3>".to_string()] }));
         assert_eq!("305 <client> :You are no longer marked as being away",
             format!("{}", RplUnAway305{ client: "<client>" }));
         assert_eq!("306 <client> :You have been marked as being away",
