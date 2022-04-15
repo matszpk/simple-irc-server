@@ -441,6 +441,7 @@ async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
 struct VolatileState {
     users: HashMap<String, User>,
     channels: HashMap<String, Channel>,
+    wallops_users: HashSet<String>,
     invisible_users_count: usize,
     operators_count: usize,
     max_users_count: usize,
@@ -457,8 +458,8 @@ impl VolatileState {
             });
         }
         
-        VolatileState{ users: HashMap::new(), channels, invisible_users_count: 0,
-                operators_count: 0 , max_users_count: 0 }
+        VolatileState{ users: HashMap::new(), channels, wallops_users: HashSet::new(),
+                invisible_users_count: 0, operators_count: 0 , max_users_count: 0 }
     }
 }
 
@@ -911,7 +912,12 @@ impl MainState {
                         state.channels.get_mut(&ch.clone()).unwrap().rename_user(
                                     &old_nick, nick_str.clone());
                     }
-                    state.users.insert(nick_str, user);
+                    state.users.insert(nick_str.clone(), user);
+                    // wallops users
+                    if state.wallops_users.contains(&old_nick) {
+                        state.wallops_users.remove(&old_nick);
+                        state.wallops_users.insert(nick_str);
+                    }
                     
                     for (_,u) in &state.users {
                         if !u.modes.invisible || u.nick == nick {
@@ -1779,6 +1785,8 @@ impl MainState {
     
     async fn process_wallops<'a>(&self, conn_state: &mut ConnState, text: &'a str)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let state = self.state.read().await;
         Ok(())
     }
 }
