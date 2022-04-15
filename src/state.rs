@@ -1716,8 +1716,52 @@ impl MainState {
         self.process_privmsg_notice(conn_state, targets, text, true).await
     }
     
+    async fn send_who_info<'a>(&self, conn_state: &mut ConnState,
+            channel: Option<(&'a str, &ChannelUserModes)>,
+            user: &User) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut flags = String::new();
+        if user.away.is_some() { flags.push('G');
+        } else { flags.push('H'); }
+        if user.modes.local_oper || user.modes.oper {
+            flags.push('*');
+        }
+        if let Some((_, ref chum)) = channel {
+            flags += &chum.to_string(&conn_state.caps);
+        }
+        self.feed_msg(&mut conn_state.stream, RplWhoReply352{ client,
+            channel: channel.map(|(c,_)| c).unwrap_or("*"), username: &user.name,
+            host: &user.hostname, server: &self.config.name, nick: &user.nick,
+            flags: &flags, hopcount: 0, realname: &user.realname}).await?;
+        
+        Ok(())
+    }
+    
     async fn process_who<'a>(&self, conn_state: &mut ConnState, mask: &'a str)
             -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
+        
+        if mask.contains('*') || mask.contains('?') {
+            for (_, u) in &state.users {
+                if match_wildcard(mask, &u.nick) || match_wildcard(mask, &u.source) ||
+                    match_wildcard(mask, &u.realname) {
+                    self.send_who_info(conn_state, None, &u).await?;
+                }
+            }
+        } else if validate_channel(mask).is_ok() {
+            if let Some(channel) = state.channels.get(mask) {
+                for (u, chum) in &channel.users {
+                    self.send_who_info(conn_state, Some((&channel.name, chum)),
+                        state.users.get(u).unwrap()).await?;
+                }
+            }
+        } else if validate_username(mask).is_ok() {
+            if let Some(ref arg_user) = state.users.get(mask) {
+                self.send_who_info(conn_state, None, arg_user).await?;
+            }
+        }
+        let client = conn_state.user_state.client_name();
+        self.feed_msg(&mut conn_state.stream, RplEndOfWho315{ client, mask }).await?;
         Ok(())
     }
     
