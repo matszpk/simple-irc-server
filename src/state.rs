@@ -115,6 +115,7 @@ struct User {
     channels: HashSet<String>,
     invited_to: HashSet<String>,    // invited in channels
     last_activity: u64,
+    signon: u64,
 }
 
 impl User {
@@ -122,6 +123,7 @@ impl User {
             sender: UnboundedSender<String>) -> User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
+        let now_ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         User{ hostname: user_state.hostname.clone(), sender,
                 name: user_state.name.as_ref().unwrap().clone(),
                 realname: user_state.realname.as_ref().unwrap().clone(),
@@ -129,8 +131,7 @@ impl User {
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
                 channels: HashSet::new(), invited_to: HashSet::new(),
-                last_activity: SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
-                            .as_secs() }
+                last_activity: now_ts, signon: now_ts }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -1748,21 +1749,22 @@ impl MainState {
     async fn send_who_info<'a>(&self, conn_state: &mut ConnState,
             channel: Option<(&'a str, &ChannelUserModes)>,
             user: &User) -> Result<(), Box<dyn Error>> {
-        let client = conn_state.user_state.client_name();
-        let mut flags = String::new();
-        if user.away.is_some() { flags.push('G');
-        } else { flags.push('H'); }
-        if user.modes.local_oper || user.modes.oper {
-            flags.push('*');
+        if !user.modes.invisible {
+            let client = conn_state.user_state.client_name();
+            let mut flags = String::new();
+            if user.away.is_some() { flags.push('G');
+            } else { flags.push('H'); }
+            if user.modes.local_oper || user.modes.oper {
+                flags.push('*');
+            }
+            if let Some((_, ref chum)) = channel {
+                flags += &chum.to_string(&conn_state.caps);
+            }
+            self.feed_msg(&mut conn_state.stream, RplWhoReply352{ client,
+                channel: channel.map(|(c,_)| c).unwrap_or("*"), username: &user.name,
+                host: &user.hostname, server: &self.config.name, nick: &user.nick,
+                flags: &flags, hopcount: 0, realname: &user.realname}).await?;
         }
-        if let Some((_, ref chum)) = channel {
-            flags += &chum.to_string(&conn_state.caps);
-        }
-        self.feed_msg(&mut conn_state.stream, RplWhoReply352{ client,
-            channel: channel.map(|(c,_)| c).unwrap_or("*"), username: &user.name,
-            host: &user.hostname, server: &self.config.name, nick: &user.nick,
-            flags: &flags, hopcount: 0, realname: &user.realname}).await?;
-        
         Ok(())
     }
     
@@ -1796,6 +1798,58 @@ impl MainState {
     
     async fn process_whois<'a>(&self, conn_state: &mut ConnState, target: Option<&'a str>,
             nickmasks: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
+        if target.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "ADMIN", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            let state = self.state.read().await;
+            
+            let mut nicks = HashSet::<String>::new();
+            let mut real_nickmasks = vec![];
+            
+            nickmasks.iter().for_each(|nickmask| {
+                if nickmask.contains('*') || nickmask.contains('?') {
+                    // wildcard
+                    real_nickmasks.push(nickmask);
+                } else {
+                    if state.users.contains_key(&nickmask.to_string()) {
+                        nicks.insert(nickmask.to_string());
+                    }
+                }
+            });
+            
+            state.users.keys().for_each(|nick| {
+                if real_nickmasks.iter().any(|mask| match_wildcard(mask, nick)) {
+                    nicks.insert(nick.to_string());
+                }
+            });
+            
+            for nick in nicks {
+                let user = state.users.get(&nick).unwrap();
+                if user.modes.invisible { continue; }
+                
+                if user.modes.registered {
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsRegNick307{ client,
+                            nick: &nick }).await?;
+                }
+                self.feed_msg(&mut conn_state.stream, RplWhoIsUser311{ client,
+                        nick: &nick, username: &user.name, host: &user.hostname,
+                        realname: &user.realname }).await?;
+                self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
+                        nick: &nick, server: &self.config.name,
+                        server_info: &self.config.info }).await?;
+                if user.modes.oper || user.modes.local_oper {
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsOperator313{ client,
+                            nick: &nick }).await?;
+                }
+                self.feed_msg(&mut conn_state.stream, RplwhoIsIdle317{ client,
+                        nick: &nick, secs: SystemTime::now().duration_since(UNIX_EPOCH)
+                            .unwrap().as_secs() - user.last_activity,
+                        signon: user.signon }).await?;
+            }
+        }
         Ok(())
     }
     
