@@ -1876,6 +1876,8 @@ impl MainState {
                             nick: &nick, modes: &user.modes.to_string() }).await?;
                 }
             }
+            self.feed_msg(&mut conn_state.stream, RplEndOfWhoIs318{ client,
+                nick: &nickmasks.join(",") }).await?;
         }
         Ok(())
     }
