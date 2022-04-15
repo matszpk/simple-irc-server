@@ -114,6 +114,7 @@ struct User {
     away: Option<String>,
     channels: HashSet<String>,
     invited_to: HashSet<String>,    // invited in channels
+    last_activity: u64,
 }
 
 impl User {
@@ -127,7 +128,9 @@ impl User {
                 nick: user_state.name.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
-                channels: HashSet::new(), invited_to: HashSet::new() }
+                channels: HashSet::new(), invited_to: HashSet::new(),
+                last_activity: SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
+                            .as_secs() }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -1100,6 +1103,10 @@ impl MainState {
                     user.channels.insert(chname_str.to_string());
                 }
             });
+            if join_count!=0 {
+                user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
+                            .unwrap().as_secs();
+            }
         }
         
         // sending messages
@@ -1130,6 +1137,7 @@ impl MainState {
             }
         }
         }
+        
         Ok(())
     }
     
@@ -1140,12 +1148,14 @@ impl MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         
         let mut removed_from = vec![];
+        let mut something_done = false;
         
         for channel in &channels {
             if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
                 if chanobj.users.contains_key(&user_nick) {
                     chanobj.users.remove(&user_nick);
                     removed_from.push(true);
+                    something_done = true;
                 } else {
                     self.feed_msg(&mut conn_state.stream,
                                 ErrNotOnChannel442{ client, channel }).await?;
@@ -1175,9 +1185,13 @@ impl MainState {
         }
         
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
-        let user = state.users.get_mut(user_nick.as_str()).unwrap();
+        let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
         for channel in &channels {
             user.channels.remove(&channel.to_string());
+        }
+        if something_done {
+            user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
+                        .unwrap().as_secs();
         }
         Ok(())
     }
@@ -1585,9 +1599,12 @@ impl MainState {
     async fn process_privmsg_notice<'a>(&self, conn_state: &mut ConnState,
             targets: Vec<&'a str>, text: &'a str,
             notice: bool) -> Result<(), Box<dyn Error>> {
-        let state = self.state.read().await;
         let client = conn_state.user_state.client_name();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        
+        let mut something_done = false;
+        {
+        let state = self.state.read().await;
         let user = state.users.get(user_nick).unwrap();
         
         for target in HashSet::<&&str>::from_iter(targets.iter()) {
@@ -1679,6 +1696,7 @@ impl MainState {
                                 state.users.get(u).unwrap().send_msg_display(
                                         &conn_state.user_state.source, &msg_str))?;
                         }
+                        something_done = true;
                     }
                 } else {
                     if !notice {
@@ -1695,12 +1713,23 @@ impl MainState {
                                         nick: target, message: &away }).await?;
                         }
                     }
+                    something_done = true;
                 } else {
                     if !notice {
                         self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
                                         nick: target }).await?;
                     }
                 }
+            }
+        }
+        }
+        
+        {
+            if something_done {
+                let mut state = self.state.write().await;
+                let mut user = state.users.get_mut(user_nick).unwrap();
+                user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
+                        .unwrap().as_secs();
             }
         }
         Ok(())
