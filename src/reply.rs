@@ -21,9 +21,9 @@
 
 use std::fmt;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct WhoIsChannelStruct<'a> {
-    pub(crate) prefix: Option<&'a str>,
+    pub(crate) prefix: Option<String>,
     pub(crate) channel: &'a str,
 }
 
@@ -271,7 +271,7 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "318 {} {} :End of /WHOIS list", client, nick) }
             RplWhoIsChannels319{ client, nick, channels } => {
                 write!(f, "319 {} {} :{}", client, nick, channels.iter().map(|c| {
-                    if let Some(prefix) = c.prefix {
+                    if let Some(ref prefix) = c.prefix {
                         prefix.to_string() + c.channel
                     } else { c.channel.to_string() }
                 }).collect::<Vec<_>>().join(" ")) }

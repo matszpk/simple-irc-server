@@ -1748,8 +1748,8 @@ impl MainState {
     
     async fn send_who_info<'a>(&self, conn_state: &mut ConnState,
             channel: Option<(&'a str, &ChannelUserModes)>,
-            user: &User) -> Result<(), Box<dyn Error>> {
-        if !user.modes.invisible {
+            user: &User, cmd_user: &User) -> Result<(), Box<dyn Error>> {
+        if !user.modes.invisible || !user.channels.is_disjoint(&cmd_user.channels) {
             let client = conn_state.user_state.client_name();
             let mut flags = String::new();
             if user.away.is_some() { flags.push('G');
@@ -1771,24 +1771,26 @@ impl MainState {
     async fn process_who<'a>(&self, conn_state: &mut ConnState, mask: &'a str)
             -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
         
         if mask.contains('*') || mask.contains('?') {
             for (_, u) in &state.users {
                 if match_wildcard(mask, &u.nick) || match_wildcard(mask, &u.source) ||
                     match_wildcard(mask, &u.realname) {
-                    self.send_who_info(conn_state, None, &u).await?;
+                    self.send_who_info(conn_state, None, &u, &user).await?;
                 }
             }
         } else if validate_channel(mask).is_ok() {
             if let Some(channel) = state.channels.get(mask) {
                 for (u, chum) in &channel.users {
                     self.send_who_info(conn_state, Some((&channel.name, chum)),
-                        state.users.get(u).unwrap()).await?;
+                        state.users.get(u).unwrap(), &user).await?;
                 }
             }
         } else if validate_username(mask).is_ok() {
             if let Some(ref arg_user) = state.users.get(mask) {
-                self.send_who_info(conn_state, None, arg_user).await?;
+                self.send_who_info(conn_state, None, arg_user, &user).await?;
             }
         }
         let client = conn_state.user_state.client_name();
@@ -1805,6 +1807,8 @@ impl MainState {
                     command: "ADMIN", subcommand: None, info: "Server unsupported" }).await?;
         } else {
             let state = self.state.read().await;
+            let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+            let user = state.users.get(user_nick).unwrap();
             
             let mut nicks = HashSet::<String>::new();
             let mut real_nickmasks = vec![];
@@ -1827,10 +1831,11 @@ impl MainState {
             });
             
             for nick in nicks {
-                let user = state.users.get(&nick).unwrap();
-                if user.modes.invisible { continue; }
+                let arg_user = state.users.get(&nick).unwrap();
+                if arg_user.modes.invisible &&
+                    arg_user.channels.is_disjoint(&user.channels) { continue; }
                 
-                if user.modes.registered {
+                if arg_user.modes.registered {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsRegNick307{ client,
                             nick: &nick }).await?;
                 }
@@ -1840,14 +1845,36 @@ impl MainState {
                 self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
                         nick: &nick, server: &self.config.name,
                         server_info: &self.config.info }).await?;
-                if user.modes.oper || user.modes.local_oper {
+                if arg_user.modes.oper || arg_user.modes.local_oper {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsOperator313{ client,
                             nick: &nick }).await?;
                 }
+                // channels
+                let channel_replies = arg_user.channels.iter()
+                    .filter_map(|chname| {
+                    let ch = state.channels.get(chname).unwrap();
+                    if !ch.modes.secret {
+                        Some(WhoIsChannelStruct{ prefix: Some(ch.users.get(&arg_user.nick)
+                            .unwrap().to_string(&conn_state.caps)).clone(),
+                            channel: &ch.name })
+                    } else { None }
+                    }).collect::<Vec<_>>();
+                
+                for chr_chunk in channel_replies.chunks(30) {
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsChannels319{ client,
+                            nick: &nick, channels: &chr_chunk }).await?;
+                }
+                
                 self.feed_msg(&mut conn_state.stream, RplwhoIsIdle317{ client,
                         nick: &nick, secs: SystemTime::now().duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() - user.last_activity,
                         signon: user.signon }).await?;
+                if user.modes.oper || user.modes.local_oper {
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsHost378{ client,
+                            nick: &nick, host_info: &user.hostname }).await?;
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsModes379{ client,
+                            nick: &nick, modes: &user.modes.to_string() }).await?;
+                }
             }
         }
         Ok(())
