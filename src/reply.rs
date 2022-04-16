@@ -129,6 +129,7 @@ pub(crate) enum Reply<'a> {
     ErrNoSuchChannel403{ client: &'a str, channel: &'a str },
     ErrCannotSendToChain404{ client: &'a str, channel: &'a str },
     ErrTooManyChannels405{ client: &'a str, channel: &'a str },
+    ErrWasNoSuchNick406{ client: &'a str, nick: &'a str },
     ErrNoOrigin409{ client: &'a str },
     ErrInputTooLong417{ client: &'a str },
     ErrUnknownCommand421{ client: &'a str, command: &'a str },
@@ -369,6 +370,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "404 {} {} :Cannot send to channel", client, channel) }
             ErrTooManyChannels405{ client, channel } => {
                 write!(f, "405 {} {} :You have joined too many channels", client, channel) }
+            ErrWasNoSuchNick406{ client, nick } => {
+                write!(f, "406 {} {} :There was no such nickname", client, nick) }
             ErrNoOrigin409{ client } => {
                 write!(f, "409 {} :No origin specified", client) }
             ErrInputTooLong417{ client } => {
@@ -698,6 +701,8 @@ mod test {
         assert_eq!("405 <client> <channel> :You have joined too many channels",
             format!("{}", ErrTooManyChannels405{ client: "<client>",
                 channel: "<channel>" }));
+        assert_eq!("406 <client> <nickname> :There was no such nickname",
+            format!("{}", ErrWasNoSuchNick406{ client: "<client>", nick: "<nickname>" }));
         assert_eq!("409 <client> :No origin specified",
             format!("{}", ErrNoOrigin409{ client: "<client>" }));
         assert_eq!("417 <client> :Input line was too long",

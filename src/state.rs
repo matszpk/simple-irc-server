@@ -116,6 +116,7 @@ struct User {
     invited_to: HashSet<String>,    // invited in channels
     last_activity: u64,
     signon: u64,
+    history_entry: NickHistoryEntry
 }
 
 impl User {
@@ -131,7 +132,12 @@ impl User {
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
                 channels: HashSet::new(), invited_to: HashSet::new(),
-                last_activity: now_ts, signon: now_ts }
+                last_activity: now_ts, signon: now_ts,
+                history_entry: NickHistoryEntry{
+                    username: user_state.name.as_ref().unwrap().clone(),
+                    hostname: user_state.hostname.clone(),
+                    realname: user_state.realname.as_ref().unwrap().clone(),
+                    signon: now_ts } }
     }
     
     fn update_nick(&mut self, user_state: &ConnUserState) {
@@ -285,11 +291,7 @@ struct NickHistoryEntry {
     username: String,
     hostname: String,
     realname: String,
-}
-
-struct NickHistory {
-    nick: String,
-    entries: Vec<NickHistoryEntry>,
+    signon: u64,
 }
 
 #[derive(Copy, Clone)]
@@ -460,6 +462,7 @@ struct VolatileState {
     invisible_users_count: usize,
     operators_count: usize,
     max_users_count: usize,
+    nick_histories: HashMap<String, Vec<NickHistoryEntry>>,
 }
 
 impl VolatileState {
@@ -474,7 +477,8 @@ impl VolatileState {
         }
         
         VolatileState{ users: HashMap::new(), channels, wallops_users: HashSet::new(),
-                invisible_users_count: 0, operators_count: 0 , max_users_count: 0 }
+                invisible_users_count: 0, operators_count: 0 , max_users_count: 0,
+                nick_histories: HashMap::new() }
     }
 }
 
@@ -1815,7 +1819,7 @@ impl MainState {
         
         if target.is_some() {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
-                    command: "ADMIN", subcommand: None, info: "Server unsupported" }).await?;
+                    command: "WHOIS", subcommand: None, info: "Server unsupported" }).await?;
         } else {
             let state = self.state.read().await;
             let user_nick = conn_state.user_state.nick.as_ref().unwrap();
@@ -1895,6 +1899,34 @@ impl MainState {
     
     async fn process_whowas<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             count: Option<usize>, server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        
+        if server.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "WHOWAS", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            let state = self.state.read().await;
+            if let Some(hist) = state.nick_histories.get(&nickname.to_string()) {
+                let hist_count = if let Some(c) = count {
+                    if c > 0 { c } else { hist.len() }
+                } else { hist.len() };
+                for entry in hist.iter().rev().take(hist_count) {
+                    self.feed_msg(&mut conn_state.stream, RplWhoWasUser314{ client,
+                            nick: &nickname, username: &entry.username,
+                            host: &entry.hostname, realname: &entry.realname }).await?;
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
+                            nick: &nickname, server: &self.config.name,
+                            server_info: &format!("Logged in at {}",
+                                DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(
+                                        entry.signon as i64, 0), Utc)) }).await?;
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream, ErrWasNoSuchNick406{ client,
+                    nick: nickname }).await?;
+            }
+            self.feed_msg(&mut conn_state.stream, RplEndOfWhoWas369{ client,
+                    nick: nickname }).await?;
+        }
         Ok(())
     }
     
