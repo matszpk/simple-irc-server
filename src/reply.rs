@@ -250,20 +250,20 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "306 {} :You have been marked as being away", client) }
             RplWhoReply352{ client, channel, username, host, server, nick, flags,
                     hopcount, realname } => {
-                write!(f, "352 {} {} {} {} {} {} {} :{} {}", client, channel, username, host,
+                write!(f, "352 {} {} ~{} {} {} {} {} :{} {}", client, channel, username, host,
                     server, nick, flags, hopcount, realname) }
             RplEndOfWho315{ client, mask } => {
                 write!(f, "315 {} {} :End of WHO list", client, mask) }
             RplWhoIsRegNick307{ client, nick } => {
                 write!(f, "307 {} {} :has identified for this nick", client, nick) }
             RplWhoIsUser311{ client, nick, username, host, realname } => {
-                write!(f, "311 {} {} {} {} * :{}", client, nick, username, host, realname) }
+                write!(f, "311 {} {} ~{} {} * :{}", client, nick, username, host, realname) }
             RplWhoIsServer312{ client, nick, server, server_info } => {
                 write!(f, "312 {} {} {} :{}", client, nick, server, server_info) }
             RplWhoIsOperator313{ client, nick } => {
                 write!(f, "313 {} {} :is an IRC operator", client, nick) }
             RplWhoWasUser314{ client, nick, username, host, realname } => {
-                write!(f, "314 {} {} {} {} * :{}", client, nick, username, host, realname) }
+                write!(f, "314 {} {} ~{} {} * :{}", client, nick, username, host, realname) }
             RplwhoIsIdle317{ client, nick, secs, signon } => {
                 write!(f, "317 {} {} {} {} :seconds idle, signon time",
                     client, nick, secs, signon) }
@@ -547,7 +547,7 @@ mod test {
             format!("{}", RplUnAway305{ client: "<client>" }));
         assert_eq!("306 <client> :You have been marked as being away",
             format!("{}", RplNowAway306{ client: "<client>" }));
-        assert_eq!("352 <client> <channel> <username> <host> <server> <nick> \
+        assert_eq!("352 <client> <channel> ~<username> <host> <server> <nick> \
                 <flags> :2 <realname>",
             format!("{}", RplWhoReply352{ client: "<client>", channel: "<channel>",
                 username: "<username>", host: "<host>", server: "<server>", nick: "<nick>",
@@ -556,7 +556,7 @@ mod test {
             format!("{}", RplEndOfWho315{ client: "<client>", mask: "<mask>" }));
         assert_eq!("307 <client> <nick> :has identified for this nick",
             format!("{}", RplWhoIsRegNick307{ client: "<client>", nick: "<nick>" }));
-        assert_eq!("311 <client> <nick> <username> <host> * :<realname>",
+        assert_eq!("311 <client> <nick> ~<username> <host> * :<realname>",
             format!("{}", RplWhoIsUser311{ client: "<client>", nick: "<nick>",
                 host: "<host>", username: "<username>", realname: "<realname>" }));
         assert_eq!("312 <client> <nick> <server> :<server info>",
@@ -564,7 +564,7 @@ mod test {
                 server: "<server>", server_info: "<server info>" }));
         assert_eq!("313 <client> <nick> :is an IRC operator",
             format!("{}", RplWhoIsOperator313{ client: "<client>", nick: "<nick>" }));
-        assert_eq!("314 <client> <nick> <username> <host> * :<realname>",
+        assert_eq!("314 <client> <nick> ~<username> <host> * :<realname>",
             format!("{}", RplWhoWasUser314{ client: "<client>", nick: "<nick>",
                 username: "<username>", host: "<host>", realname: "<realname>" }));
         assert_eq!("317 <client> <nick> 134 548989343 :seconds idle, signon time",
