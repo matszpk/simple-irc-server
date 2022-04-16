@@ -186,7 +186,7 @@ impl<'a> fmt::Display for Reply<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RplWelcome001{ client, networkname, nick, user, host } => {
-                write!(f, "001 {} :Welcome to the {} Network, {}!{}@{}",
+                write!(f, "001 {} :Welcome to the {} Network, {}!~{}@{}",
                     client, networkname, nick, user, host) }
             RplYourHost002{ client, servername, version } => {
                 write!(f, "002 {} :Your host is {}, running version {}",
@@ -301,7 +301,7 @@ impl<'a> fmt::Display for Reply<'a> {
             RplWhoIsActually338P2{ client, nick, host_ip } => {
                 write!(f, "338 {} {} {} :Is actually using host", client, nick, host_ip) }
             RplWhoIsActually338P3{ client, nick, username, hostname, ip } => {
-                write!(f, "338 {} {} {}@{} {} :Is actually using host", client, nick,
+                write!(f, "338 {} {} ~{}@{} {} :Is actually using host", client, nick,
                     username, hostname, ip) }
             RplInviting341{ client, nick, channel } => {
                 write!(f, "341 {} {} {}", client, nick, channel) }
@@ -444,10 +444,10 @@ impl<'a> fmt::Display for Reply<'a> {
             ErrNoPrivs723{ client, privil } => {
                 write!(f, "723 {} {} :Insufficient oper privileges.", client, privil) }
             RplLoggedIn900{ client, nick, user, host, account, username } => {
-                write!(f, "900 {} {}!{}@{} {} :You are now logged in as {}", client, nick,
+                write!(f, "900 {} {}!~{}@{} {} :You are now logged in as {}", client, nick,
                     user, host, account, username) }
             RplLoggedOut901{ client, nick, user, host } => {
-                write!(f, "901 {} {}!{}@{} :You are now logged out", client, nick,
+                write!(f, "901 {} {}!~{}@{} :You are now logged out", client, nick,
                     user, host) }
             ErrNickLocked902{ client } => {
                 write!(f, "902 {} :You must use a nick assigned to you", client) }
@@ -475,7 +475,7 @@ mod test {
     
     #[test]
     fn test_replies() {
-        assert_eq!("001 <client> :Welcome to the <networkname> Network, <nick>!<user>@<host>",
+        assert_eq!("001 <client> :Welcome to the <networkname> Network, <nick>!~<user>@<host>",
             format!("{}", RplWelcome001{ client: "<client>", networkname: "<networkname>",
                 nick: "<nick>", user: "<user>", host: "<host>" }));
         assert_eq!("002 <client> :Your host is <servername>, running version <version>",
@@ -575,9 +575,11 @@ mod test {
         assert_eq!("319 <client> <nick> :prefix1<channel1> <channel2> prefix3<channel3>",
             format!("{}", RplWhoIsChannels319{ client: "<client>", nick: "<nick>",
                 channels: &vec![
-                    WhoIsChannelStruct{ prefix: Some("prefix1"), channel: "<channel1>" },
+                    WhoIsChannelStruct{ prefix: Some("prefix1".to_string()),
+                            channel: "<channel1>" },
                     WhoIsChannelStruct{ prefix: None, channel: "<channel2>" },
-                    WhoIsChannelStruct{ prefix: Some("prefix3"), channel: "<channel3>" }]}));
+                    WhoIsChannelStruct{ prefix: Some("prefix3".to_string()),
+                            channel: "<channel3>" }]}));
         assert_eq!("320 <client> <nick> :special info",
             format!("{}", RplWhoIsSpecial320{ client: "<client>", nick: "<nick>",
                 special_info: "special info" }));
@@ -611,7 +613,7 @@ mod test {
         assert_eq!("338 <client> <nick> <host|ip> :Is actually using host",
             format!("{}", RplWhoIsActually338P2{ client: "<client>", nick: "<nick>",
                 host_ip: "<host|ip>" }));
-        assert_eq!("338 <client> <nick> <username>@<hostname> <ip> :Is actually using host",
+        assert_eq!("338 <client> <nick> ~<username>@<hostname> <ip> :Is actually using host",
             format!("{}", RplWhoIsActually338P3{ client: "<client>", nick: "<nick>",
                 username: "<username>", hostname: "<hostname>", ip: "<ip>" }));
         assert_eq!("341 <client> <nick> <channel>",
@@ -780,12 +782,12 @@ mod test {
                 line: "<last line of help text>" }));
         assert_eq!("723 <client> <priv> :Insufficient oper privileges.",
             format!("{}", ErrNoPrivs723{ client: "<client>", privil: "<priv>" }));
-        assert_eq!("900 <client> <nick>!<user>@<host> <account> \
+        assert_eq!("900 <client> <nick>!~<user>@<host> <account> \
             :You are now logged in as <username>",
             format!("{}", RplLoggedIn900{ client: "<client>", nick: "<nick>",
                 user: "<user>", host: "<host>", account: "<account>",
                 username: "<username>" }));
-        assert_eq!("901 <client> <nick>!<user>@<host> :You are now logged out",
+        assert_eq!("901 <client> <nick>!~<user>@<host> :You are now logged out",
             format!("{}", RplLoggedOut901{ client: "<client>", nick: "<nick>",
                 user: "<user>", host: "<host>" }));
         assert_eq!("902 <client> :You must use a nick assigned to you",
