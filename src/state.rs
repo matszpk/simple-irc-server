@@ -281,6 +281,17 @@ impl Channel {
     }
 }
 
+struct NickHistoryEntry {
+    username: String,
+    hostname: String,
+    realname: String,
+}
+
+struct NickHistory {
+    nick: String,
+    entries: Vec<NickHistoryEntry>,
+}
+
 #[derive(Copy, Clone)]
 pub(crate) struct CapState {
     multi_prefix: bool,
