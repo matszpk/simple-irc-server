@@ -1618,7 +1618,7 @@ impl MainState {
                     let mut mode_set = false;
                     for mchar in mchars.chars() {
                         match mchar {
-                            'i'|'m'|'t'|'n'|'s' => {
+                            'i'|'m'|'t'|'n'|'s'|'l'|'k'|'o'|'v'|'h'|'q'|'a' => {
                                 if !if_op {
                                     self.feed_msg(&mut conn_state.stream,
                                         ErrChanOpPrivsNeeded482{ client,
@@ -1646,13 +1646,34 @@ impl MainState {
                                 } else { // print
                                 }
                             },
-                            'o' => { },
-                            'v' => { },
-                            'h' => { },
-                            'q' => { },
-                            'a' => { },
-                            'l' => { },
-                            'k' => { },
+                            'o' => {
+                                let arg = margs_it.next().unwrap();
+                            },
+                            'v' => {
+                                let arg = margs_it.next().unwrap();
+                            },
+                            'h' => {
+                                let arg = margs_it.next().unwrap();
+                            },
+                            'q' => {
+                                let arg = margs_it.next().unwrap();
+                            },
+                            'a' => {
+                                let arg = margs_it.next().unwrap();
+                            },
+                            'l' => { 
+                                let arg = margs_it.next().unwrap();
+                                if if_op {
+                                    chanobj.modes.client_limit = if mode_set {
+                                        Some(arg.parse::<usize>().unwrap())
+                                    } else { None };
+                                }
+                            },
+                            'k' => { 
+                                let arg = margs_it.next().unwrap();
+                                if if_op { chanobj.modes.key =
+                                    if mode_set { Some(arg.to_string()) } else { None }; }
+                            },
                             'i' => if if_op { chanobj.modes.invite_only = mode_set; },
                             'm' => if if_op { chanobj.modes.moderated = mode_set; },
                             't' => if if_op { chanobj.modes.protected_topic = mode_set; },
