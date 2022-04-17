@@ -1607,18 +1607,45 @@ impl MainState {
         let mut state = statem.deref_mut();
         
         if validate_channel(target).is_ok() {
+            let user = state.users.get(target).unwrap();
             // channel
             if let Some(chanobj) = state.channels.get_mut(target) {
+                if let Some(ref chum) = chanobj.users.get(user_nick) {
+                let if_op = chum.oper_type == OperatorType::Oper;
+                //
                 for (mchars, margs) in modes {
                     let mut margs_it = margs.iter();
                     let mut mode_set = false;
                     for mchar in mchars.chars() {
                         match mchar {
+                            'i'|'m'|'t'|'n'|'s' => {
+                                if !if_op {
+                                    self.feed_msg(&mut conn_state.stream,
+                                        ErrChanOpPrivsNeeded482{ client,
+                                                channel: target }).await?;
+                                }
+                            }
+                            _ => (),
+                        }
+                    
+                        match mchar {
                             '+' => mode_set = true,
                             '-' => mode_set = false,
-                            'b' => { },
-                            'e' => { },
-                            'I' => { },
+                            'b' => {
+                                if let Some(bmask) = margs_it.next() {
+                                } else { // print
+                                }
+                            },
+                            'e' => {
+                                if let Some(emask) = margs_it.next() {
+                                } else { // print
+                                }
+                            },
+                            'I' => {
+                                if let Some(imask) = margs_it.next() {
+                                } else { // print
+                                }
+                            },
                             'o' => { },
                             'v' => { },
                             'h' => { },
@@ -1626,14 +1653,19 @@ impl MainState {
                             'a' => { },
                             'l' => { },
                             'k' => { },
-                            'i' => { },
-                            'm' => { },
-                            't' => { },
-                            'n' => { },
-                            's' => { },
+                            'i' => if if_op { chanobj.modes.invite_only = mode_set; },
+                            'm' => if if_op { chanobj.modes.moderated = mode_set; },
+                            't' => if if_op { chanobj.modes.protected_topic = mode_set; },
+                            'n' => if if_op {
+                                    chanobj.modes.no_external_messages = mode_set; },
+                            's' => if if_op { chanobj.modes.secret = mode_set; },
                             _ => (),
                         }
                     }
+                }
+                } else {
+                    self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
+                            channel: target }).await?;
                 }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrNoSuchChannel403{ client,

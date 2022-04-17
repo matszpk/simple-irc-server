@@ -262,7 +262,7 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
     (pattern.len()!=0 && pattern.as_bytes()[pattern.len()-1] == b'*') || t.len() == 0
 }
 
-pub(crate) fn normalize_hostmask(mask: &str) -> String {
+pub(crate) fn normalize_sourcemask(mask: &str) -> String {
     let mut out = String::new();
     if let Some(p) = mask.find('!') {
         out += mask; // normalized
