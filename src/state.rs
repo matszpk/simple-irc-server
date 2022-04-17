@@ -17,7 +17,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::ops::{Deref, Drop};
+use std::ops::{Deref, DerefMut, Drop};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -1609,6 +1609,52 @@ impl MainState {
     
     async fn process_mode<'a>(&self, conn_state: &mut ConnState, target: &'a str,
             modes: Vec<(&'a str, Vec<&'a str>)>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let mut statem = self.state.write().await;
+        let mut state = statem.deref_mut();
+        
+        if validate_channel(target).is_ok() {
+            // channel
+        } else {
+            // user
+            let mut user = state.users.get_mut(target).unwrap();
+            if user_nick == target {
+                for (mchars, _) in modes {
+                    for mchar in mchars.chars() {
+                        let mut mode_set = false;
+                        match mchar {
+                            '+' => mode_set = true,
+                            '-' => mode_set = false,
+                            'i' => {
+                                if mode_set {
+                                    if !user.modes.invisible {
+                                        user.modes.invisible = true;
+                                        state.invisible_users_count += 1;
+                                    }
+                                } else {
+                                    if user.modes.invisible {
+                                        user.modes.invisible = false;
+                                        state.invisible_users_count -= 1;
+                                    }
+                                }
+                            },
+                            'r' => (),
+                            'w' => (),
+                            'o' => (),
+                            'O' => (),
+                            _ => (),
+                        }
+                    }
+                }
+            } else if state.users.contains_key(target) {
+                self.feed_msg(&mut conn_state.stream,
+                        ErrUsersDontMatch502{ client }).await?;
+            } else {
+                self.feed_msg(&mut conn_state.stream,
+                        ErrNoSuchNick401{ client, nick: target }).await?;
+            }
+        }
         Ok(())
     }
     
