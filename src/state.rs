@@ -1641,16 +1641,53 @@ impl MainState {
                             'b' => {
                                 if let Some(bmask) = margs_it.next() {
                                 } else { // print
+                                    if let Some(ban) = &chanobj.modes.ban {
+                                        for b in ban {
+                                            if let Some(ban_info) = chanobj.ban_info
+                                                    .get(&b.clone()) {
+                                                self.feed_msg(&mut conn_state.stream,
+                                                    RplBanList367{ client, channel: target,
+                                                        mask: &b, who: &ban_info.who,
+                                                        set_ts: ban_info.set_time }).await?;
+                                            } else {
+                                                self.feed_msg(&mut conn_state.stream,
+                                                    RplBanList367{ client, channel: target,
+                                                    mask: &b, who: "", set_ts: 0 }).await?;
+                                            }
+                                        }
+                                    }
+                                    self.feed_msg(&mut conn_state.stream,  RplEndOfBanList368{
+                                            client, channel: target }).await?;
                                 }
                             },
                             'e' => {
                                 if let Some(emask) = margs_it.next() {
                                 } else { // print
+                                    if let Some(exception) = &chanobj.modes.exception {
+                                        for e in exception {
+                                            self.feed_msg(&mut conn_state.stream,
+                                                RplExceptList348{ client, channel: target,
+                                                    mask: &e }).await?;
+                                        }
+                                    }
+                                    self.feed_msg(&mut conn_state.stream, 
+                                        RplEndOfExceptList349{ client,
+                                                channel: target }).await?;
                                 }
                             },
                             'I' => {
                                 if let Some(imask) = margs_it.next() {
                                 } else { // print
+                                    if let Some(inv_ex) = &chanobj.modes.invite_exception {
+                                        for e in inv_ex {
+                                            self.feed_msg(&mut conn_state.stream,
+                                                RplInviteList346{ client, channel: target,
+                                                    mask: &e }).await?;
+                                        }
+                                    }
+                                    self.feed_msg(&mut conn_state.stream, 
+                                        RplEndOfInviteList347{ client,
+                                                channel: target }).await?;
                                 }
                             },
                             'o' => {
