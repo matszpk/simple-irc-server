@@ -1608,13 +1608,44 @@ impl MainState {
         
         if validate_channel(target).is_ok() {
             // channel
+            if let Some(chanobj) = state.channels.get_mut(target) {
+                for (mchars, margs) in modes {
+                    let mut margs_it = margs.iter();
+                    let mut mode_set = false;
+                    for mchar in mchars.chars() {
+                        match mchar {
+                            '+' => mode_set = true,
+                            '-' => mode_set = false,
+                            'b' => { },
+                            'e' => { },
+                            'I' => { },
+                            'o' => { },
+                            'v' => { },
+                            'h' => { },
+                            'q' => { },
+                            'a' => { },
+                            'l' => { },
+                            'k' => { },
+                            'i' => { },
+                            'm' => { },
+                            't' => { },
+                            'n' => { },
+                            's' => { },
+                            _ => (),
+                        }
+                    }
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream, ErrNoSuchChannel403{ client,
+                            channel: target }).await?;
+            }
         } else {
             // user
             let mut user = state.users.get_mut(target).unwrap();
             if user_nick == target {
                 for (mchars, _) in modes {
+                    let mut mode_set = false;
                     for mchar in mchars.chars() {
-                        let mut mode_set = false;
                         match mchar {
                             '+' => mode_set = true,
                             '-' => mode_set = false,
