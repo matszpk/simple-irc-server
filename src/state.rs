@@ -1019,7 +1019,8 @@ impl MainState {
     
     async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             keys_opt: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
-        let mut state = self.state.write().await;
+        let mut statem = self.state.write().await;
+        let mut state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         let mut join_count = state.users.get(&user_nick).unwrap().channels.len();
         
@@ -1027,7 +1028,7 @@ impl MainState {
         
         {
         let client = conn_state.user_state.client_name();
-        let user = state.users.get(user_nick.as_str()).unwrap();
+        let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
         for (i, chname_str) in channels.iter().enumerate() {
             let (join, create) = if let Some(channel) =
                                 state.channels.get(&chname_str.to_string()) {
@@ -1096,11 +1097,12 @@ impl MainState {
                 join_count += 1;
             }
         }
-        }   //
         
-        joined_created.iter().zip(channels.iter()).for_each(|((join, create), chname_str)| {
+        for ((join, create), chname_str) in joined_created.iter().zip(channels.iter()) {
             let chname = chname_str.to_string();
+            
             if *join {
+                user.channels.insert(chname_str.to_string());
                 if *create {
                     state.channels.insert(chname.clone(), Channel::new(
                                 chname.clone(), user_nick.clone()));
@@ -1109,20 +1111,11 @@ impl MainState {
                     chanobj.users.insert(user_nick.clone(), ChannelUserModes::default());
                 }
             }
-        });
-        
-        {   // add to user channels
-            let user = state.users.get_mut(user_nick.as_str()).unwrap();
-            joined_created.iter().zip(channels.iter()).for_each(
-                        |((join, _), chname_str)| {
-                if *join {
-                    user.channels.insert(chname_str.to_string());
-                }
-            });
-            if join_count!=0 {
-                user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
-                            .unwrap().as_secs();
-            }
+        }
+        if join_count!=0 {
+            user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
+                        .unwrap().as_secs();
+        }
         }
         
         // sending messages
@@ -1160,7 +1153,8 @@ impl MainState {
     async fn process_part<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             reason: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        let mut state = self.state.write().await;
+        let mut statem = self.state.write().await;
+        let mut state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         
         let mut removed_from = vec![];
@@ -1168,35 +1162,34 @@ impl MainState {
         
         for channel in &channels {
             if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
-                if chanobj.users.contains_key(&user_nick) {
+                let do_it = if chanobj.users.contains_key(&user_nick) {
                     chanobj.users.remove(&user_nick);
                     removed_from.push(true);
                     something_done = true;
+                    true
                 } else {
                     self.feed_msg(&mut conn_state.stream,
                                 ErrNotOnChannel442{ client, channel }).await?;
                     removed_from.push(false);
+                    false
+                };
+                
+                // send message
+                if do_it {
+                    let part_msg = if let Some(r) = reason {
+                        format!("PART {} :{}", channel, r)
+                    } else {
+                        format!("PART {}", channel)
+                    };
+                    for (nick, _) in &chanobj.users {
+                        state.users.get(&nick.clone()).unwrap().send_msg_display(
+                                    &conn_state.user_state.source, part_msg.as_str())?;
+                    }
                 }
             } else {
                 self.feed_msg(&mut conn_state.stream,
                                 ErrNoSuchChannel403{ client, channel }).await?;
                 removed_from.push(false);
-            }
-        }
-        
-        for (remove, channel) in removed_from.iter().zip(channels.iter()) {
-            if *remove {
-                let chanobj = state.channels.get(&channel.to_string()).unwrap();
-                // send message
-                let part_msg = if let Some(r) = reason {
-                    format!("PART {} :{}", channel, r)
-                } else {
-                    format!("PART {}", channel)
-                };
-                for (nick, _) in &chanobj.users {
-                    state.users.get(&nick.clone()).unwrap().send_msg_display(
-                                &conn_state.user_state.source, part_msg.as_str())?;
-                }
             }
         }
         
@@ -1254,8 +1247,8 @@ impl MainState {
             }
             if do_change_topic {
                 let chanobj = state.channels.get(channel).unwrap();
-                for cu in &chanobj.users {
-                    state.users.get(cu.0).unwrap().send_message(msg,
+                for (cu, _) in &chanobj.users {
+                    state.users.get(cu).unwrap().send_message(msg,
                                 &conn_state.user_state.source)?;
                 }
             }
@@ -1418,7 +1411,8 @@ impl MainState {
     async fn process_kick<'a>(&self, conn_state: &mut ConnState, channel: &'a str,
             kick_users: Vec<&'a str>, comment: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
-        let mut state = self.state.write().await;
+        let mut statem = self.state.write().await;
+        let mut state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
@@ -1466,12 +1460,10 @@ impl MainState {
                     state.users.get(&nick.to_string()).unwrap().send_msg_display(
                             &conn_state.user_state.source, kick_msg.clone())?;
                 }
+                state.users.get_mut(&ku.to_string()).unwrap().channels
+                    .remove(&channel.to_string());
             }
         }
-        
-        kicked.iter().for_each(|ku| {
-            state.users.get_mut(&ku.to_string()).unwrap().channels
-                    .remove(&channel.to_string()); });
         Ok(())
     }
     
