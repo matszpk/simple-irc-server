@@ -262,6 +262,26 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
     (pattern.len()!=0 && pattern.as_bytes()[pattern.len()-1] == b'*') || t.len() == 0
 }
 
+pub(crate) fn normalize_hostmask(mask: &str) -> String {
+    let mut out = String::new();
+    if let Some(p) = mask.find('!') {
+        out += mask; // normalized
+        if mask[p+1..].find('@').is_none() {
+            out += "@*";
+        }
+    } else {
+        if let Some(p2) = mask.find('@') {
+           out += &mask[..p2]; 
+           out += "!*";
+           out += &mask[p2..];
+        } else {
+            out += mask; // normalized
+            out += "!*@*";
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
