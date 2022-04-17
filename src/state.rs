@@ -1631,10 +1631,81 @@ impl MainState {
                                     }
                                 }
                             },
-                            'r' => (),
-                            'w' => (),
-                            'o' => (),
-                            'O' => (),
+                            'r' => {
+                                if mode_set {
+                                    if !user.modes.registered {
+                                        if conn_state.user_state.registered {
+                                            user.modes.registered = true;
+                                        } else {
+                                            self.feed_msg(&mut conn_state.stream,
+                                                ErrNoPrivileges481{ client }).await?;
+                                        }
+                                    }
+                                } else {
+                                    if user.modes.registered {
+                                        user.modes.registered = false;
+                                        self.feed_msg(&mut conn_state.stream,
+                                            ErrYourConnRestricted484{ client }).await?;
+                                    }
+                                }
+                            },
+                            'w' => {
+                                if mode_set {
+                                    if !user.modes.wallops {
+                                        state.wallops_users.insert(user_nick.to_string());
+                                        user.modes.wallops = true;
+                                    }
+                                } else {
+                                    if user.modes.wallops {
+                                        state.wallops_users.remove(&user_nick.to_string());
+                                        user.modes.wallops = false;
+                                    }
+                                }
+                            },
+                            'o' => {
+                                if mode_set {
+                                    if !user.modes.oper {
+                                        if self.oper_config_idxs.contains_key(user_nick) {
+                                            user.modes.oper = true;
+                                            if !user.modes.local_oper {
+                                                state.operators_count += 1;
+                                            }
+                                        } else {
+                                            self.feed_msg(&mut conn_state.stream,
+                                                ErrNoPrivileges481{ client }).await?;
+                                        }
+                                    }
+                                } else {
+                                    if user.modes.oper {
+                                        user.modes.oper = false;
+                                        if !user.modes.local_oper {
+                                            state.operators_count -= 1;
+                                        }
+                                    }
+                                }
+                            },
+                            'O' => {
+                                if mode_set {
+                                    if !user.modes.local_oper {
+                                        if self.oper_config_idxs.contains_key(user_nick) {
+                                            user.modes.oper = true;
+                                            if !user.modes.oper {
+                                                state.operators_count += 1;
+                                            }
+                                        } else {
+                                            self.feed_msg(&mut conn_state.stream,
+                                                ErrNoPrivileges481{ client }).await?;
+                                        }
+                                    }
+                                } else {
+                                    if user.modes.oper {
+                                        user.modes.oper = false;
+                                        if !user.modes.oper {
+                                            state.operators_count -= 1;
+                                        }
+                                    }
+                                }
+                            },
                             _ => (),
                         }
                     }
