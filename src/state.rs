@@ -1606,6 +1606,227 @@ impl MainState {
         Ok(())
     }
     
+    async fn process_mode_channel<'a>(&self, conn_state: &mut ConnState,
+            chanobj: &mut Channel, target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)>,
+            if_op: bool) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        //
+        for (mchars, margs) in modes {
+            let mut margs_it = margs.iter();
+            let mut mode_set = false;
+            for mchar in mchars.chars() {
+                match mchar {
+                    'i'|'m'|'t'|'n'|'s'|'l'|'k'|'o'|'v'|'h'|'q'|'a' => {
+                        if !if_op {
+                            self.feed_msg(&mut conn_state.stream,
+                                ErrChanOpPrivsNeeded482{ client,
+                                        channel: target }).await?;
+                        }
+                    }
+                    _ => (),
+                }
+            
+                match mchar {
+                    '+' => mode_set = true,
+                    '-' => mode_set = false,
+                    'b' => {
+                        if let Some(bmask) = margs_it.next() {
+                        } else { // print
+                            if let Some(ban) = &chanobj.modes.ban {
+                                for b in ban {
+                                    if let Some(ban_info) = chanobj.ban_info
+                                            .get(&b.clone()) {
+                                        self.feed_msg(&mut conn_state.stream,
+                                            RplBanList367{ client, channel: target, mask: &b,
+                                                who: &ban_info.who,
+                                                set_ts: ban_info.set_time }).await?;
+                                    } else {
+                                        self.feed_msg(&mut conn_state.stream,
+                                            RplBanList367{ client, channel: target,
+                                            mask: &b, who: "", set_ts: 0 }).await?;
+                                    }
+                                }
+                            }
+                            self.feed_msg(&mut conn_state.stream,  RplEndOfBanList368{
+                                    client, channel: target }).await?;
+                        }
+                    },
+                    'e' => {
+                        if let Some(emask) = margs_it.next() {
+                        } else { // print
+                            if let Some(exception) = &chanobj.modes.exception {
+                                for e in exception {
+                                    self.feed_msg(&mut conn_state.stream, RplExceptList348{
+                                        client, channel: target, mask: &e }).await?;
+                                }
+                            }
+                            self.feed_msg(&mut conn_state.stream, 
+                                RplEndOfExceptList349{ client,
+                                        channel: target }).await?;
+                        }
+                    },
+                    'I' => {
+                        if let Some(imask) = margs_it.next() {
+                        } else { // print
+                            if let Some(inv_ex) = &chanobj.modes.invite_exception {
+                                for e in inv_ex {
+                                    self.feed_msg(&mut conn_state.stream, RplInviteList346{
+                                        client, channel: target, mask: &e }).await?;
+                                }
+                            }
+                            self.feed_msg(&mut conn_state.stream, 
+                                RplEndOfInviteList347{ client,
+                                        channel: target }).await?;
+                        }
+                    },
+                    'o' => {
+                        let arg = margs_it.next().unwrap();
+                    },
+                    'v' => {
+                        let arg = margs_it.next().unwrap();
+                    },
+                    'h' => {
+                        let arg = margs_it.next().unwrap();
+                    },
+                    'q' => {
+                        let arg = margs_it.next().unwrap();
+                    },
+                    'a' => {
+                        let arg = margs_it.next().unwrap();
+                    },
+                    'l' => { 
+                        let arg = margs_it.next().unwrap();
+                        if if_op {
+                            chanobj.modes.client_limit = if mode_set {
+                                Some(arg.parse::<usize>().unwrap())
+                            } else { None };
+                        }
+                    },
+                    'k' => { 
+                        let arg = margs_it.next().unwrap();
+                        if if_op { chanobj.modes.key =
+                            if mode_set { Some(arg.to_string()) } else { None }; }
+                    },
+                    'i' => if if_op { chanobj.modes.invite_only = mode_set; },
+                    'm' => if if_op { chanobj.modes.moderated = mode_set; },
+                    't' => if if_op { chanobj.modes.protected_topic = mode_set; },
+                    'n' => if if_op {
+                            chanobj.modes.no_external_messages = mode_set; },
+                    's' => if if_op { chanobj.modes.secret = mode_set; },
+                    _ => (),
+                }
+            }
+        }
+        Ok(())
+    }
+    
+    async fn process_mode_user<'a>(&self, conn_state: &mut ConnState,
+            state: &mut VolatileState, target: &'a str,
+            modes: Vec<(&'a str, Vec<&'a str>)>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut user = state.users.get_mut(target).unwrap();
+        let user_nick = target;
+        for (mchars, _) in modes {
+            let mut mode_set = false;
+            for mchar in mchars.chars() {
+                match mchar {
+                    '+' => mode_set = true,
+                    '-' => mode_set = false,
+                    'i' => {
+                        if mode_set {
+                            if !user.modes.invisible {
+                                user.modes.invisible = true;
+                                state.invisible_users_count += 1;
+                            }
+                        } else {
+                            if user.modes.invisible {
+                                user.modes.invisible = false;
+                                state.invisible_users_count -= 1;
+                            }
+                        }
+                    },
+                    'r' => {
+                        if mode_set {
+                            if !user.modes.registered {
+                                if conn_state.user_state.registered {
+                                    user.modes.registered = true;
+                                } else {
+                                    self.feed_msg(&mut conn_state.stream,
+                                        ErrNoPrivileges481{ client }).await?;
+                                }
+                            }
+                        } else {
+                            if user.modes.registered {
+                                user.modes.registered = false;
+                                self.feed_msg(&mut conn_state.stream,
+                                    ErrYourConnRestricted484{ client }).await?;
+                            }
+                        }
+                    },
+                    'w' => {
+                        if mode_set {
+                            if !user.modes.wallops {
+                                state.wallops_users.insert(user_nick.to_string());
+                                user.modes.wallops = true;
+                            }
+                        } else {
+                            if user.modes.wallops {
+                                state.wallops_users.remove(&user_nick.to_string());
+                                user.modes.wallops = false;
+                            }
+                        }
+                    },
+                    'o' => {
+                        if mode_set {
+                            if !user.modes.oper {
+                                if self.oper_config_idxs.contains_key(user_nick) {
+                                    user.modes.oper = true;
+                                    if !user.modes.local_oper {
+                                        state.operators_count += 1;
+                                    }
+                                } else {
+                                    self.feed_msg(&mut conn_state.stream,
+                                        ErrNoPrivileges481{ client }).await?;
+                                }
+                            }
+                        } else {
+                            if user.modes.oper {
+                                user.modes.oper = false;
+                                if !user.modes.local_oper {
+                                    state.operators_count -= 1;
+                                }
+                            }
+                        }
+                    },
+                    'O' => {
+                        if mode_set {
+                            if !user.modes.local_oper {
+                                if self.oper_config_idxs.contains_key(user_nick) {
+                                    user.modes.oper = true;
+                                    if !user.modes.oper {
+                                        state.operators_count += 1;
+                                    }
+                                } else {
+                                    self.feed_msg(&mut conn_state.stream,
+                                        ErrNoPrivileges481{ client }).await?;
+                                }
+                            }
+                        } else {
+                            if user.modes.oper {
+                                user.modes.oper = false;
+                                if !user.modes.oper {
+                                    state.operators_count -= 1;
+                                }
+                            }
+                        }
+                    },
+                    _ => (),
+                }
+            }
+        }
+        Ok(())
+    }
+    
     async fn process_mode<'a>(&self, conn_state: &mut ConnState, target: &'a str,
             modes: Vec<(&'a str, Vec<&'a str>)>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
@@ -1617,120 +1838,16 @@ impl MainState {
             let user = state.users.get(target).unwrap();
             // channel
             if let Some(chanobj) = state.channels.get_mut(target) {
-                if let Some(ref chum) = chanobj.users.get(user_nick) {
-                let if_op = chum.oper_type == OperatorType::Oper;
-                //
-                for (mchars, margs) in modes {
-                    let mut margs_it = margs.iter();
-                    let mut mode_set = false;
-                    for mchar in mchars.chars() {
-                        match mchar {
-                            'i'|'m'|'t'|'n'|'s'|'l'|'k'|'o'|'v'|'h'|'q'|'a' => {
-                                if !if_op {
-                                    self.feed_msg(&mut conn_state.stream,
-                                        ErrChanOpPrivsNeeded482{ client,
-                                                channel: target }).await?;
-                                }
-                            }
-                            _ => (),
-                        }
-                    
-                        match mchar {
-                            '+' => mode_set = true,
-                            '-' => mode_set = false,
-                            'b' => {
-                                if let Some(bmask) = margs_it.next() {
-                                } else { // print
-                                    if let Some(ban) = &chanobj.modes.ban {
-                                        for b in ban {
-                                            if let Some(ban_info) = chanobj.ban_info
-                                                    .get(&b.clone()) {
-                                                self.feed_msg(&mut conn_state.stream,
-                                                    RplBanList367{ client, channel: target,
-                                                        mask: &b, who: &ban_info.who,
-                                                        set_ts: ban_info.set_time }).await?;
-                                            } else {
-                                                self.feed_msg(&mut conn_state.stream,
-                                                    RplBanList367{ client, channel: target,
-                                                    mask: &b, who: "", set_ts: 0 }).await?;
-                                            }
-                                        }
-                                    }
-                                    self.feed_msg(&mut conn_state.stream,  RplEndOfBanList368{
-                                            client, channel: target }).await?;
-                                }
-                            },
-                            'e' => {
-                                if let Some(emask) = margs_it.next() {
-                                } else { // print
-                                    if let Some(exception) = &chanobj.modes.exception {
-                                        for e in exception {
-                                            self.feed_msg(&mut conn_state.stream,
-                                                RplExceptList348{ client, channel: target,
-                                                    mask: &e }).await?;
-                                        }
-                                    }
-                                    self.feed_msg(&mut conn_state.stream, 
-                                        RplEndOfExceptList349{ client,
-                                                channel: target }).await?;
-                                }
-                            },
-                            'I' => {
-                                if let Some(imask) = margs_it.next() {
-                                } else { // print
-                                    if let Some(inv_ex) = &chanobj.modes.invite_exception {
-                                        for e in inv_ex {
-                                            self.feed_msg(&mut conn_state.stream,
-                                                RplInviteList346{ client, channel: target,
-                                                    mask: &e }).await?;
-                                        }
-                                    }
-                                    self.feed_msg(&mut conn_state.stream, 
-                                        RplEndOfInviteList347{ client,
-                                                channel: target }).await?;
-                                }
-                            },
-                            'o' => {
-                                let arg = margs_it.next().unwrap();
-                            },
-                            'v' => {
-                                let arg = margs_it.next().unwrap();
-                            },
-                            'h' => {
-                                let arg = margs_it.next().unwrap();
-                            },
-                            'q' => {
-                                let arg = margs_it.next().unwrap();
-                            },
-                            'a' => {
-                                let arg = margs_it.next().unwrap();
-                            },
-                            'l' => { 
-                                let arg = margs_it.next().unwrap();
-                                if if_op {
-                                    chanobj.modes.client_limit = if mode_set {
-                                        Some(arg.parse::<usize>().unwrap())
-                                    } else { None };
-                                }
-                            },
-                            'k' => { 
-                                let arg = margs_it.next().unwrap();
-                                if if_op { chanobj.modes.key =
-                                    if mode_set { Some(arg.to_string()) } else { None }; }
-                            },
-                            'i' => if if_op { chanobj.modes.invite_only = mode_set; },
-                            'm' => if if_op { chanobj.modes.moderated = mode_set; },
-                            't' => if if_op { chanobj.modes.protected_topic = mode_set; },
-                            'n' => if if_op {
-                                    chanobj.modes.no_external_messages = mode_set; },
-                            's' => if if_op { chanobj.modes.secret = mode_set; },
-                            _ => (),
-                        }
-                    }
-                }
+                let (if_op, error) = if let Some(ref chum) = chanobj.users.get(user_nick) {
+                    (chum.oper_type == OperatorType::Oper, false)
                 } else {
                     self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
                             channel: target }).await?;
+                    (false, true)
+                };
+                if !error {
+                    self.process_mode_channel(conn_state, chanobj, target,
+                            modes, if_op).await?;
                 }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrNoSuchChannel403{ client,
@@ -1738,106 +1855,8 @@ impl MainState {
             }
         } else {
             // user
-            let mut user = state.users.get_mut(target).unwrap();
             if user_nick == target {
-                for (mchars, _) in modes {
-                    let mut mode_set = false;
-                    for mchar in mchars.chars() {
-                        match mchar {
-                            '+' => mode_set = true,
-                            '-' => mode_set = false,
-                            'i' => {
-                                if mode_set {
-                                    if !user.modes.invisible {
-                                        user.modes.invisible = true;
-                                        state.invisible_users_count += 1;
-                                    }
-                                } else {
-                                    if user.modes.invisible {
-                                        user.modes.invisible = false;
-                                        state.invisible_users_count -= 1;
-                                    }
-                                }
-                            },
-                            'r' => {
-                                if mode_set {
-                                    if !user.modes.registered {
-                                        if conn_state.user_state.registered {
-                                            user.modes.registered = true;
-                                        } else {
-                                            self.feed_msg(&mut conn_state.stream,
-                                                ErrNoPrivileges481{ client }).await?;
-                                        }
-                                    }
-                                } else {
-                                    if user.modes.registered {
-                                        user.modes.registered = false;
-                                        self.feed_msg(&mut conn_state.stream,
-                                            ErrYourConnRestricted484{ client }).await?;
-                                    }
-                                }
-                            },
-                            'w' => {
-                                if mode_set {
-                                    if !user.modes.wallops {
-                                        state.wallops_users.insert(user_nick.to_string());
-                                        user.modes.wallops = true;
-                                    }
-                                } else {
-                                    if user.modes.wallops {
-                                        state.wallops_users.remove(&user_nick.to_string());
-                                        user.modes.wallops = false;
-                                    }
-                                }
-                            },
-                            'o' => {
-                                if mode_set {
-                                    if !user.modes.oper {
-                                        if self.oper_config_idxs.contains_key(user_nick) {
-                                            user.modes.oper = true;
-                                            if !user.modes.local_oper {
-                                                state.operators_count += 1;
-                                            }
-                                        } else {
-                                            self.feed_msg(&mut conn_state.stream,
-                                                ErrNoPrivileges481{ client }).await?;
-                                        }
-                                    }
-                                } else {
-                                    if user.modes.oper {
-                                        user.modes.oper = false;
-                                        if !user.modes.local_oper {
-                                            state.operators_count -= 1;
-                                        }
-                                    }
-                                }
-                            },
-                            'O' => {
-                                if mode_set {
-                                    if !user.modes.local_oper {
-                                        if self.oper_config_idxs.contains_key(user_nick) {
-                                            user.modes.oper = true;
-                                            if !user.modes.oper {
-                                                state.operators_count += 1;
-                                            }
-                                        } else {
-                                            self.feed_msg(&mut conn_state.stream,
-                                                ErrNoPrivileges481{ client }).await?;
-                                        }
-                                    }
-                                } else {
-                                    if user.modes.oper {
-                                        user.modes.oper = false;
-                                        if !user.modes.oper {
-                                            state.operators_count -= 1;
-                                        }
-                                    }
-                                }
-                            },
-                            _ => (),
-                        }
-                    }
-                }
+                self.process_mode_user(conn_state, state, target, modes).await?;
             } else if state.users.contains_key(target) {
                 self.feed_msg(&mut conn_state.stream,
                         ErrUsersDontMatch502{ client }).await?;
