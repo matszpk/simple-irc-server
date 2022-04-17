@@ -265,10 +265,16 @@ impl ChannelTopic{
     }
 }
 
+struct BanInfo {
+    set_time: u64,
+    who: String,
+}
+
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
     modes: ChannelModes,
+    ban_info: HashMap<String, BanInfo>,
     users: HashMap<String, ChannelUserModes>,
 }
 
@@ -276,7 +282,7 @@ impl Channel {
     fn new(name: String, user_nick: String) -> Channel {
         let mut users = HashMap::new();
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
-        Channel{ name, topic: None,
+        Channel{ name, topic: None, ban_info: HashMap::new(),
             modes: ChannelModes::new_for_channel(user_nick), users }
     }
     
@@ -472,6 +478,7 @@ impl VolatileState {
             cfg_channels.iter().for_each(|c| {
                 channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
                     topic: c.topic.as_ref().map(|x| ChannelTopic::new(x.clone())),
+                    ban_info: HashMap::new(),
                     modes: c.modes.clone(), users: HashMap::new() });
             });
         }
