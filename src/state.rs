@@ -270,10 +270,31 @@ struct BanInfo {
     who: String,
 }
 
+#[derive(Default, Clone)]
+struct ChannelDefaultModes {
+    operators: HashSet<String>,
+    half_operators: HashSet<String>,
+    voices: HashSet<String>,
+    founders: HashSet<String>,
+    protecteds: HashSet<String>,
+}
+
+impl ChannelDefaultModes {
+    fn new_from_modes_and_cleanup(modes: &mut ChannelModes) -> Self {
+        ChannelDefaultModes{
+            operators: modes.operators.take().unwrap_or_default(),
+            half_operators: modes.half_operators.take().unwrap_or_default(),
+            voices: modes.voices.take().unwrap_or_default(),
+            founders: modes.founders.take().unwrap_or_default(),
+            protecteds: modes.protecteds.take().unwrap_or_default() }
+    }
+}
+
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
     modes: ChannelModes,
+    default_modes: ChannelDefaultModes,
     ban_info: HashMap<String, BanInfo>,
     users: HashMap<String, ChannelUserModes>,
 }
@@ -283,6 +304,7 @@ impl Channel {
         let mut users = HashMap::new();
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
         Channel{ name, topic: None, ban_info: HashMap::new(),
+            default_modes: ChannelDefaultModes::default(),
             modes: ChannelModes::new_for_channel(user_nick), users }
     }
     
@@ -476,10 +498,14 @@ impl VolatileState {
         let mut channels = HashMap::new();
         if let Some(ref cfg_channels) = config.channels {
             cfg_channels.iter().for_each(|c| {
+                let mut ch_modes = c.modes.clone();
+                let def_ch_modes = ChannelDefaultModes::new_from_modes_and_cleanup(
+                            &mut ch_modes);
+                
                 channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
                     topic: c.topic.as_ref().map(|x| ChannelTopic::new(x.clone())),
-                    ban_info: HashMap::new(),
-                    modes: c.modes.clone(), users: HashMap::new() });
+                    ban_info: HashMap::new(), default_modes: def_ch_modes,
+                    modes: ch_modes, users: HashMap::new() });
             });
         }
         
