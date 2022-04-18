@@ -1631,6 +1631,26 @@ impl MainState {
                     '-' => mode_set = false,
                     'b' => {
                         if let Some(bmask) = margs_it.next() {
+                            if if_op {
+                                let mut ban = chanobj.modes.ban.take()
+                                        .unwrap_or_default();
+                                let norm_bmask = normalize_sourcemask(bmask);
+                                if mode_set {
+                                    ban.insert(norm_bmask.clone());
+                                    chanobj.ban_info.insert(norm_bmask.clone(), BanInfo{
+                                        who: conn_state.user_state.nick
+                                                .as_ref().unwrap().to_string(),
+                                        set_time: SystemTime::now()
+                                            .duration_since(UNIX_EPOCH).unwrap().as_secs() });
+                                } else {
+                                    ban.remove(&norm_bmask);
+                                    chanobj.ban_info.remove(&norm_bmask);
+                                }
+                                chanobj.modes.ban = Some(ban);
+                            } else {
+                                self.feed_msg(&mut conn_state.stream, ErrChanOpPrivsNeeded482{
+                                        client, channel: target }).await?;
+                            }
                         } else { // print
                             if let Some(ban) = &chanobj.modes.ban {
                                 for b in ban {
@@ -1653,6 +1673,19 @@ impl MainState {
                     },
                     'e' => {
                         if let Some(emask) = margs_it.next() {
+                            if if_op {
+                                let mut exp = chanobj.modes.exception.take()
+                                        .unwrap_or_default();
+                                if mode_set {
+                                    exp.insert(normalize_sourcemask(emask));
+                                } else {
+                                    exp.remove(&normalize_sourcemask(emask));
+                                }
+                                chanobj.modes.exception = Some(exp);
+                            } else {
+                                self.feed_msg(&mut conn_state.stream, ErrChanOpPrivsNeeded482{
+                                        client, channel: target }).await?;
+                            }
                         } else { // print
                             if let Some(exception) = &chanobj.modes.exception {
                                 for e in exception {
@@ -1667,6 +1700,19 @@ impl MainState {
                     },
                     'I' => {
                         if let Some(imask) = margs_it.next() {
+                            if if_op {
+                                let mut exp = chanobj.modes.invite_exception.take()
+                                        .unwrap_or_default();
+                                if mode_set {
+                                    exp.insert(normalize_sourcemask(imask));
+                                } else {
+                                    exp.remove(&normalize_sourcemask(imask));
+                                }
+                                chanobj.modes.invite_exception = Some(exp);
+                            } else {
+                                self.feed_msg(&mut conn_state.stream, ErrChanOpPrivsNeeded482{
+                                        client, channel: target }).await?;
+                            }
                         } else { // print
                             if let Some(inv_ex) = &chanobj.modes.invite_exception {
                                 for e in inv_ex {
