@@ -1141,7 +1141,44 @@ impl MainState {
                                 chname.clone(), user_nick.clone()));
                 } else {
                     let chanobj = state.channels.get_mut(&chname).unwrap();
-                    chanobj.users.insert(user_nick.clone(), ChannelUserModes::default());
+                    let mut chum = ChannelUserModes::default();
+                    if chanobj.default_modes.half_operators.contains(&user_nick) {
+                        chum.oper_type = OperatorType::HalfOper;
+                        let mut half_ops = chanobj.modes.half_operators.take()
+                                .unwrap_or_default();
+                        half_ops.insert(user_nick.clone());
+                        chanobj.modes.half_operators = Some(half_ops);
+                    }
+                    if chanobj.default_modes.operators.contains(&user_nick) {
+                        let mut half_ops = chanobj.modes.half_operators.take()
+                                .unwrap_or_default();
+                        half_ops.remove(&user_nick);
+                        chanobj.modes.half_operators = Some(half_ops);
+                        chum.oper_type = OperatorType::Oper;
+                        let mut ops = chanobj.modes.operators.take().unwrap_or_default();
+                        ops.insert(user_nick.clone());
+                        chanobj.modes.operators = Some(ops);
+                    }
+                    if chanobj.default_modes.founders.contains(&user_nick) {
+                        chum.founder = true;
+                        let mut founders = chanobj.modes.founders.take().unwrap_or_default();
+                        founders.insert(user_nick.clone());
+                        chanobj.modes.founders = Some(founders);
+                    }
+                    if chanobj.default_modes.voices.contains(&user_nick) {
+                        chum.voice = true;
+                        let mut voices = chanobj.modes.voices.take().unwrap_or_default();
+                        voices.insert(user_nick.clone());
+                        chanobj.modes.voices = Some(voices);
+                    }
+                    if chanobj.default_modes.protecteds.contains(&user_nick) {
+                        chum.protected = true;
+                        let mut protecteds = chanobj.modes.protecteds.take()
+                                .unwrap_or_default();
+                        protecteds.insert(user_nick.clone());
+                        chanobj.modes.protecteds = Some(protecteds);
+                    }
+                    chanobj.users.insert(user_nick.clone(), chum);
                 }
             }
         }
