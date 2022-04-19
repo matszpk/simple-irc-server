@@ -19,7 +19,7 @@
 
 use std::error::Error;
 use bytes::{BufMut, BytesMut};
-use tokio_util::codec::{Framed, LinesCodec, LinesCodecError, Decoder, Encoder};
+use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
 
 use crate::command::CommandId::*;
@@ -185,7 +185,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                     }
                     'k' => {
                         if mode_set {
-                            if let Some(arg) = margs_it.next() {
+                            if margs_it.next().is_some() {
                                 arg_param_idx += 1;
                             } else {
                                 return Err(InvalidModeParam{ target: target.to_string(),

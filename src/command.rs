@@ -585,7 +585,7 @@ impl<'a> Command<'a> {
     
     fn validate(&self) -> Result<(), CommandError> {
         match self {
-            CAP { subcommand, caps, version } => {
+            CAP { version, .. } => {
                 if let Some(v) = version {
                     if *v < 302 { Err(WrongParameter(CAPId, 1)) }
                     else { Ok(()) }
@@ -594,19 +594,19 @@ impl<'a> Command<'a> {
             NICK{ nickname } => {
                 validate_username(nickname)
                     .map_err(|_| WrongParameter(NICKId, 0)) }
-            USER{ username, hostname, servername, realname } => {
+            USER{ username, .. } => {
                 validate_username(username)
                     .map_err(|_| WrongParameter(USERId, 0)) }
-            OPER{ name, password } => {
+            OPER{ name, .. } => {
                 validate_username(name)
                     .map_err(|_| WrongParameter(OPERId, 0)) }
-            JOIN{ channels, keys } => {
+            JOIN{ channels, .. } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
                     .map_err(|_| WrongParameter(JOINId, 0)) }
-            PART{ channels, reason } => {
+            PART{ channels, .. } => {
                 channels.iter().try_for_each(|ch| validate_channel(ch))
                     .map_err(|_| WrongParameter(PARTId, 0)) }
-            TOPIC{ channel, topic } => {
+            TOPIC{ channel, .. } => {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(TOPICId, 0))}
             NAMES{ channels } => {
@@ -626,7 +626,7 @@ impl<'a> Command<'a> {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(INVITEId, 1))
                 }
-            KICK{ channel, users, comment } => {
+            KICK{ channel, users, .. } => {
                 validate_channel(channel)
                     .map_err(|_| WrongParameter(KICKId, 0))?;
                 users.iter().try_for_each(|u| validate_username(u))
@@ -649,7 +649,7 @@ impl<'a> Command<'a> {
                 }
                 Ok(())
             }
-            CONNECT{ target_server, port, remote_server } => {
+            CONNECT{ target_server, remote_server, .. } => {
                 validate_server(target_server, WrongParameter(CONNECTId, 0))?;
                 if let Some(s) = remote_server {
                     validate_server(s, WrongParameter(CONNECTId, 1))?;
@@ -691,11 +691,11 @@ impl<'a> Command<'a> {
                     validate_usermodes(modes)
                 } else { Err(WrongParameter(MODEId, 0)) }
             }
-            PRIVMSG{ targets, text } => {
+            PRIVMSG{ targets, .. } => {
                 targets.iter().try_for_each(|n| validate_username(n)
                     .map_err(|_| WrongParameter(PRIVMSGId, 0)).or(
                     validate_prefixed_channel(n, WrongParameter(PRIVMSGId, 0)))) }
-            NOTICE{ targets, text } => {
+            NOTICE{ targets, .. } => {
                  targets.iter().try_for_each(|n| validate_username(n)
                     .map_err(|_| WrongParameter(NOTICEId, 0)).or(
                     validate_prefixed_channel(n, WrongParameter(NOTICEId, 0)))) }
@@ -708,17 +708,17 @@ impl<'a> Command<'a> {
                 nickmasks.iter().try_for_each(|n| validate_username(n))
                     .map_err(|_| WrongParameter(WHOISId, next_param_idx))
             }
-            WHOWAS{ nickname, count, server } => {
+            WHOWAS{ nickname, server, .. } => {
                 validate_username(nickname).map_err(|_| WrongParameter(WHOWASId, 0))?;
                 if let Some(s) = server {
                     validate_server(s, WrongParameter(WHOWASId, 2))?;
                 }
                 Ok(())
             }
-            KILL{ nickname, comment } => {
+            KILL{ nickname, .. } => {
                 validate_username(nickname)
                     .map_err(|_| WrongParameter(KILLId, 0)) }
-            SQUIT{ server, comment } => {
+            SQUIT{ server, .. } => {
                 validate_server(server, WrongParameter(SQUITId, 0))?;
                 Ok(())
             }

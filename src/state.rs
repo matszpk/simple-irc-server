@@ -17,7 +17,7 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-use std::ops::{Deref, DerefMut, Drop};
+use std::ops::{DerefMut, Drop};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
@@ -29,8 +29,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::convert::TryFrom;
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
-use tokio::net::{TcpListener, TcpStream};
-use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
+use tokio::net::TcpStream;
+use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::time;
@@ -206,13 +206,13 @@ flags! {
 }
 
 impl ChannelUserModes {
-    fn to_string(&self, cap_state: &CapState) -> String {
+    fn to_string(&self, caps: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
-        if self.protected { out.push('&'); }
-        if self.operator { out.push('@'); }
-        if self.half_oper { out.push('%'); }
-        if self.voice { out.push('+'); }
+        if (caps.multi_prefix || out.len() == 0) && self.protected { out.push('&'); }
+        if (caps.multi_prefix || out.len() == 0) && self.operator { out.push('@'); }
+        if (caps.multi_prefix || out.len() == 0) && self.half_oper { out.push('%'); }
+        if (caps.multi_prefix || out.len() == 0) && self.voice { out.push('+'); }
         out
     }
 }
@@ -615,7 +615,7 @@ impl VolatileState {
         if self.nick_histories.contains_key(old_nick) {
             self.nick_histories.insert(old_nick.to_string(), vec![]);
         }
-        let mut nick_hist = self.nick_histories.get_mut(old_nick).unwrap();
+        let nick_hist = self.nick_histories.get_mut(old_nick).unwrap();
         nick_hist.push(nhe);
     }
 }
@@ -884,7 +884,7 @@ impl MainState {
     }
     
     async fn process_cap<'a>(&self, conn_state: &mut ConnState, subcommand: CapCommand,
-            caps: Option<Vec<&'a str>>, version: Option<u32>) -> Result<(), Box<dyn Error>> {
+            caps: Option<Vec<&'a str>>, _: Option<u32>) -> Result<(), Box<dyn Error>> {
         match subcommand {
             CapCommand::LS => {
                 conn_state.caps_negotation = true;
@@ -953,7 +953,7 @@ impl MainState {
         let (auth_opt, registered) = {
             if !conn_state.caps_negotation {
                 let user_state = &mut conn_state.user_state;
-                if let Some(ref nick) = user_state.nick {
+                if user_state.nick.is_some() {
                     if let Some(ref name) = user_state.name {
                         let mut registered = false;
                         let password_opt = if let Some(uidx) =
@@ -1135,7 +1135,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_pong<'a>(&self, conn_state: &mut ConnState, token: &'a str)
+    async fn process_pong<'a>(&self, conn_state: &mut ConnState, _: &'a str)
             -> Result<(), Box<dyn Error>> {
         if let Some(notifier) = conn_state.pong_notifier.take() {
             notifier.send(()).map_err(|_| "pong notifier error".to_string())?;
@@ -1182,7 +1182,7 @@ impl MainState {
     async fn process_join<'a>(&self, conn_state: &mut ConnState, channels: Vec<&'a str>,
             keys_opt: Option<Vec<&'a str>>) -> Result<(), Box<dyn Error>> {
         let mut statem = self.state.write().await;
-        let mut state = statem.deref_mut();
+        let state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         let mut join_count = state.users.get(&user_nick).unwrap().channels.len();
         
@@ -1223,7 +1223,7 @@ impl MainState {
                                 match_wildcard(&e, &conn_state.user_state.source))) {
                         true
                     } else {
-                        self.feed_msg(&mut conn_state.stream, ErrBannedFromChan474{
+                        self.feed_msg(&mut conn_state.stream, ErrInviteOnlyChan473{
                             client, channel: chname_str }).await?;
                         false
                     }
@@ -1349,7 +1349,7 @@ impl MainState {
             reason: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         let mut statem = self.state.write().await;
-        let mut state = statem.deref_mut();
+        let state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         
         let mut removed_from = vec![];
@@ -1409,8 +1409,6 @@ impl MainState {
             let user_nick = conn_state.user_state.nick.as_ref().unwrap();
             
             let do_change_topic = if let Some(chanobj) = state.channels.get(channel) {
-                let user = state.users.get(user_nick).unwrap();
-                
                 if chanobj.users.contains_key(user_nick) {
                     if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
                                 .unwrap().is_half_operator() {
@@ -1452,7 +1450,6 @@ impl MainState {
             let state = self.state.read().await;
             if let Some(chanobj) = state.channels.get(channel) {
                 let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-                let user = state.users.get(user_nick).unwrap();
                 
                 if chanobj.users.contains_key(user_nick) {
                     if let Some(ref topic) = chanobj.topic {
@@ -1564,7 +1561,6 @@ impl MainState {
             channel: &'a str, msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
         let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
@@ -1606,9 +1602,8 @@ impl MainState {
             kick_users: Vec<&'a str>, comment: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         let mut statem = self.state.write().await;
-        let mut state = statem.deref_mut();
+        let state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get(user_nick).unwrap();
         let client = conn_state.user_state.client_name();
         
         let mut kicked = vec![];
@@ -1719,8 +1714,8 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_connect<'a>(&self, conn_state: &mut ConnState, target_server: &'a str,
-            port: Option<u16>, remote_server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+    async fn process_connect<'a>(&self, _: &mut ConnState, _: &'a str,
+            _: Option<u16>, _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
@@ -1764,8 +1759,8 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_stats<'a>(&self, conn_state: &mut ConnState, query: char,
-            server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+    async fn process_stats<'a>(&self, _: &mut ConnState, _: char,
+            _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
@@ -1780,7 +1775,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_help<'a>(&self, conn_state: &mut ConnState, nick: &'a str)
+    async fn process_help<'a>(&self, _: &mut ConnState, _: &'a str)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
@@ -2110,10 +2105,9 @@ impl MainState {
         let client = conn_state.user_state.client_name();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let mut statem = self.state.write().await;
-        let mut state = statem.deref_mut();
+        let state = statem.deref_mut();
         
         if validate_channel(target).is_ok() {
-            let user = state.users.get(target).unwrap();
             // channel
             if let Some(chanobj) = state.channels.get_mut(target) {
                 let (chum, error) = if let Some(chum) = chanobj.users.get(user_nick) {
@@ -2155,7 +2149,6 @@ impl MainState {
         let mut something_done = false;
         {
         let state = self.state.read().await;
-        let user = state.users.get(user_nick).unwrap();
         
         for target in HashSet::<&&str>::from_iter(targets.iter()) {
             let msg_str = if notice {
@@ -2487,12 +2480,12 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_rehash(&self, conn_state: &mut ConnState)
+    async fn process_rehash(&self, _: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
     
-    async fn process_restart(&self, conn_state: &mut ConnState)
+    async fn process_restart(&self, _: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         Ok(())
     }
@@ -2500,22 +2493,27 @@ impl MainState {
     async fn process_squit<'a>(&self, conn_state: &mut ConnState, server: &'a str,
             comment: &'a str) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        let mut state = self.state.write().await;
-        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get(user_nick).unwrap();
-        
-        if user.modes.oper {
-            for u in state.users.values_mut() {
-                if let Some(sender) = u.quit_sender.take() {
-                    sender.send((user_nick.to_string(), comment.to_string()))
-                                .map_err(|_| "error".to_string())?;
-                }
-            }
-            if let Some(sender) = state.quit_sender.take() {
-                sender.send(comment.to_string())?;
-            }
+        if self.config.name != server {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "SQUIT", subcommand: None, info: "Server unsupported" }).await?;
         } else {
-            self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
+            let mut state = self.state.write().await;
+            let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+            let user = state.users.get(user_nick).unwrap();
+            
+            if user.modes.oper {
+                for u in state.users.values_mut() {
+                    if let Some(sender) = u.quit_sender.take() {
+                        sender.send((user_nick.to_string(), comment.to_string()))
+                                    .map_err(|_| "error".to_string())?;
+                    }
+                }
+                if let Some(sender) = state.quit_sender.take() {
+                    sender.send(comment.to_string())?;
+                }
+            } else {
+                self.feed_msg(&mut conn_state.stream, ErrCantKillServer483{ client }).await?;
+            }
         }
         Ok(())
     }
@@ -2552,7 +2550,7 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_wallops<'a>(&self, conn_state: &mut ConnState, text: &'a str,
+    async fn process_wallops<'a>(&self, conn_state: &mut ConnState, _: &'a str,
             msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();

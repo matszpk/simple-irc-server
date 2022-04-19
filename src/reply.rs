@@ -42,7 +42,6 @@ pub(crate) enum Reply<'a> {
             avail_user_modes: &'a str, avail_chmodes: &'a str,
             avail_chmodes_with_params: Option<&'a str> },
     RplISupport005{ client: &'a str, tokens: &'a str },
-    RplBounce010{ client: &'a str, hostname: &'a str, port: u16, info: &'a str },
     RplUModeIs221{ client: &'a str, user_modes: &'a str },
     RplLUserClient251{ client: &'a str, users_num: usize, inv_users_num: usize,
             servers_num: usize },
@@ -58,7 +57,6 @@ pub(crate) enum Reply<'a> {
     RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplGlobalUsers266{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
-    RplNone300{ },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
     RplUserHost302{ client: &'a str, replies: &'a [String] },
     RplUnAway305{ client: &'a str },
@@ -149,7 +147,6 @@ pub(crate) enum Reply<'a> {
     ErrInviteOnlyChan473{ client: &'a str, channel: &'a str },
     ErrBannedFromChan474{ client: &'a str, channel: &'a str },
     ErrBadChannelKey475{ client: &'a str, channel: &'a str },
-    ErrBadChanMask476{ channel: &'a str },
     ErrNoPrivileges481{ client: &'a str },
     ErrChanOpPrivsNeeded482{ client: &'a str, channel: &'a str },
     ErrCantKillServer483{ client: &'a str },
@@ -158,7 +155,6 @@ pub(crate) enum Reply<'a> {
     ErrUmodeUnknownFlag501{ client: &'a str },
     ErrUsersDontMatch502{ client: &'a str },
     ErrHelpNotFound524{ client: &'a str, subject: &'a str },
-    ErrInvalidKey525{ client: &'a str, target_chan: &'a str },
     RplStartTls670{ client: &'a str },
     RplWhoIsSecure671{ client: &'a str, nick: &'a str },
     ErrStartTls691{ client: &'a str },
@@ -167,7 +163,6 @@ pub(crate) enum Reply<'a> {
     RplHelpStart704{ client: &'a str, subject: &'a str, line: &'a str },
     RplHelpTxt705{ client: &'a str, subject: &'a str, line: &'a str },
     RplEndOfHelp706{ client: &'a str, subject: &'a str, line: &'a str },
-    ErrNoPrivs723{ client: &'a str, privil: &'a str },
     RplLoggedIn900{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str,
             account: &'a str, username: &'a str },
     RplLoggedOut901{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str },
@@ -204,8 +199,6 @@ impl<'a> fmt::Display for Reply<'a> {
                         avail_user_modes, avail_chmodes) } }
             RplISupport005{ client, tokens } => {
                 write!(f, "005 {} {} :are supported by this server", client, tokens) }
-            RplBounce010{ client, hostname, port, info } => {
-                write!(f, "010 {} {} {} :{}", client, hostname, port, info) }
             RplUModeIs221{ client, user_modes } => {
                 write!(f, "221 {} {}", client, user_modes) }
             RplLUserClient251{ client, users_num, inv_users_num, servers_num } => {
@@ -239,7 +232,6 @@ impl<'a> fmt::Display for Reply<'a> {
             RplWhoIsCertFP276{ client, nick, fingerprint } => {
                 write!(f, "276 {} {} :has client certificate fingerprint {}", client, nick,
                     fingerprint) }
-            RplNone300{ } => { write!(f, "300 It is none") }
             RplAway301{ client, nick, message } => {
                 write!(f, "301 {} {} :{}", client, nick, message) }
             RplUserHost302{ client, replies } => {
@@ -410,8 +402,6 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "474 {} {} :Cannot join channel (+b)", client, channel) }
             ErrBadChannelKey475{ client, channel } => {
                 write!(f, "475 {} {} :Cannot join channel (+k)", client, channel) }
-            ErrBadChanMask476{ channel } => {
-                write!(f, "476 {} :Bad Channel Mask", channel) }
             ErrNoPrivileges481{ client } => {
                 write!(f, "481 {} :Permission Denied- You're not an IRC operator", client) }
             ErrChanOpPrivsNeeded482{ client, channel } => {
@@ -428,8 +418,6 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "502 {} :Cant change mode for other users", client) }
             ErrHelpNotFound524{ client, subject } => {
                 write!(f, "524 {} {} :No help available on this topic", client, subject) }
-            ErrInvalidKey525{ client, target_chan } => {
-                write!(f, "525 {} {} :Key is not well-formed", client, target_chan) }
             RplStartTls670{ client } => {
                 write!(f, "670 {} :STARTTLS successful, proceed with TLS handshake", client) }
             RplWhoIsSecure671{ client, nick } => {
@@ -444,8 +432,6 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "705 {} {} :{}", client, subject, line) }
             RplEndOfHelp706{ client, subject, line } => {
                 write!(f, "706 {} {} :{}", client, subject, line) }
-            ErrNoPrivs723{ client, privil } => {
-                write!(f, "723 {} {} :Insufficient oper privileges.", client, privil) }
             RplLoggedIn900{ client, nick, user, host, account, username } => {
                 write!(f, "900 {} {}!~{}@{} {} :You are now logged in as {}", client, nick,
                     user, host, account, username) }
@@ -500,9 +486,6 @@ mod test {
             avail_chmodes_with_params: None }));
         assert_eq!("005 <client> <1-13 tokens> :are supported by this server",
             format!("{}", RplISupport005{ client: "<client>", tokens: "<1-13 tokens>" }));
-        assert_eq!("010 <client> <hostname> 6667 :<info>",
-            format!("{}", RplBounce010{ client: "<client>", hostname: "<hostname>",
-                port: 6667, info: "<info>" }));
         assert_eq!("221 <client> <user modes>",
             format!("{}", RplUModeIs221{ client: "<client>", user_modes: "<user modes>" }));
         assert_eq!("251 <client> :There are 3 users and 4 invisible on 5 servers",
@@ -536,7 +519,6 @@ mod test {
         assert_eq!("276 <client> <nick> :has client certificate fingerprint <fingerprint>",
             format!("{}", RplWhoIsCertFP276{ client: "<client>", nick: "<nick>",
                 fingerprint: "<fingerprint>" }));
-        assert_eq!("300 It is none", format!("{}", RplNone300{}));
         assert_eq!("301 <client> <nick> :<message>",
             format!("{}", RplAway301{ client: "<client>", nick: "<nick>",
                 message: "<message>" }));
@@ -744,8 +726,6 @@ mod test {
             format!("{}", ErrBannedFromChan474{ client: "<client>", channel: "<channel>" }));
         assert_eq!("475 <client> <channel> :Cannot join channel (+k)",
             format!("{}", ErrBadChannelKey475{ client: "<client>", channel: "<channel>" }));
-        assert_eq!("476 <channel> :Bad Channel Mask",
-            format!("{}", ErrBadChanMask476{ channel: "<channel>" }));
         assert_eq!("481 <client> :Permission Denied- You're not an IRC operator",
             format!("{}", ErrNoPrivileges481{ client: "<client>" }));
         assert_eq!("482 <client> <channel> :You're not channel operator",
@@ -763,9 +743,6 @@ mod test {
             format!("{}", ErrUsersDontMatch502{ client: "<client>" }));
         assert_eq!("524 <client> <subject> :No help available on this topic",
             format!("{}", ErrHelpNotFound524{ client: "<client>", subject: "<subject>" }));
-        assert_eq!("525 <client> <target chan> :Key is not well-formed",
-            format!("{}", ErrInvalidKey525{ client: "<client>",
-                target_chan: "<target chan>" }));
         assert_eq!("670 <client> :STARTTLS successful, proceed with TLS handshake",
             format!("{}", RplStartTls670{ client: "<client>" }));
         assert_eq!("671 <client> <nick> :is using a secure connection",
@@ -785,8 +762,6 @@ mod test {
         assert_eq!("706 <client> <subject> :<last line of help text>",
             format!("{}", RplEndOfHelp706{ client: "<client>", subject: "<subject>",
                 line: "<last line of help text>" }));
-        assert_eq!("723 <client> <priv> :Insufficient oper privileges.",
-            format!("{}", ErrNoPrivs723{ client: "<client>", privil: "<priv>" }));
         assert_eq!("900 <client> <nick>!~<user>@<host> <account> \
             :You are now logged in as <username>",
             format!("{}", RplLoggedIn900{ client: "<client>", nick: "<nick>",

@@ -26,15 +26,13 @@ mod state;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use clap;
 use clap::Parser;
 use tokio;
 use tokio::net::{TcpStream,TcpListener};
-use tokio_util::codec::{Framed, LinesCodec, LinesCodecError};
+use tokio_util::codec::Framed;
 
 use config::*;
-use reply::*;
 use command::*;
 use utils::*;
 use state::*;
@@ -67,6 +65,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 tokio::spawn(user_state_process(main_state.clone(), stream, addr));
             }
             Ok(msg) = &mut quit_receiver => {
+                println!("Server quit: {}", msg);
                 do_quit = true;
             }
         }

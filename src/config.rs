@@ -24,11 +24,9 @@ use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
 use clap;
-use clap::Parser;
 use toml;
 use serde_derive::{Serialize, Deserialize};
-use validator::{Validate,ValidationError};
-use tokio;
+use validator::Validate;
 
 use crate::utils::validate_channel;
 use crate::utils::validate_username;
