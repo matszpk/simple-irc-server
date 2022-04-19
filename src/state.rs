@@ -376,6 +376,7 @@ impl Channel {
     }
 }
 
+#[derive(Clone)]
 struct NickHistoryEntry {
     username: String,
     hostname: String,
@@ -588,6 +589,14 @@ impl VolatileState {
                 self.channels.get_mut(chname).unwrap().remove_user(nick);
             });
         }
+    }
+    
+    fn insert_to_nick_history<'a>(&mut self, old_nick: &'a String, nhe: NickHistoryEntry) {
+        if self.nick_histories.contains_key(old_nick) {
+            self.nick_histories.insert(old_nick.to_string(), vec![]);
+        }
+        let mut nick_hist = self.nick_histories.get_mut(old_nick).unwrap();
+        nick_hist.push(nhe);
     }
 }
 
@@ -1028,7 +1037,8 @@ impl MainState {
             conn_state.user_state.set_nick(nick.to_string());
             self.authenticate(conn_state).await?;
         } else {
-            let mut state = self.state.write().await;
+            let mut statem = self.state.write().await;
+            let state = statem.deref_mut();
             let old_nick = conn_state.user_state.nick.as_ref().unwrap().to_string();
             if nick != old_nick {
                 let nick_str = nick.to_string();
@@ -1040,6 +1050,9 @@ impl MainState {
                         state.channels.get_mut(&ch.clone()).unwrap().rename_user(
                                     &old_nick, nick_str.clone());
                     }
+                    // add nick history
+                    state.insert_to_nick_history(&old_nick, user.history_entry.clone());
+                    
                     state.users.insert(nick_str.clone(), user);
                     // wallops users
                     if state.wallops_users.contains(&old_nick) {
