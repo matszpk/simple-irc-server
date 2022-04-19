@@ -304,6 +304,76 @@ impl Channel {
         self.users.insert(nick.clone(), oldchumode);
         self.modes.rename_user(old_nick, nick.clone());
     }
+    
+    fn remove_user(&mut self, nick: &str) {
+        self.remove_operator(nick);
+        self.remove_half_operator(nick);
+        self.remove_founder(nick);
+        self.remove_voice(nick);
+        self.remove_protected(nick);
+        self.users.remove(nick);
+    }
+    
+    fn add_operator(&mut self, nick: &str) {
+        let mut ops = self.modes.operators.take().unwrap_or_default();
+        ops.insert(nick.to_string());
+        self.modes.operators = Some(ops);
+        self.users.get_mut(nick).unwrap().operator = true;
+    }
+    fn remove_operator(&mut self, nick: &str) {
+        let mut ops = self.modes.operators.take().unwrap_or_default();
+        ops.remove(nick);
+        self.modes.operators = Some(ops);
+        self.users.get_mut(nick).unwrap().operator = false;
+    }
+    fn add_half_operator(&mut self, nick: &str) {
+        let mut half_ops = self.modes.half_operators.take().unwrap_or_default();
+        half_ops.insert(nick.to_string());
+        self.modes.half_operators = Some(half_ops);
+        self.users.get_mut(nick).unwrap().half_oper = true;
+    }
+    fn remove_half_operator(&mut self, nick: &str) {
+        let mut half_ops = self.modes.half_operators.take().unwrap_or_default();
+        half_ops.remove(nick);
+        self.modes.half_operators = Some(half_ops);
+        self.users.get_mut(nick).unwrap().half_oper = false;
+    }
+    fn add_voice(&mut self, nick: &str) {
+        let mut voices = self.modes.voices.take().unwrap_or_default();
+        voices.insert(nick.to_string());
+        self.modes.voices = Some(voices);
+        self.users.get_mut(nick).unwrap().voice = true;
+    }
+    fn remove_voice(&mut self, nick: &str) {
+        let mut voices = self.modes.voices.take().unwrap_or_default();
+        voices.remove(nick);
+        self.modes.voices = Some(voices);
+        self.users.get_mut(nick).unwrap().voice = false;
+    }
+    fn add_founder(&mut self, nick: &str) {
+        let mut founders = self.modes.founders.take().unwrap_or_default();
+        founders.insert(nick.to_string());
+        self.modes.founders = Some(founders);
+        self.users.get_mut(nick).unwrap().founder = true;
+    }
+    fn remove_founder(&mut self, nick: &str) {
+        let mut founders = self.modes.founders.take().unwrap_or_default();
+        founders.remove(nick);
+        self.modes.founders = Some(founders);
+        self.users.get_mut(nick).unwrap().founder = false;
+    }
+    fn add_protected(&mut self, nick: &str) {
+        let mut protecteds = self.modes.protecteds.take().unwrap_or_default();
+        protecteds.insert(nick.to_string());
+        self.modes.protecteds = Some(protecteds);
+        self.users.get_mut(nick).unwrap().protected = true;
+    }
+    fn remove_protected(&mut self, nick: &str) {
+        let mut protecteds = self.modes.protecteds.take().unwrap_or_default();
+        protecteds.remove(nick);
+        self.modes.protecteds = Some(protecteds);
+        self.users.get_mut(nick).unwrap().protected = false;
+    }
 }
 
 struct NickHistoryEntry {
@@ -1220,7 +1290,7 @@ impl MainState {
         for channel in &channels {
             if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
                 let do_it = if chanobj.users.contains_key(&user_nick) {
-                    chanobj.users.remove(&user_nick);
+                    chanobj.remove_user(&user_nick);
                     removed_from.push(true);
                     something_done = true;
                     true
@@ -1773,20 +1843,61 @@ impl MainState {
                                         channel: target }).await?;
                         }
                     },
-                    'o' => {
+                    'o'|'v'|'h'|'q'|'a' => {
                         let arg = margs_it.next().unwrap();
-                    },
-                    'v' => {
-                        let arg = margs_it.next().unwrap();
-                    },
-                    'h' => {
-                        let arg = margs_it.next().unwrap();
-                    },
-                    'q' => {
-                        let arg = margs_it.next().unwrap();
-                    },
-                    'a' => {
-                        let arg = margs_it.next().unwrap();
+                        if chanobj.users.contains_key(&arg.to_string()) {
+                            match mchar {
+                                'o' => {
+                                    if if_op {
+                                        if mode_set {
+                                            chanobj.add_operator(&arg);
+                                        } else {
+                                            chanobj.remove_operator(&arg);
+                                        }
+                                    }
+                                },
+                                'v' => {
+                                    if if_op {
+                                        if mode_set {
+                                            chanobj.add_voice(&arg);
+                                        } else {
+                                            chanobj.remove_voice(&arg);
+                                        }
+                                    }
+                                },
+                                'h' => {
+                                    if if_op {
+                                        if mode_set {
+                                            chanobj.add_half_operator(&arg);
+                                        } else {
+                                            chanobj.remove_half_operator(&arg);
+                                        }
+                                    }
+                                },
+                                'q' => {
+                                    if if_op {
+                                        if mode_set {
+                                            chanobj.add_founder(&arg);
+                                        } else {
+                                            chanobj.remove_founder(&arg);
+                                        }
+                                    }
+                                },
+                                'a' => {
+                                    if if_op {
+                                        if mode_set {
+                                            chanobj.add_protected(&arg);
+                                        } else {
+                                            chanobj.remove_protected(&arg);
+                                        }
+                                    }
+                                },
+                                _ => {},
+                            }
+                        } else {
+                            self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
+                                    channel: target }).await?;
+                        }
                     },
                     'l' => { 
                         let arg = margs_it.next().unwrap();
