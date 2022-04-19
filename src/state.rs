@@ -163,25 +163,19 @@ enum OperatorType {
     HalfOper,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 struct ChannelUserModes {
     founder: bool,
     protected: bool,
     voice: bool,
-    oper_type: OperatorType,
-}
-
-impl Default for ChannelUserModes {
-    fn default() -> Self {
-        ChannelUserModes{ founder: false, protected: false, voice: false,
-                oper_type: OperatorType::NoOper }
-    }
+    operator: bool,
+    half_oper: bool,
 }
 
 impl ChannelUserModes {
     fn new_for_created_channel() -> Self {
         ChannelUserModes{ founder: false, protected: false, voice: false,
-                oper_type: OperatorType::Oper }
+                operator: true, half_oper: false }
     }
 }
 
@@ -203,11 +197,8 @@ impl ChannelUserModes {
         let mut out = String::new();
         if self.founder { out.push('~'); }
         if self.protected { out.push('&'); }
-        match self.oper_type {
-            OperatorType::Oper => out.push('@'),
-            OperatorType::HalfOper => out.push('%'),
-            _ => (),
-        };
+        if self.operator { out.push('@'); }
+        if self.half_oper { out.push('%'); }
         if self.voice { out.push('+'); }
         out
     }
@@ -1143,18 +1134,14 @@ impl MainState {
                     let chanobj = state.channels.get_mut(&chname).unwrap();
                     let mut chum = ChannelUserModes::default();
                     if chanobj.default_modes.half_operators.contains(&user_nick) {
-                        chum.oper_type = OperatorType::HalfOper;
+                        chum.half_oper = true;
                         let mut half_ops = chanobj.modes.half_operators.take()
                                 .unwrap_or_default();
                         half_ops.insert(user_nick.clone());
                         chanobj.modes.half_operators = Some(half_ops);
                     }
                     if chanobj.default_modes.operators.contains(&user_nick) {
-                        let mut half_ops = chanobj.modes.half_operators.take()
-                                .unwrap_or_default();
-                        half_ops.remove(&user_nick);
-                        chanobj.modes.half_operators = Some(half_ops);
-                        chum.oper_type = OperatorType::Oper;
+                        chum.operator = true;
                         let mut ops = chanobj.modes.operators.take().unwrap_or_default();
                         ops.insert(user_nick.clone());
                         chanobj.modes.operators = Some(ops);
@@ -1288,7 +1275,7 @@ impl MainState {
                 
                 if chanobj.users.contains_key(user_nick) {
                     if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
-                                .unwrap().oper_type == OperatorType::Oper{
+                                .unwrap().operator {
                         true
                     } else {
                         self.feed_msg(&mut conn_state.stream,
@@ -1445,8 +1432,7 @@ impl MainState {
         let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
             if chanobj.users.contains_key(user_nick) {
                 if chanobj.modes.invite_only {
-                    if !(chanobj.users.get(user_nick).unwrap().
-                                oper_type == OperatorType::Oper) {
+                    if !chanobj.users.get(user_nick).unwrap().operator {
                         self.feed_msg(&mut conn_state.stream,
                                     ErrChanOpPrivsNeeded482{ client, channel }).await?;
                         false
@@ -1491,8 +1477,7 @@ impl MainState {
         
         if let Some(chanobj) = state.channels.get_mut(channel) {
             if chanobj.users.contains_key(user_nick) {
-                if chanobj.users.get(user_nick).unwrap().
-                                oper_type == OperatorType::Oper {
+                if chanobj.users.get(user_nick).unwrap().operator {
                     for kick_user in &kick_users {
                         let ku = kick_user.to_string();
                         if let Some(chum) = chanobj.users.get(&ku) {
@@ -1948,7 +1933,7 @@ impl MainState {
             // channel
             if let Some(chanobj) = state.channels.get_mut(target) {
                 let (if_op, error) = if let Some(ref chum) = chanobj.users.get(user_nick) {
-                    (chum.oper_type == OperatorType::Oper, false)
+                    (chum.operator, false)
                 } else {
                     self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
                             channel: target }).await?;
