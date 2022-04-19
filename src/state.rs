@@ -1552,7 +1552,7 @@ impl MainState {
                         let ku = kick_user.to_string();
                         if let Some(chum) = chanobj.users.get(&ku) {
                             if !chum.protected {
-                                chanobj.users.remove(&ku);
+                                chanobj.remove_user(&ku);
                                 kicked.push(kick_user);
                             } else {
                                 self.feed_msg(&mut conn_state.stream, ErrCannotDoCommand972{
