@@ -574,6 +574,21 @@ impl VolatileState {
                 invisible_users_count: 0, operators_count: 0 , max_users_count: 0,
                 nick_histories: HashMap::new() }
     }
+    
+    fn remove_user(&mut self, nick: &str) {
+        if let Some(user) = self.users.remove(nick) {
+            if user.modes.local_oper || user.modes.oper {
+                self.operators_count -= 1;
+            }
+            if user.modes.invisible {
+                self.invisible_users_count -= 1;
+            }
+            self.wallops_users.remove(nick);
+            user.channels.iter().for_each(|chname| {
+                self.channels.get_mut(chname).unwrap().remove_user(nick);
+            });
+        }
+    }
 }
 
 pub(crate) struct MainState {
@@ -1098,6 +1113,7 @@ impl MainState {
                 }
             }
             user.modes.oper = true;
+            state.operators_count += 1;
         } else {
             self.feed_msg(&mut conn_state.stream, ErrNoOperHost491{ client }).await?;
         }
