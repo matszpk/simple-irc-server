@@ -58,9 +58,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind((config.listen, config.port)).await?;
     let main_state = Arc::new(MainState::new_from_config(config));
     
-    loop {
-        let (stream, addr) = listener.accept().await?;
-        tokio::spawn(user_state_process(main_state.clone(), stream, addr));
+    let mut quit_receiver = main_state.get_quit_receiver().await;
+    let mut do_quit = false;
+    while !do_quit {
+        tokio::select! {
+            res = listener.accept() => {
+                let (stream, addr) = res?;
+                tokio::spawn(user_state_process(main_state.clone(), stream, addr));
+            }
+            Ok(msg) = &mut quit_receiver => {
+                do_quit = true;
+            }
+        }
     }
     Ok(())
 }

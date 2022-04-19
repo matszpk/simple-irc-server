@@ -559,6 +559,8 @@ struct VolatileState {
     operators_count: usize,
     max_users_count: usize,
     nick_histories: HashMap<String, Vec<NickHistoryEntry>>,
+    quit_sender: Option<oneshot::Sender<String>>,
+    quit_receiver: Option<oneshot::Receiver<String>>
 }
 
 impl VolatileState {
@@ -577,9 +579,11 @@ impl VolatileState {
             });
         }
         
+        let (quit_sender, quit_receiver) = oneshot::channel();
         VolatileState{ users: HashMap::new(), channels, wallops_users: HashSet::new(),
                 invisible_users_count: 0, operators_count: 0 , max_users_count: 0,
-                nick_histories: HashMap::new() }
+                nick_histories: HashMap::new(),
+                quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver) }
     }
     
     fn remove_user(&mut self, nick: &str) {
@@ -665,7 +669,12 @@ impl MainState {
         conn_state.stream.flush().await.map_err(|e| e.to_string())?;
         res
     }
-
+    
+    pub(crate) async fn get_quit_receiver(&self) -> oneshot::Receiver<String> {
+        let mut state = self.state.write().await;
+        state.quit_receiver.take().unwrap()
+    }
+    
     async fn process_internal(&self, conn_state: &mut ConnState)
                 -> Result<(), Box<dyn Error>> {
         tokio::select! {
@@ -2475,6 +2484,24 @@ impl MainState {
     
     async fn process_squit<'a>(&self, conn_state: &mut ConnState, server: &'a str,
             comment: &'a str) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        
+        if user.modes.oper {
+            for u in state.users.values_mut() {
+                if let Some(sender) = u.quit_sender.take() {
+                    sender.send((user_nick.to_string(), comment.to_string()))
+                                .map_err(|_| "error".to_string())?;
+                }
+            }
+            if let Some(sender) = state.quit_sender.take() {
+                sender.send(comment.to_string())?;
+            }
+        } else {
+            self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
+        }
         Ok(())
     }
     
