@@ -47,6 +47,7 @@ async fn user_state_process(main_state: Arc<MainState>, stream: TcpStream, addr:
                 eprintln!("Error: {}" , e);
             }
         }
+        main_state.remove_user(&conn_state).await;
     }
 }
 

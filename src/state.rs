@@ -645,6 +645,13 @@ impl MainState {
         }
     }
     
+    pub(crate) async fn remove_user(&self, conn_state: &ConnState)  {
+        if let Some(ref nick) = conn_state.user_state.nick {
+            let mut state = self.state.write().await;
+            state.remove_user(nick);
+        }
+    }
+    
     pub(crate) async fn process(&self, conn_state: &mut ConnState)
                 -> Result<(), String> {
         // use conversion error to string to avoid problems with thread safety
