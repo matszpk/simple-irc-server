@@ -36,7 +36,6 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
-use const_table::const_table;
 use flagset::{flags, FlagSet};
 
 use crate::config::*;
@@ -46,23 +45,23 @@ use crate::utils::*;
 
 use Reply::*;
 
-#[const_table]
-pub(crate) enum SupportTokenInt {
-    SupportTokenIntValue{ name: &'static str, value: usize },
-    AWAYLEN = SupportTokenIntValue{ name: "AWAYLEN", value: 1000 },
-    CHANNELLEN = SupportTokenIntValue{ name: "CHANNELLEN", value: 1000 },
-    HOSTLEN = SupportTokenIntValue{ name: "HOSTLEN", value: 1000 },
-    KEYLEN = SupportTokenIntValue{ name: "KEYLEN", value: 1000 },
-    KICKLEN = SupportTokenIntValue{ name: "KICKLEN", value: 1000 },
-    LINELEN = SupportTokenIntValue{ name: "LINELEN", value: 2000 },
-    MAXNICKLEN = SupportTokenIntValue{ name: "MAXNICKLEN", value: 200 },
-    MAXPARA = SupportTokenIntValue{ name: "MAXPARA", value: 500 },
-    MAXTARGETS = SupportTokenIntValue{ name: "MAXTARGETS", value: 500 },
-    MODES = SupportTokenIntValue{ name: "MODES", value: 500 },
-    NICKLEN = SupportTokenIntValue{ name: "NICKLEN", value: 200 },
-    TOPICLEN = SupportTokenIntValue{ name: "TOPICLEN", value: 1000 },
-    USERLEN = SupportTokenIntValue{ name: "USERLEN", value: 200 },
-}
+struct SupportTokenIntValue{ name: &'static str, value: usize }
+
+static SUPPORT_TOKEN_INT_VALUE: [SupportTokenIntValue; 13] = [
+    SupportTokenIntValue{ name: "AWAYLEN", value: 1000 },
+    SupportTokenIntValue{ name: "CHANNELLEN", value: 1000 },
+    SupportTokenIntValue{ name: "HOSTLEN", value: 1000 },
+    SupportTokenIntValue{ name: "KEYLEN", value: 1000 },
+    SupportTokenIntValue{ name: "KICKLEN", value: 1000 },
+    SupportTokenIntValue{ name: "LINELEN", value: 2000 },
+    SupportTokenIntValue{ name: "MAXNICKLEN", value: 200 },
+    SupportTokenIntValue{ name: "MAXPARA", value: 500 },
+    SupportTokenIntValue{ name: "MAXTARGETS", value: 500 },
+    SupportTokenIntValue{ name: "MODES", value: 500 },
+    SupportTokenIntValue{ name: "NICKLEN", value: 200 },
+    SupportTokenIntValue{ name: "TOPICLEN", value: 1000 },
+    SupportTokenIntValue{ name: "USERLEN", value: 200 },
+];
 
 impl ToString for SupportTokenIntValue {
     fn to_string(&self) -> String {
@@ -73,19 +72,19 @@ impl ToString for SupportTokenIntValue {
     }
 }
 
-#[const_table]
-pub(crate) enum SupportTokenString {
-    SupportTokenStringValue{ name: &'static str, value: &'static str },
-    CASEMAPPING = SupportTokenStringValue{ name: "CASEMAPPING", value: "ascii" },
-    CHANMODES = SupportTokenStringValue{ name: "CHANMODES", value: "Iabehiklmnopqstv" },
-    CHANTYPES = SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
-    EXCEPTS = SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
-    INVEX = SupportTokenStringValue{ name: "INVEX", value: "I" },
-    MAXLIST = SupportTokenStringValue{ name: "MAXLIST", value: "beI:1000" },
-    PREFIX = SupportTokenStringValue{ name: "PREFIX", value: "(qaohv)~&@%+" },
-    STATUSMSG = SupportTokenStringValue{ name: "STATUSMSG", value: "~&@%+" },
-    USERMODES = SupportTokenStringValue{ name: "USERMODES", value: "Oiorw" },
-}
+struct SupportTokenStringValue{ name: &'static str, value: &'static str }
+
+static SUPPORT_TOKEN_STRING_VALUE: [SupportTokenStringValue; 9] = [
+    SupportTokenStringValue{ name: "CASEMAPPING", value: "ascii" },
+    SupportTokenStringValue{ name: "CHANMODES", value: "Iabehiklmnopqstv" },
+    SupportTokenStringValue{ name: "CHANTYPES", value: "&#" },
+    SupportTokenStringValue{ name: "EXCEPTS", value: "e" },
+    SupportTokenStringValue{ name: "INVEX", value: "I" },
+    SupportTokenStringValue{ name: "MAXLIST", value: "beI:1000" },
+    SupportTokenStringValue{ name: "PREFIX", value: "(qaohv)~&@%+" },
+    SupportTokenStringValue{ name: "STATUSMSG", value: "~&@%+" },
+    SupportTokenStringValue{ name: "USERMODES", value: "Oiorw" },
+];
 
 impl ToString for SupportTokenStringValue {
     fn to_string(&self) -> String {
@@ -96,12 +95,10 @@ impl ToString for SupportTokenStringValue {
     }
 }
 
-#[const_table]
-pub(crate) enum SupportTokenBool {
-    SupportTokenBoolValue{ name: &'static str },
-    FNC = SupportTokenBoolValue{ name: "FNC" },
-    SAFELIST = SupportTokenBoolValue{ name: "SAFELIST" },
-}
+static SUPPORT_TOKEN_BOOL_VALUE: [&'static str; 2] = [
+    "FNC",
+    "SAFELIST",
+];
 
 struct User {
     hostname: String,
@@ -926,18 +923,9 @@ impl MainState {
             tokens.push(format!("CHANLIMIT=&#:{}", max_joins));
             tokens.push(format!("MAXCHANNELS={}", max_joins));
         }
-        let inf_range = 0 as u32..;
-        inf_range.map_while(|i| {
-            let t: Result<SupportTokenString, _> = TryFrom::try_from(i as u32);
-            t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-        let inf_range = 0 as u32..;
-        inf_range.map_while(|i| {
-            let t: Result<SupportTokenInt, _> = TryFrom::try_from(i as u32);
-            t.ok() }).for_each(|t| { tokens.push(t.to_string()); });
-        let inf_range = 0 as u32..;
-        inf_range.map_while(|i| {
-            let t: Result<SupportTokenBool, _> = TryFrom::try_from(i as u32);
-            t.ok() }).for_each(|t| { tokens.push(t.name.to_string()); });
+        SUPPORT_TOKEN_STRING_VALUE.iter().for_each(|t| { tokens.push(t.to_string()); });
+        SUPPORT_TOKEN_INT_VALUE.iter().for_each(|t| { tokens.push(t.to_string()); });
+        SUPPORT_TOKEN_BOOL_VALUE.iter().for_each(|t| { tokens.push(t.to_string()); });
         
         tokens.sort();
         
