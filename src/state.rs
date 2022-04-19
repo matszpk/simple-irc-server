@@ -173,6 +173,23 @@ impl ChannelUserModes {
         ChannelUserModes{ founder: true, protected: false, voice: false,
                 operator: true, half_oper: false }
     }
+    
+    fn is_protected(&self) -> bool {
+        self.founder || self.protected
+    }
+    
+    fn is_operator(&self) -> bool {
+        self.founder || self.protected || self.operator
+    }
+    fn is_half_operator(&self) -> bool {
+        self.founder || self.protected || self.operator || self.half_oper
+    }
+    fn is_only_half_operator(&self) -> bool {
+        !self.founder && !self.protected && !self.operator && self.half_oper
+    }
+    fn is_voice(&self) -> bool {
+        self.founder || self.protected || self.operator || self.half_oper || self.voice
+    }
 }
 
 flags! {
@@ -1396,7 +1413,7 @@ impl MainState {
                 
                 if chanobj.users.contains_key(user_nick) {
                     if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
-                                .unwrap().operator {
+                                .unwrap().is_half_operator() {
                         true
                     } else {
                         self.feed_msg(&mut conn_state.stream,
@@ -1598,11 +1615,14 @@ impl MainState {
         
         if let Some(chanobj) = state.channels.get_mut(channel) {
             if chanobj.users.contains_key(user_nick) {
-                if chanobj.users.get(user_nick).unwrap().operator {
+                let user_chum = chanobj.users.get(user_nick).unwrap();
+                if user_chum.is_half_operator() {
+                    let is_only_half_oper = user_chum.is_only_half_operator();
                     for kick_user in &kick_users {
                         let ku = kick_user.to_string();
                         if let Some(chum) = chanobj.users.get(&ku) {
-                            if !chum.protected {
+                            if !chum.is_protected() && (!chum.is_half_operator() ||
+                                !is_only_half_oper) {
                                 chanobj.remove_user(&ku);
                                 kicked.push(kick_user);
                             } else {
@@ -1777,8 +1797,10 @@ impl MainState {
     
     async fn process_mode_channel<'a>(&self, conn_state: &mut ConnState,
             chanobj: &mut Channel, target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)>,
-            if_op: bool) -> Result<(), Box<dyn Error>> {
+            chum: &ChannelUserModes) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
+        let if_op = chum.is_operator();
+        let if_half_op = chum.is_operator();
         //
         for (mchars, margs) in modes {
             let mut margs_it = margs.iter();
@@ -1800,7 +1822,7 @@ impl MainState {
                     '-' => mode_set = false,
                     'b' => {
                         if let Some(bmask) = margs_it.next() {
-                            if if_op {
+                            if if_half_op {
                                 let mut ban = chanobj.modes.ban.take()
                                         .unwrap_or_default();
                                 let norm_bmask = normalize_sourcemask(bmask);
@@ -1908,7 +1930,7 @@ impl MainState {
                                     }
                                 },
                                 'v' => {
-                                    if if_op {
+                                    if if_half_op {
                                         if mode_set {
                                             chanobj.add_voice(&arg);
                                         } else {
@@ -1926,7 +1948,7 @@ impl MainState {
                                     }
                                 },
                                 'q' => {
-                                    if if_op {
+                                    if chum.founder {
                                         if mode_set {
                                             chanobj.add_founder(&arg);
                                         } else {
@@ -1935,7 +1957,7 @@ impl MainState {
                                     }
                                 },
                                 'a' => {
-                                    if if_op {
+                                    if chum.is_protected() {
                                         if mode_set {
                                             chanobj.add_protected(&arg);
                                         } else {
@@ -2094,16 +2116,16 @@ impl MainState {
             let user = state.users.get(target).unwrap();
             // channel
             if let Some(chanobj) = state.channels.get_mut(target) {
-                let (if_op, error) = if let Some(ref chum) = chanobj.users.get(user_nick) {
-                    (chum.operator, false)
+                let (chum, error) = if let Some(chum) = chanobj.users.get(user_nick) {
+                    (*chum, false)
                 } else {
                     self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
                             channel: target }).await?;
-                    (false, true)
+                    (ChannelUserModes::default(), true)
                 };
                 if !error {
                     self.process_mode_channel(conn_state, chanobj, target,
-                            modes, if_op).await?;
+                            modes, &chum).await?;
                 }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrNoSuchChannel403{ client,
@@ -2169,7 +2191,7 @@ impl MainState {
                     };
                     let can_send = can_send && {
                         if !chanobj.modes.moderated ||
-                            chanuser_mode.map_or(false, |chum| chum.voice) {
+                            chanuser_mode.map_or(false, |chum| chum.is_voice()) {
                             true
                         } else {
                             if !notice {
