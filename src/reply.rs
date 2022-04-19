@@ -77,7 +77,7 @@ pub(crate) enum Reply<'a> {
     RplEndOfWhoIs318{ client: &'a str, nick: &'a str },
     RplWhoIsChannels319{ client: &'a str, nick: &'a str,
             channels: &'a [WhoIsChannelStruct<'a>] },
-    RplWhoIsSpecial320{ client: &'a str, nick: &'a str, special_info: &'a str },
+    //RplWhoIsSpecial320{ client: &'a str, nick: &'a str, special_info: &'a str },
     RplListStart321{ client: &'a str },
     RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
     RplListEnd323{ client: &'a str },
@@ -268,8 +268,8 @@ impl<'a> fmt::Display for Reply<'a> {
                         prefix.to_string() + c.channel
                     } else { c.channel.to_string() }
                 }).collect::<Vec<_>>().join(" ")) }
-            RplWhoIsSpecial320{ client, nick, special_info } => {
-                write!(f, "320 {} {} :{}", client, nick, special_info) }
+            //RplWhoIsSpecial320{ client, nick, special_info } => {
+            //    write!(f, "320 {} {} :{}", client, nick, special_info) }
             RplListStart321{ client } => {
                 write!(f, "321 {} Channel :Users  Name", client) }
             RplList322{ client, channel, client_count, topic } => {
@@ -565,9 +565,9 @@ mod test {
                     WhoIsChannelStruct{ prefix: None, channel: "<channel2>" },
                     WhoIsChannelStruct{ prefix: Some("prefix3".to_string()),
                             channel: "<channel3>" }]}));
-        assert_eq!("320 <client> <nick> :special info",
-            format!("{}", RplWhoIsSpecial320{ client: "<client>", nick: "<nick>",
-                special_info: "special info" }));
+//         assert_eq!("320 <client> <nick> :special info",
+//             format!("{}", RplWhoIsSpecial320{ client: "<client>", nick: "<nick>",
+//                 special_info: "special info" }));
         assert_eq!("321 <client> Channel :Users  Name",
             format!("{}", RplListStart321{ client: "<client>" }));
         assert_eq!("322 <client> <channel> 47 :<topic>",

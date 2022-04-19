@@ -26,7 +26,6 @@ use std::net::IpAddr;
 use std::error::Error;
 use std::iter::FromIterator;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::convert::TryFrom;
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::TcpStream;
@@ -424,7 +423,6 @@ impl CapState {
 }
 
 pub(crate) struct ConnUserState {
-    ip_addr: IpAddr,
     hostname: String,
     name: Option<String>,
     realname: Option<String>,
@@ -439,7 +437,7 @@ impl ConnUserState {
     fn new(ip_addr: IpAddr) -> ConnUserState {
         let mut source = "@".to_string();
         source.push_str(&ip_addr.to_string());
-        ConnUserState{ ip_addr, hostname: ip_addr.to_string(),
+        ConnUserState{ hostname: ip_addr.to_string(),
             name: None, realname: None, nick: None, source, password: None,
             authenticated: false, registered: false }
     }
@@ -1756,10 +1754,16 @@ impl MainState {
             remote_server: Option<&'a str>, server_mask: Option<&'a str>)
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        self.feed_msg(&mut conn_state.stream, RplLinks364{ client,
-                server: &self.config.name, mask: &self.config.name, 
-                hop_count: 0, server_info: &self.config.info }).await?;
-        self.feed_msg(&mut conn_state.stream, RplEndOfLinks365{ client, mask: "*" }).await?;
+        if remote_server.is_some() || server_mask.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "TIME", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            self.feed_msg(&mut conn_state.stream, RplLinks364{ client,
+                    server: &self.config.name, mask: &self.config.name, 
+                    hop_count: 0, server_info: &self.config.info }).await?;
+            self.feed_msg(&mut conn_state.stream,
+                    RplEndOfLinks365{ client, mask: "*" }).await?;
+        }
         Ok(())
     }
     
