@@ -159,13 +159,6 @@ impl User {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum OperatorType {
-    NoOper,
-    Oper,
-    HalfOper,
-}
-
 #[derive(Copy, Clone, Default)]
 struct ChannelUserModes {
     founder: bool,
