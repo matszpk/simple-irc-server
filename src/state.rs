@@ -170,7 +170,7 @@ struct ChannelUserModes {
 
 impl ChannelUserModes {
     fn new_for_created_channel() -> Self {
-        ChannelUserModes{ founder: false, protected: false, voice: false,
+        ChannelUserModes{ founder: true, protected: false, voice: false,
                 operator: true, half_oper: false }
     }
 }
@@ -581,7 +581,7 @@ impl VolatileState {
     
     fn remove_user(&mut self, nick: &str) {
         if let Some(user) = self.users.remove(nick) {
-            if user.modes.local_oper || user.modes.oper {
+            if user.modes.is_local_oper() {
                 self.operators_count -= 1;
             }
             if user.modes.invisible {
@@ -2281,7 +2281,7 @@ impl MainState {
             let mut flags = String::new();
             if user.away.is_some() { flags.push('G');
             } else { flags.push('H'); }
-            if user.modes.local_oper || user.modes.oper {
+            if user.modes.is_local_oper() {
                 flags.push('*');
             }
             if let Some((_, ref chum)) = channel {
@@ -2372,7 +2372,7 @@ impl MainState {
                 self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
                         nick: &nick, server: &self.config.name,
                         server_info: &self.config.info }).await?;
-                if arg_user.modes.oper || arg_user.modes.local_oper {
+                if arg_user.modes.is_local_oper() {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsOperator313{ client,
                             nick: &nick }).await?;
                 }
@@ -2396,7 +2396,7 @@ impl MainState {
                         nick: &nick, secs: SystemTime::now().duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() - user.last_activity,
                         signon: user.signon }).await?;
-                if user.modes.oper || user.modes.local_oper {
+                if user.modes.is_local_oper() {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsHost378{ client,
                             nick: &nick, host_info: &user.hostname }).await?;
                     self.feed_msg(&mut conn_state.stream, RplWhoIsModes379{ client,
@@ -2536,7 +2536,7 @@ impl MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let user = state.users.get(user_nick).unwrap();
         
-        if user.modes.local_oper || user.modes.oper {
+        if user.modes.is_local_oper() {
             state.wallops_users.iter().try_for_each(|wu| state.users.get(wu).unwrap()
                 .send_message(msg, &conn_state.user_state.source))?;
         } else {

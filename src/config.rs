@@ -70,20 +70,13 @@ pub(crate) struct OperatorConfig {
     pub(crate) mask: Option<String>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
 pub(crate) struct UserModes {
     pub(crate) invisible: bool,
     pub(crate) oper: bool,
     pub(crate) local_oper: bool,
     pub(crate) registered: bool,
     pub(crate) wallops: bool,
-}
-
-impl Default for UserModes {
-    fn default() -> Self {
-        UserModes{ invisible: false, oper: false, local_oper: false,
-                registered: false, wallops: false }
-    }
 }
 
 impl fmt::Display for UserModes {
@@ -95,6 +88,12 @@ impl fmt::Display for UserModes {
         if self.registered { s.push('r'); }
         if self.wallops { s.push('w'); }
         f.write_str(&s)
+    }
+}
+
+impl UserModes {
+    pub(crate) fn is_local_oper(&self) -> bool {
+        self.local_oper || self.oper
     }
 }
 
@@ -120,7 +119,8 @@ pub(crate) struct ChannelModes {
 impl ChannelModes {
     pub(crate) fn new_for_channel(user_nick: String) -> Self {
         let mut def = ChannelModes::default();
-        def.operators = Some([ user_nick ].into());
+        def.operators = Some([ user_nick.clone() ].into());
+        def.founders = Some([ user_nick ].into());
         def
     }
     
