@@ -2449,9 +2449,10 @@ impl MainState {
         
         if user.modes.oper {
             if let Some(user_to_kill) = state.users.get_mut(nickname) {
-                user_to_kill.quit_sender.take().unwrap()
-                        .send((user_nick.to_string(), comment.to_string()))
+                if let Some(sender) = user_to_kill.quit_sender.take() {
+                    sender.send((user_nick.to_string(), comment.to_string()))
                             .map_err(|_| "error".to_string())?;
+                }
             } else {
                 self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
                             nick: nickname }).await?;
