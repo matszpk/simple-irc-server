@@ -106,6 +106,7 @@ pub(crate) enum SupportTokenBool {
 struct User {
     hostname: String,
     sender: UnboundedSender<String>,
+    quit_sender: Option<oneshot::Sender<(String, String)>>,
     name: String,
     realname: String,
     nick: String,
@@ -121,11 +122,13 @@ struct User {
 
 impl User {
     fn new(config: &MainConfig, user_state: &ConnUserState, registered: bool,
-            sender: UnboundedSender<String>) -> User {
+            sender: UnboundedSender<String>,
+            quit_sender: oneshot::Sender<(String, String)>) -> User {
         let mut user_modes = config.default_user_modes;
         user_modes.registered = registered;
         let now_ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         User{ hostname: user_state.hostname.clone(), sender,
+                quit_sender: Some(quit_sender),
                 name: user_state.name.as_ref().unwrap().clone(),
                 realname: user_state.realname.as_ref().unwrap().clone(),
                 nick: user_state.name.as_ref().unwrap().clone(),
@@ -474,6 +477,8 @@ pub(crate) struct ConnState {
     timeout_sender: Arc<UnboundedSender<()>>,
     timeout_receiver: UnboundedReceiver<()>,
     pong_notifier: Option<oneshot::Sender<()>>,
+    quit_receiver: oneshot::Receiver<(String, String)>,
+    quit_sender: Option<oneshot::Sender<(String, String)>>,
     
     user_state: ConnUserState,
     
@@ -489,11 +494,12 @@ impl ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
+        let (quit_sender, quit_receiver) = oneshot::channel();
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
-            pong_notifier: None,
+            pong_notifier: None, quit_sender: Some(quit_sender), quit_receiver,
             caps_negotation: false, caps: CapState::default(),
             quit: Arc::new(AtomicI32::new(0)),
             conns_count }
@@ -675,6 +681,12 @@ impl MainState {
             Some(_) = conn_state.timeout_receiver.recv() => {
                 self.feed_msg(&mut conn_state.stream,
                             "ERROR :Pong timeout, connection will be closed.").await?;
+                conn_state.quit.store(1, Ordering::SeqCst);
+                Ok(())
+            }
+            Ok((killer, comment)) = &mut conn_state.quit_receiver => {
+                self.feed_msg(&mut conn_state.stream,
+                        format!("ERROR :User killed by {}: {}", killer, comment)).await?;
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
@@ -965,7 +977,8 @@ impl MainState {
                     let user_state = &conn_state.user_state;
                     let mut state = self.state.write().await;
                     let user = User::new(&self.config, &user_state, registered,
-                                conn_state.sender.take().unwrap());
+                                conn_state.sender.take().unwrap(), 
+                                conn_state.quit_sender.take().unwrap());
                     let umode_str = user.modes.to_string();
                     state.users.insert(user_state.nick.as_ref().unwrap().clone(),
                         user);
@@ -2429,6 +2442,23 @@ impl MainState {
     
     async fn process_kill<'a>(&self, conn_state: &mut ConnState, nickname: &'a str,
             comment: &'a str) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        
+        if user.modes.oper {
+            if let Some(user_to_kill) = state.users.get_mut(nickname) {
+                user_to_kill.quit_sender.take().unwrap()
+                        .send((user_nick.to_string(), comment.to_string()))
+                            .map_err(|_| "error".to_string())?;
+            } else {
+                self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
+                            nick: nickname }).await?;
+            }
+        } else {
+            self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
+        }
         Ok(())
     }
     
