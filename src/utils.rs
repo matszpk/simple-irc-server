@@ -31,8 +31,8 @@ use crate::command::CommandError::*;
 pub(crate) struct IRCLinesCodec(LinesCodec);
 
 impl IRCLinesCodec {
-    pub fn new() -> IRCLinesCodec {
-        IRCLinesCodec(LinesCodec::new())
+    pub fn new_with_max_length(max_length: usize) -> IRCLinesCodec {
+        IRCLinesCodec(LinesCodec::new_with_max_length(max_length))
     }
 }
 

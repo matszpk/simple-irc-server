@@ -733,6 +733,12 @@ impl MainState {
                             }
                         }
                     }
+                    Some(Err(LinesCodecError::MaxLineLengthExceeded)) => {
+                        let client = conn_state.user_state.client_name();
+                        self.feed_msg(&mut conn_state.stream,
+                                    ErrInputTooLong417{ client }).await?;
+                        return Ok(())
+                    },
                     Some(Err(e)) => return Err(Box::new(e)),
                     // if end of stream
                     None => return Ok(()),

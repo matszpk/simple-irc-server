@@ -38,7 +38,7 @@ use utils::*;
 use state::*;
 
 async fn user_state_process(main_state: Arc<MainState>, stream: TcpStream, addr: SocketAddr) {
-    let line_stream = Framed::new(stream, IRCLinesCodec::new());
+    let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
         while !conn_state.is_quit() {
             if let Err(e) = main_state.process(&mut conn_state).await {

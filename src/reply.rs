@@ -76,20 +76,14 @@ pub(crate) enum Reply<'a> {
     RplEndOfWhoIs318{ client: &'a str, nick: &'a str },
     RplWhoIsChannels319{ client: &'a str, nick: &'a str,
             channels: &'a [WhoIsChannelStruct<'a>] },
-    //RplWhoIsSpecial320{ client: &'a str, nick: &'a str, special_info: &'a str },
     RplListStart321{ client: &'a str },
     RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
     RplListEnd323{ client: &'a str },
     RplChannelModeIs324{ client: &'a str, channel: &'a str, modestring: &'a str },
     RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: u64 },
-    RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
     RplNoTopic331{ client: &'a str, channel: &'a str },
     RplTopic332{ client: &'a str, channel: &'a str, topic: &'a str },
     RplTopicWhoTime333{ client: &'a str, channel: &'a str, nick: &'a str, setat: u64 },
-    RplWhoIsActually338P1{ client: &'a str, nick: &'a str },
-    RplWhoIsActually338P2{ client: &'a str, nick: &'a str, host_ip: &'a str },
-    RplWhoIsActually338P3{ client: &'a str, nick: &'a str,
-            username: &'a str, hostname: &'a str, ip: &'a str },
     RplInviting341{ client: &'a str, nick: &'a str, channel: &'a str },
     RplInviteList346{ client: &'a str, channel: &'a str, mask: &'a str },
     RplEndOfInviteList347{ client: &'a str, channel: &'a str },
@@ -126,10 +120,8 @@ pub(crate) enum Reply<'a> {
     ErrCannotSendToChain404{ client: &'a str, channel: &'a str },
     ErrTooManyChannels405{ client: &'a str, channel: &'a str },
     ErrWasNoSuchNick406{ client: &'a str, nick: &'a str },
-    ErrNoOrigin409{ client: &'a str },
     ErrInputTooLong417{ client: &'a str },
     ErrUnknownCommand421{ client: &'a str, command: &'a str },
-    ErrNoMotd422{ client: &'a str },
     ErrNicknameInUse433{ client: &'a str, nick: &'a str },
     ErrUserNotInChannel441{ client: &'a str, nick: &'a str, channel: &'a str },
     ErrNotOnChannel442{ client: &'a str, channel: &'a str },
@@ -263,8 +255,6 @@ impl<'a> fmt::Display for Reply<'a> {
                         prefix.to_string() + c.channel
                     } else { c.channel.to_string() }
                 }).collect::<Vec<_>>().join(" ")) }
-            //RplWhoIsSpecial320{ client, nick, special_info } => {
-            //    write!(f, "320 {} {} :{}", client, nick, special_info) }
             RplListStart321{ client } => {
                 write!(f, "321 {} Channel :Users  Name", client) }
             RplList322{ client, channel, client_count, topic } => {
@@ -275,21 +265,12 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "324 {} {} {}", client, channel, modestring) }
             RplCreationTime329{ client, channel, creation_time } => {
                 write!(f, "329 {} {} {}", client, channel, creation_time) }
-            RplWhoIsAccount330{ client, nick, account } => {
-                write!(f, "330 {} {} {} :is logged in as", client, nick, account) }
             RplNoTopic331{ client, channel } => {
                 write!(f, "331 {} {} :No topic is set", client, channel) }
             RplTopic332{ client, channel, topic } => {
                 write!(f, "332 {} {} :{}", client, channel, topic) }
             RplTopicWhoTime333{ client, channel, nick, setat } => {
                 write!(f, "333 {} {} {} {}", client, channel, nick, setat) }
-            RplWhoIsActually338P1{ client, nick } => {
-                write!(f, "338 {} {} :is actually ...", client, nick) }
-            RplWhoIsActually338P2{ client, nick, host_ip } => {
-                write!(f, "338 {} {} {} :Is actually using host", client, nick, host_ip) }
-            RplWhoIsActually338P3{ client, nick, username, hostname, ip } => {
-                write!(f, "338 {} {} ~{}@{} {} :Is actually using host", client, nick,
-                    username, hostname, ip) }
             RplInviting341{ client, nick, channel } => {
                 write!(f, "341 {} {} {}", client, nick, channel) }
             RplInviteList346{ client, channel, mask } => {
@@ -358,14 +339,10 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "405 {} {} :You have joined too many channels", client, channel) }
             ErrWasNoSuchNick406{ client, nick } => {
                 write!(f, "406 {} {} :There was no such nickname", client, nick) }
-            ErrNoOrigin409{ client } => {
-                write!(f, "409 {} :No origin specified", client) }
             ErrInputTooLong417{ client } => {
                 write!(f, "417 {} :Input line was too long", client) }
             ErrUnknownCommand421{ client, command } => {
                 write!(f, "421 {} {} :Unknown command", client, command) }
-            ErrNoMotd422{ client } => {
-                write!(f, "422 {} :MOTD File is missing", client) }
             ErrNicknameInUse433{ client, nick } => {
                 write!(f, "433 {} {} :Nickname is already in use", client, nick) }
             ErrUserNotInChannel441{ client, nick, channel } => {
@@ -555,9 +532,6 @@ mod test {
                     WhoIsChannelStruct{ prefix: None, channel: "<channel2>" },
                     WhoIsChannelStruct{ prefix: Some("prefix3".to_string()),
                             channel: "<channel3>" }]}));
-//         assert_eq!("320 <client> <nick> :special info",
-//             format!("{}", RplWhoIsSpecial320{ client: "<client>", nick: "<nick>",
-//                 special_info: "special info" }));
         assert_eq!("321 <client> Channel :Users  Name",
             format!("{}", RplListStart321{ client: "<client>" }));
         assert_eq!("322 <client> <channel> 47 :<topic>",
@@ -571,9 +545,6 @@ mod test {
         assert_eq!("329 <client> <channel> 334411111",
             format!("{}", RplCreationTime329{ client: "<client>", channel: "<channel>",
                 creation_time: 334411111 }));
-        assert_eq!("330 <client> <nick> <account> :is logged in as",
-            format!("{}", RplWhoIsAccount330{ client: "<client>", nick: "<nick>",
-                account: "<account>" }));
         assert_eq!("331 <client> <channel> :No topic is set",
             format!("{}", RplNoTopic331{ client: "<client>", channel: "<channel>" }));
         assert_eq!("332 <client> <channel> :<topic>",
@@ -582,14 +553,6 @@ mod test {
         assert_eq!("333 <client> <channel> <nick> 38329311",
             format!("{}", RplTopicWhoTime333{ client: "<client>", channel: "<channel>",
                 nick: "<nick>", setat: 38329311 }));
-        assert_eq!("338 <client> <nick> :is actually ...",
-            format!("{}", RplWhoIsActually338P1{ client: "<client>", nick: "<nick>" }));
-        assert_eq!("338 <client> <nick> <host|ip> :Is actually using host",
-            format!("{}", RplWhoIsActually338P2{ client: "<client>", nick: "<nick>",
-                host_ip: "<host|ip>" }));
-        assert_eq!("338 <client> <nick> ~<username>@<hostname> <ip> :Is actually using host",
-            format!("{}", RplWhoIsActually338P3{ client: "<client>", nick: "<nick>",
-                username: "<username>", hostname: "<hostname>", ip: "<ip>" }));
         assert_eq!("341 <client> <nick> <channel>",
             format!("{}", RplInviting341{ client: "<client>", nick: "<nick>",
                 channel: "<channel>" }));
@@ -674,15 +637,11 @@ mod test {
                 channel: "<channel>" }));
         assert_eq!("406 <client> <nickname> :There was no such nickname",
             format!("{}", ErrWasNoSuchNick406{ client: "<client>", nick: "<nickname>" }));
-        assert_eq!("409 <client> :No origin specified",
-            format!("{}", ErrNoOrigin409{ client: "<client>" }));
         assert_eq!("417 <client> :Input line was too long",
             format!("{}", ErrInputTooLong417{ client: "<client>" }));
         assert_eq!("421 <client> <command> :Unknown command",
             format!("{}", ErrUnknownCommand421{ client: "<client>",
                 command: "<command>" }));
-        assert_eq!("422 <client> :MOTD File is missing",
-            format!("{}", ErrNoMotd422{ client: "<client>" }));
         assert_eq!("433 <client> <nick> :Nickname is already in use",
             format!("{}", ErrNicknameInUse433{ client: "<client>", nick: "<nick>" }));
         assert_eq!("441 <client> <nick> <channel> :They aren't on that channel",
