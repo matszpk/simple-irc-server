@@ -653,7 +653,7 @@ mod test {
             format!("{}", RplWhoIsModes379{ client: "<client>", nick: "<nick>",
                 modes: "+ailosw" }));
         assert_eq!("381 <client> :You are now an IRC operator",
-            format!("{}", RplYoueOper381{ client: "<client>" }));
+            format!("{}", RplYoureOper381{ client: "<client>" }));
         assert_eq!("382 <client> <config file> :Rehashing",
             format!("{}", RplRehashing382{ client: "<client>",
                 config_file: "<config file>" }));
