@@ -140,7 +140,7 @@ pub(crate) enum Reply<'a> {
     ErrNeedMoreParams461{ client: &'a str, command: &'a str },
     ErrAlreadyRegistered462{ client: &'a str },
     ErrPasswdMismatch464{ client: &'a str },
-    ErrYoureBannedCreep465{ client: &'a str },
+    //ErrYoureBannedCreep465{ client: &'a str },
     ErrChannelIsFull471{ client: &'a str, channel: &'a str },
     ErrUnknownMode472{ client: &'a str, modechar: char },
     ErrInviteOnlyChan473{ client: &'a str, channel: &'a str },
@@ -388,8 +388,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "462 {} :You may not reregister", client) }
             ErrPasswdMismatch464{ client } => {
                 write!(f, "464 {} :Password incorrect", client) }
-            ErrYoureBannedCreep465{ client } => {
-                write!(f, "465 {} :You are banned from this server.", client) }
+            //ErrYoureBannedCreep465{ client } => {
+            //    write!(f, "465 {} :You are banned from this server.", client) }
             ErrChannelIsFull471{ client, channel } => {
                 write!(f, "471 {} {} :Cannot join channel (+l)", client, channel) }
             ErrUnknownMode472{ client, modechar } => {
@@ -711,8 +711,8 @@ mod test {
             format!("{}", ErrAlreadyRegistered462{ client: "<client>" }));
         assert_eq!("464 <client> :Password incorrect",
             format!("{}", ErrPasswdMismatch464{ client: "<client>" }));
-        assert_eq!("465 <client> :You are banned from this server.",
-            format!("{}", ErrYoureBannedCreep465{ client: "<client>" }));
+        //assert_eq!("465 <client> :You are banned from this server.",
+        //    format!("{}", ErrYoureBannedCreep465{ client: "<client>" }));
         assert_eq!("471 <client> <channel> :Cannot join channel (+l)",
             format!("{}", ErrChannelIsFull471{ client: "<client>", channel: "<channel>" }));
         assert_eq!("472 <client> x :is unknown mode char to me",

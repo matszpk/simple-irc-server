@@ -1493,6 +1493,8 @@ impl MainState {
                                 channel: &channel.name, replies: &name_chunk }).await?;
             }
         }
+        self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
+                    channel: &channel.name }).await?;
         Ok(())
     }
     
