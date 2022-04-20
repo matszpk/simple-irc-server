@@ -114,7 +114,7 @@ impl<'a> Message<'a> {
                 out += s;
             });
             let last = self.params[self.params.len()-1];
-            if last.find([':', ' ', '\t']).is_some() {
+            if last.find(|c|  c==':' || c == ' ' || c == '\t').is_some() {
                 out += " :";
             } else {
                 out.push(' ');
