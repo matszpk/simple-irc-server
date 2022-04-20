@@ -82,7 +82,7 @@ pub(crate) enum Reply<'a> {
     RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
     RplListEnd323{ client: &'a str },
     RplChannelModeIs324{ client: &'a str, channel: &'a str, modestring: &'a str },
-    RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: &'a str },
+    RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: u64 },
     RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
     RplNoTopic331{ client: &'a str, channel: &'a str },
     RplTopic332{ client: &'a str, channel: &'a str, topic: &'a str },
@@ -576,9 +576,9 @@ mod test {
         assert_eq!("324 <client> <channel> <modestring>",
             format!("{}", RplChannelModeIs324{ client: "<client>", channel: "<channel>",
                 modestring: "<modestring>" }));
-        assert_eq!("329 <client> <channel> <creationtime>",
+        assert_eq!("329 <client> <channel> 334411111",
             format!("{}", RplCreationTime329{ client: "<client>", channel: "<channel>",
-                creation_time: "<creationtime>" }));
+                creation_time: 334411111 }));
         assert_eq!("330 <client> <nick> <account> :is logged in as",
             format!("{}", RplWhoIsAccount330{ client: "<client>", nick: "<nick>",
                 account: "<account>" }));

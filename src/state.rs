@@ -297,6 +297,7 @@ struct Channel {
     default_modes: ChannelDefaultModes,
     ban_info: HashMap<String, BanInfo>,
     users: HashMap<String, ChannelUserModes>,
+    creation_time: u64,
 }
 
 impl Channel {
@@ -305,7 +306,8 @@ impl Channel {
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
         Channel{ name, topic: None, ban_info: HashMap::new(),
             default_modes: ChannelDefaultModes::default(),
-            modes: ChannelModes::new_for_channel(user_nick), users }
+            modes: ChannelModes::new_for_channel(user_nick), users,
+            creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
     }
     
     fn rename_user(&mut self, old_nick: &String, nick: String) {
@@ -580,7 +582,9 @@ impl VolatileState {
                 channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
                     topic: c.topic.as_ref().map(|x| ChannelTopic::new(x.clone())),
                     ban_info: HashMap::new(), default_modes: def_ch_modes,
-                    modes: ch_modes, users: HashMap::new() });
+                    modes: ch_modes, users: HashMap::new(),
+                    creation_time: SystemTime::now().duration_since(UNIX_EPOCH)
+                            .unwrap().as_secs() });
             });
         }
         
@@ -1792,6 +1796,8 @@ impl MainState {
         if modes.len() == 0 {
             self.feed_msg(&mut conn_state.stream, RplChannelModeIs324{ client,
                     channel: target, modestring: &chanobj.modes.to_string() }).await?;
+            self.feed_msg(&mut conn_state.stream, RplCreationTime329{ client,
+                channel: target, creation_time: chanobj.creation_time }).await?;
         } else {
         //
         for (mchars, margs) in modes {
