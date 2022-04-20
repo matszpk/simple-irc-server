@@ -1136,6 +1136,12 @@ mod test {
             Command::from_message(&Message{ source: None, command: "INFO",
                 params: vec![] }).map_err(|e| e.to_string()));
         
+        assert_eq!(Ok(MODE{ target: "andy", modes: vec![] }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "andy" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(MODE{ target: "#engines", modes: vec![] }),
+            Command::from_message(&Message{ source: None, command: "MODE",
+                params: vec![ "#engines" ] }).map_err(|e| e.to_string()));
         assert_eq!(Ok(MODE{ target: "andy", modes: vec![("+ow", vec![])] }),
             Command::from_message(&Message{ source: None, command: "MODE",
                 params: vec![ "andy", "+ow" ] }).map_err(|e| e.to_string()));

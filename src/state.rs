@@ -1782,6 +1782,7 @@ impl MainState {
         Ok(())
     }
     
+    // FIXME: accept no modes string given
     async fn process_mode_channel<'a>(&self, conn_state: &mut ConnState,
             chanobj: &mut Channel, target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)>,
             chum: &ChannelUserModes) -> Result<(), Box<dyn Error>> {
