@@ -115,7 +115,7 @@ pub(crate) enum Reply<'a> {
     RplEndOfMotd376{ client: &'a str },
     RplWhoIsHost378{ client: &'a str, nick: &'a str, host_info: &'a str },
     RplWhoIsModes379{ client: &'a str, nick: &'a str, modes: &'a str },
-    RplYouReoper381{ client: &'a str },
+    RplYoureOper381{ client: &'a str },
     RplRehashing382{ client: &'a str, config_file: &'a str },
     RplTime391{ client: &'a str, server: &'a str, timestamp: u64, ts_offset: &'a str,
             human_readable: &'a str },
@@ -337,7 +337,7 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "378 {} {} :is connecting from {}", client, nick, host_info) }
             RplWhoIsModes379{ client, nick, modes } => {
                 write!(f, "379 {} {} :is using modes {}", client, nick, modes) }
-            RplYouReoper381{ client } => {
+            RplYoureOper381{ client } => {
                 write!(f, "381 {} :You are now an IRC operator", client) }
             RplRehashing382{ client, config_file } => {
                 write!(f, "382 {} {} :Rehashing", client, config_file) }
@@ -653,7 +653,7 @@ mod test {
             format!("{}", RplWhoIsModes379{ client: "<client>", nick: "<nick>",
                 modes: "+ailosw" }));
         assert_eq!("381 <client> :You are now an IRC operator",
-            format!("{}", RplYouReoper381{ client: "<client>" }));
+            format!("{}", RplYoueOper381{ client: "<client>" }));
         assert_eq!("382 <client> <config file> :Rehashing",
             format!("{}", RplRehashing382{ client: "<client>",
                 config_file: "<config file>" }));

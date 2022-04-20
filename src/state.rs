@@ -1156,6 +1156,7 @@ impl MainState {
             }
             user.modes.oper = true;
             state.operators_count += 1;
+            self.feed_msg(&mut conn_state.stream, RplYoureOper381{ client }).await?;
         } else {
             self.feed_msg(&mut conn_state.stream, ErrNoOperHost491{ client }).await?;
         }
