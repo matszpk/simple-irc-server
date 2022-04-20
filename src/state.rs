@@ -1557,13 +1557,20 @@ impl MainState {
         
         let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
             if chanobj.users.contains_key(user_nick) {
-                if chanobj.modes.invite_only {
+                let do_invite2 = if chanobj.modes.invite_only {
                     if !chanobj.users.get(user_nick).unwrap().operator {
                         self.feed_msg(&mut conn_state.stream,
                                     ErrChanOpPrivsNeeded482{ client, channel }).await?;
                         false
                     } else { true }
-                } else { true }
+                } else { true };
+                if do_invite2 {
+                    if chanobj.users.contains_key(nickname) {
+                        self.feed_msg(&mut conn_state.stream, ErrUserOnChannel443{ client,
+                                    nick: nickname, channel }).await?;
+                        false
+                    } else { true }
+                } else { false }
             } else {
                 self.feed_msg(&mut conn_state.stream,
                                     ErrNotOnChannel442{ client, channel }).await?;
