@@ -53,7 +53,6 @@ pub(crate) enum Reply<'a> {
     RplAdminLoc1257{ client: &'a str, info: &'a str },
     RplAdminLoc2258{ client: &'a str, info: &'a str },
     RplAdminEmail259{ client: &'a str, email: &'a str },
-    RplTryAgain263{ client: &'a str, command: &'a str },
     RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplGlobalUsers266{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
@@ -131,7 +130,6 @@ pub(crate) enum Reply<'a> {
     ErrInputTooLong417{ client: &'a str },
     ErrUnknownCommand421{ client: &'a str, command: &'a str },
     ErrNoMotd422{ client: &'a str },
-    ErrErroneusNickname432{ client: &'a str, nick: &'a str },
     ErrNicknameInUse433{ client: &'a str, nick: &'a str },
     ErrUserNotInChannel441{ client: &'a str, nick: &'a str, channel: &'a str },
     ErrNotOnChannel442{ client: &'a str, channel: &'a str },
@@ -220,8 +218,6 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "258 {} :{}", client, info) }
             RplAdminEmail259{ client, email } => {
                 write!(f, "259 {} :{}", client, email) }
-            RplTryAgain263{ client, command } => {
-                write!(f, "263 {} {} :Please wait a while and try again.", client, command) }
             RplLocalUsers265{ client, clients_num, max_clients_num } => {
                 write!(f, "265 {} {} {} :Current local users {}, max {}", client,
                     clients_num, max_clients_num, clients_num, max_clients_num) }
@@ -370,8 +366,6 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "421 {} {} :Unknown command", client, command) }
             ErrNoMotd422{ client } => {
                 write!(f, "422 {} :MOTD File is missing", client) }
-            ErrErroneusNickname432{ client, nick } => {
-                write!(f, "432 {} {} :Erroneus nickname", client, nick) }
             ErrNicknameInUse433{ client, nick } => {
                 write!(f, "433 {} {} :Nickname is already in use", client, nick) }
             ErrUserNotInChannel441{ client, nick, channel } => {
@@ -506,8 +500,6 @@ mod test {
             format!("{}", RplAdminLoc2258{ client: "<client>", info: "<info>" }));
         assert_eq!("259 <client> :<info>",
             format!("{}", RplAdminEmail259{ client: "<client>", email: "<info>" }));
-        assert_eq!("263 <client> <command> :Please wait a while and try again.",
-            format!("{}", RplTryAgain263{ client: "<client>", command: "<command>" }));
         assert_eq!("265 <client> 4 7 :Current local users 4, max 7",
             format!("{}", RplLocalUsers265{ client: "<client>", clients_num: 4,
                 max_clients_num: 7 }));
@@ -691,8 +683,6 @@ mod test {
                 command: "<command>" }));
         assert_eq!("422 <client> :MOTD File is missing",
             format!("{}", ErrNoMotd422{ client: "<client>" }));
-        assert_eq!("432 <client> <nick> :Erroneus nickname",
-            format!("{}", ErrErroneusNickname432{ client: "<client>", nick: "<nick>" }));
         assert_eq!("433 <client> <nick> :Nickname is already in use",
             format!("{}", ErrNicknameInUse433{ client: "<client>", nick: "<nick>" }));
         assert_eq!("441 <client> <nick> <channel> :They aren't on that channel",
