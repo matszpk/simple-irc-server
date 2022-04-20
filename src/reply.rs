@@ -81,8 +81,7 @@ pub(crate) enum Reply<'a> {
     RplListStart321{ client: &'a str },
     RplList322{ client: &'a str, channel: &'a str, client_count: usize, topic: &'a str },
     RplListEnd323{ client: &'a str },
-    RplChannelModeIs324{ client: &'a str, channel: &'a str, modestring: &'a str,
-            mode_args: &'a [&'a str] },
+    RplChannelModeIs324{ client: &'a str, channel: &'a str, modestring: &'a str },
     RplCreationTime329{ client: &'a str, channel: &'a str, creation_time: &'a str },
     RplWhoIsAccount330{ client: &'a str, nick: &'a str, account: &'a str },
     RplNoTopic331{ client: &'a str, channel: &'a str },
@@ -276,9 +275,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "322 {} {} {} :{}", client, channel, client_count, topic) }
             RplListEnd323{ client } => {
                 write!(f, "323 {} :End of /LIST", client) }
-            RplChannelModeIs324{ client, channel, modestring, mode_args } => {
-                write!(f, "324 {} {} {} {}", client, channel, modestring, mode_args.iter()
-                    .map(|a| a.to_string()).collect::<Vec<_>>().join(" ")) }
+            RplChannelModeIs324{ client, channel, modestring } => {
+                write!(f, "324 {} {} {}", client, channel, modestring) }
             RplCreationTime329{ client, channel, creation_time } => {
                 write!(f, "329 {} {} {}", client, channel, creation_time) }
             RplWhoIsAccount330{ client, nick, account } => {
@@ -575,10 +573,9 @@ mod test {
                 client_count: 47, topic: "<topic>" }));
         assert_eq!("323 <client> :End of /LIST",
             format!("{}", RplListEnd323{ client: "<client>" }));
-        assert_eq!("324 <client> <channel> <modestring> <modearg1> <modearg2>",
+        assert_eq!("324 <client> <channel> <modestring>",
             format!("{}", RplChannelModeIs324{ client: "<client>", channel: "<channel>",
-                modestring: "<modestring>",
-                mode_args: &vec![ "<modearg1>", "<modearg2>" ] }));
+                modestring: "<modestring>" }));
         assert_eq!("329 <client> <channel> <creationtime>",
             format!("{}", RplCreationTime329{ client: "<client>", channel: "<channel>",
                 creation_time: "<creationtime>" }));

@@ -1782,13 +1782,17 @@ impl MainState {
         Ok(())
     }
     
-    // FIXME: accept no modes string given
     async fn process_mode_channel<'a>(&self, conn_state: &mut ConnState,
             chanobj: &mut Channel, target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)>,
             chum: &ChannelUserModes) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         let if_op = chum.is_operator();
         let if_half_op = chum.is_operator();
+        
+        if modes.len() == 0 {
+            self.feed_msg(&mut conn_state.stream, RplChannelModeIs324{ client,
+                    channel: target, modestring: &chanobj.modes.to_string() }).await?;
+        } else {
         //
         for (mchars, margs) in modes {
             let mut margs_it = margs.iter();
@@ -1983,6 +1987,7 @@ impl MainState {
                 }
             }
         }
+        } // if modes.len() == 0
         Ok(())
     }
     
@@ -1992,6 +1997,10 @@ impl MainState {
         let client = conn_state.user_state.client_name();
         let mut user = state.users.get_mut(target).unwrap();
         let user_nick = target;
+        if modes.len() == 0 {
+            self.feed_msg(&mut conn_state.stream, RplUModeIs221{ client,
+                    user_modes: &user.modes.to_string() }).await?;
+        } else {
         for (mchars, _) in modes {
             let mut mode_set = false;
             for mchar in mchars.chars() {
@@ -2090,6 +2099,7 @@ impl MainState {
                 }
             }
         }
+        } // if modes.len() != 0
         Ok(())
     }
     
