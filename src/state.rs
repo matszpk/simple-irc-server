@@ -116,6 +116,13 @@ struct User {
     history_entry: NickHistoryEntry
 }
 
+static HELP_TOPICS: [(&'static str, &'static str); 1] = [
+    ("COMMANDS", "List of commands
+    ADMIN - 
+    HELP -
+    JOIN -")
+];
+
 impl User {
     fn new(config: &MainConfig, user_state: &ConnUserState, registered: bool,
             sender: UnboundedSender<String>,
@@ -1787,8 +1794,27 @@ impl MainState {
         Ok(())
     }
     
-    async fn process_help<'a>(&self, _: &mut ConnState, _: &'a str)
+    async fn process_help<'a>(&self, conn_state: &mut ConnState, subject: &'a str)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        if let Some((_, content)) = HELP_TOPICS.iter().find(|(t, _)| *t == subject) {
+            let lines = content.split_terminator('\n').collect::<Vec<_>>();
+            for (i, line) in lines.iter().enumerate() {
+                if i+1 == lines.len() {
+                    self.feed_msg(&mut conn_state.stream,
+                            RplEndOfHelp706{ client, subject, line }).await?;
+                } else if i == 0 {
+                    self.feed_msg(&mut conn_state.stream,
+                            RplHelpStart704{ client, subject, line }).await?;
+                } else {
+                    self.feed_msg(&mut conn_state.stream,
+                            RplHelpTxt705{ client, subject, line }).await?;
+                }
+            }
+        } else {
+            self.feed_msg(&mut conn_state.stream,
+                        ErrHelpNotFound524{ client, subject }).await?;
+        }
         Ok(())
     }
     

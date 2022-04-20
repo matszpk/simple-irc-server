@@ -288,7 +288,7 @@ mod test {
     
     #[test]
     fn test_irc_lines_codec() {
-        let mut codec = IRCLinesCodec::new();
+        let mut codec = IRCLinesCodec::new_with_max_length(2000);
         let mut buf = BytesMut::new();
         codec.encode("my line".to_string(), &mut buf).unwrap();
         assert_eq!("my line\r\n".as_bytes(), buf);

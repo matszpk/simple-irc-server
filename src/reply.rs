@@ -55,7 +55,7 @@ pub(crate) enum Reply<'a> {
     RplAdminEmail259{ client: &'a str, email: &'a str },
     RplLocalUsers265{ client: &'a str, clients_num: usize, max_clients_num: usize },
     RplGlobalUsers266{ client: &'a str, clients_num: usize, max_clients_num: usize },
-    RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
+    //RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
     RplUserHost302{ client: &'a str, replies: &'a [String] },
     RplUnAway305{ client: &'a str },
@@ -109,13 +109,13 @@ pub(crate) enum Reply<'a> {
     RplWhoIsHost378{ client: &'a str, nick: &'a str, host_info: &'a str },
     RplWhoIsModes379{ client: &'a str, nick: &'a str, modes: &'a str },
     RplYoureOper381{ client: &'a str },
-    RplRehashing382{ client: &'a str, config_file: &'a str },
+    //RplRehashing382{ client: &'a str, config_file: &'a str },
     RplTime391{ client: &'a str, server: &'a str, timestamp: u64, ts_offset: &'a str,
             human_readable: &'a str },
     ErrUnknownError400{ client: &'a str, command: &'a str, subcommand: Option<&'a str>,
             info: &'a str },
     ErrNoSuchNick401{ client: &'a str, nick: &'a str },
-    ErrNoSuchServer402{ client: &'a str, server: &'a str },
+    //ErrNoSuchServer402{ client: &'a str, server: &'a str },
     ErrNoSuchChannel403{ client: &'a str, channel: &'a str },
     ErrCannotSendToChain404{ client: &'a str, channel: &'a str },
     ErrTooManyChannels405{ client: &'a str, channel: &'a str },
@@ -144,24 +144,24 @@ pub(crate) enum Reply<'a> {
     ErrUmodeUnknownFlag501{ client: &'a str },
     ErrUsersDontMatch502{ client: &'a str },
     ErrHelpNotFound524{ client: &'a str, subject: &'a str },
-    RplStartTls670{ client: &'a str },
-    RplWhoIsSecure671{ client: &'a str, nick: &'a str },
-    ErrStartTls691{ client: &'a str },
+    //RplStartTls670{ client: &'a str },
+    //RplWhoIsSecure671{ client: &'a str, nick: &'a str },
+    //ErrStartTls691{ client: &'a str },
     ErrInvalidModeParam696{ client: &'a str, target: &'a str, modechar: char,
         param: &'a str, description: &'a str },
     RplHelpStart704{ client: &'a str, subject: &'a str, line: &'a str },
     RplHelpTxt705{ client: &'a str, subject: &'a str, line: &'a str },
     RplEndOfHelp706{ client: &'a str, subject: &'a str, line: &'a str },
-    RplLoggedIn900{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str,
-            account: &'a str, username: &'a str },
-    RplLoggedOut901{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str },
-    ErrNickLocked902{ client: &'a str },
-    RplSaslSuccess903{ client: &'a str },
-    ErrSaslFail904{ client: &'a str },
-    ErrSaslTooLong905{ client: &'a str },
-    ErrSaslAborted906{ client: &'a str },
-    ErrSaslAlready907{ client: &'a str },
-    RplSaslMechs908{ client: &'a str, mechanisms: &'a str },
+    //RplLoggedIn900{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str,
+    //        account: &'a str, username: &'a str },
+    //RplLoggedOut901{ client: &'a str, nick: &'a str, user: &'a str, host: &'a str },
+    //ErrNickLocked902{ client: &'a str },
+    //RplSaslSuccess903{ client: &'a str },
+    //ErrSaslFail904{ client: &'a str },
+    //ErrSaslTooLong905{ client: &'a str },
+    //ErrSaslAborted906{ client: &'a str },
+    //ErrSaslAlready907{ client: &'a str },
+    //RplSaslMechs908{ client: &'a str, mechanisms: &'a str },
     ErrCannotDoCommand972{ client: &'a str },
 }
 
@@ -216,9 +216,9 @@ impl<'a> fmt::Display for Reply<'a> {
             RplGlobalUsers266{ client, clients_num, max_clients_num } => {
                 write!(f, "266 {} {} {} :Current global users {}, max {}", client,
                     clients_num, max_clients_num, clients_num, max_clients_num) }
-            RplWhoIsCertFP276{ client, nick, fingerprint } => {
-                write!(f, "276 {} {} :has client certificate fingerprint {}", client, nick,
-                    fingerprint) }
+            //RplWhoIsCertFP276{ client, nick, fingerprint } => {
+            //    write!(f, "276 {} {} :has client certificate fingerprint {}", client, nick,
+            //        fingerprint) }
             RplAway301{ client, nick, message } => {
                 write!(f, "301 {} {} :{}", client, nick, message) }
             RplUserHost302{ client, replies } => {
@@ -316,8 +316,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "379 {} {} :is using modes {}", client, nick, modes) }
             RplYoureOper381{ client } => {
                 write!(f, "381 {} :You are now an IRC operator", client) }
-            RplRehashing382{ client, config_file } => {
-                write!(f, "382 {} {} :Rehashing", client, config_file) }
+            //RplRehashing382{ client, config_file } => {
+            //    write!(f, "382 {} {} :Rehashing", client, config_file) }
             RplTime391{ client, server, timestamp, ts_offset, human_readable } => {
                 write!(f, "391 {} {} {} {} :{}", client, server, timestamp, ts_offset,
                     human_readable) }
@@ -329,8 +329,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 } }
             ErrNoSuchNick401{ client, nick } => {
                 write!(f, "401 {} {} :No such nick/channel", client, nick) }
-            ErrNoSuchServer402{ client, server } => {
-                write!(f, "402 {} {} :No such server", client, server) }
+            //ErrNoSuchServer402{ client, server } => {
+            //    write!(f, "402 {} {} :No such server", client, server) }
             ErrNoSuchChannel403{ client, channel } => {
                 write!(f, "403 {} {} :No such channel", client, channel) }
             ErrCannotSendToChain404{ client, channel } => {
@@ -387,40 +387,41 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "502 {} :Cant change mode for other users", client) }
             ErrHelpNotFound524{ client, subject } => {
                 write!(f, "524 {} {} :No help available on this topic", client, subject) }
-            RplStartTls670{ client } => {
-                write!(f, "670 {} :STARTTLS successful, proceed with TLS handshake", client) }
-            RplWhoIsSecure671{ client, nick } => {
-                write!(f, "671 {} {} :is using a secure connection", client, nick) }
-            ErrStartTls691{ client } => {
-                write!(f, "691 {} :STARTTLS failed (Wrong moon phase)", client) }
+            //RplStartTls670{ client } => {
+            //    write!(f, "670 {} :STARTTLS successful, proceed with TLS handshake", client) }
+            //RplWhoIsSecure671{ client, nick } => {
+            //    write!(f, "671 {} {} :is using a secure connection", client, nick) }
+            //ErrStartTls691{ client } => {
+            //    write!(f, "691 {} :STARTTLS failed (Wrong moon phase)", client) }
             ErrInvalidModeParam696{ client, target, modechar, param, description } => {
-                write!(f, "696 {} {} {} {} :{}", client, target, modechar, param, description) }
+                write!(f, "696 {} {} {} {} :{}", client, target, modechar,
+                          param, description) }
             RplHelpStart704{ client, subject, line } => {
                 write!(f, "704 {} {} :{}", client, subject, line) }
             RplHelpTxt705{ client, subject, line } => {
                 write!(f, "705 {} {} :{}", client, subject, line) }
             RplEndOfHelp706{ client, subject, line } => {
                 write!(f, "706 {} {} :{}", client, subject, line) }
-            RplLoggedIn900{ client, nick, user, host, account, username } => {
-                write!(f, "900 {} {}!~{}@{} {} :You are now logged in as {}", client, nick,
-                    user, host, account, username) }
-            RplLoggedOut901{ client, nick, user, host } => {
-                write!(f, "901 {} {}!~{}@{} :You are now logged out", client, nick,
-                    user, host) }
-            ErrNickLocked902{ client } => {
-                write!(f, "902 {} :You must use a nick assigned to you", client) }
-            RplSaslSuccess903{ client } => {
-                write!(f, "903 {} :SASL authentication successful", client) }
-            ErrSaslFail904{ client } => {
-                write!(f, "904 {} :SASL authentication failed", client) }
-            ErrSaslTooLong905{ client } => {
-                write!(f, "905 {} :SASL message too long", client) }
-            ErrSaslAborted906{ client } => {
-                write!(f, "906 {} :SASL authentication aborted", client) }
-            ErrSaslAlready907{ client } => {
-                write!(f, "907 {} :You have already authenticated using SASL", client) }
-            RplSaslMechs908{ client, mechanisms } => {
-                write!(f, "908 {} {} :are available SASL mechanisms", client, mechanisms) }
+            //RplLoggedIn900{ client, nick, user, host, account, username } => {
+            //    write!(f, "900 {} {}!~{}@{} {} :You are now logged in as {}", client, nick,
+            //        user, host, account, username) }
+            //RplLoggedOut901{ client, nick, user, host } => {
+            //    write!(f, "901 {} {}!~{}@{} :You are now logged out", client, nick,
+            //        user, host) }
+            //ErrNickLocked902{ client } => {
+            //    write!(f, "902 {} :You must use a nick assigned to you", client) }
+            //RplSaslSuccess903{ client } => {
+            //    write!(f, "903 {} :SASL authentication successful", client) }
+            //ErrSaslFail904{ client } => {
+            //    write!(f, "904 {} :SASL authentication failed", client) }
+            //ErrSaslTooLong905{ client } => {
+            //    write!(f, "905 {} :SASL message too long", client) }
+            //ErrSaslAborted906{ client } => {
+            //    write!(f, "906 {} :SASL authentication aborted", client) }
+            //ErrSaslAlready907{ client } => {
+            //    write!(f, "907 {} :You have already authenticated using SASL", client) }
+            //RplSaslMechs908{ client, mechanisms } => {
+            //    write!(f, "908 {} {} :are available SASL mechanisms", client, mechanisms) }
             ErrCannotDoCommand972{ client } => {
                 write!(f, "972 {} :Can not do command", client) }
         }
@@ -483,9 +484,9 @@ mod test {
         assert_eq!("266 <client> 7 10 :Current global users 7, max 10",
             format!("{}", RplGlobalUsers266{ client: "<client>", clients_num: 7,
                 max_clients_num: 10 }));
-        assert_eq!("276 <client> <nick> :has client certificate fingerprint <fingerprint>",
-            format!("{}", RplWhoIsCertFP276{ client: "<client>", nick: "<nick>",
-                fingerprint: "<fingerprint>" }));
+        //assert_eq!("276 <client> <nick> :has client certificate fingerprint <fingerprint>",
+        //    format!("{}", RplWhoIsCertFP276{ client: "<client>", nick: "<nick>",
+        //        fingerprint: "<fingerprint>" }));
         assert_eq!("301 <client> <nick> :<message>",
             format!("{}", RplAway301{ client: "<client>", nick: "<nick>",
                 message: "<message>" }));
@@ -609,9 +610,9 @@ mod test {
                 modes: "+ailosw" }));
         assert_eq!("381 <client> :You are now an IRC operator",
             format!("{}", RplYoureOper381{ client: "<client>" }));
-        assert_eq!("382 <client> <config file> :Rehashing",
-            format!("{}", RplRehashing382{ client: "<client>",
-                config_file: "<config file>" }));
+        //assert_eq!("382 <client> <config file> :Rehashing",
+        //    format!("{}", RplRehashing382{ client: "<client>",
+        //        config_file: "<config file>" }));
         assert_eq!("391 <client> <server> 485829211 <TS offset> :<human-readable time>",
             format!("{}", RplTime391{ client: "<client>", server: "<server>",
                 timestamp: 485829211, ts_offset: "<TS offset>",
@@ -624,9 +625,9 @@ mod test {
                 subcommand: Some("<subcommand>"), info: "<info>" }));
         assert_eq!("401 <client> <nickname> :No such nick/channel",
             format!("{}", ErrNoSuchNick401{ client: "<client>", nick: "<nickname>" }));
-        assert_eq!("402 <client> <server name> :No such server",
-            format!("{}", ErrNoSuchServer402{ client: "<client>",
-                server: "<server name>" }));
+        //assert_eq!("402 <client> <server name> :No such server",
+        //    format!("{}", ErrNoSuchServer402{ client: "<client>",
+        //        server: "<server name>" }));
         assert_eq!("403 <client> <channel> :No such channel",
             format!("{}", ErrNoSuchChannel403{ client: "<client>", channel: "<channel>" }));
         assert_eq!("404 <client> <channel> :Cannot send to channel",
@@ -689,12 +690,12 @@ mod test {
             format!("{}", ErrUsersDontMatch502{ client: "<client>" }));
         assert_eq!("524 <client> <subject> :No help available on this topic",
             format!("{}", ErrHelpNotFound524{ client: "<client>", subject: "<subject>" }));
-        assert_eq!("670 <client> :STARTTLS successful, proceed with TLS handshake",
-            format!("{}", RplStartTls670{ client: "<client>" }));
-        assert_eq!("671 <client> <nick> :is using a secure connection",
-            format!("{}", RplWhoIsSecure671{ client: "<client>", nick: "<nick>" }));
-        assert_eq!("691 <client> :STARTTLS failed (Wrong moon phase)",
-            format!("{}", ErrStartTls691{ client: "<client>" }));
+        //assert_eq!("670 <client> :STARTTLS successful, proceed with TLS handshake",
+        //    format!("{}", RplStartTls670{ client: "<client>" }));
+        //assert_eq!("671 <client> <nick> :is using a secure connection",
+        //    format!("{}", RplWhoIsSecure671{ client: "<client>", nick: "<nick>" }));
+        //assert_eq!("691 <client> :STARTTLS failed (Wrong moon phase)",
+        //    format!("{}", ErrStartTls691{ client: "<client>" }));
         assert_eq!("696 <client> <target chan/user> x <parameter> :<description>",
             format!("{}", ErrInvalidModeParam696{ client: "<client>",
                 target: "<target chan/user>", modechar: 'x', param: "<parameter>",
@@ -708,29 +709,29 @@ mod test {
         assert_eq!("706 <client> <subject> :<last line of help text>",
             format!("{}", RplEndOfHelp706{ client: "<client>", subject: "<subject>",
                 line: "<last line of help text>" }));
-        assert_eq!("900 <client> <nick>!~<user>@<host> <account> \
-            :You are now logged in as <username>",
-            format!("{}", RplLoggedIn900{ client: "<client>", nick: "<nick>",
-                user: "<user>", host: "<host>", account: "<account>",
-                username: "<username>" }));
-        assert_eq!("901 <client> <nick>!~<user>@<host> :You are now logged out",
-            format!("{}", RplLoggedOut901{ client: "<client>", nick: "<nick>",
-                user: "<user>", host: "<host>" }));
-        assert_eq!("902 <client> :You must use a nick assigned to you",
-            format!("{}", ErrNickLocked902{ client: "<client>" }));
-        assert_eq!("903 <client> :SASL authentication successful",
-            format!("{}", RplSaslSuccess903{ client: "<client>" }));
-        assert_eq!("904 <client> :SASL authentication failed",
-            format!("{}", ErrSaslFail904{ client: "<client>" }));
-        assert_eq!("905 <client> :SASL message too long",
-            format!("{}", ErrSaslTooLong905{ client: "<client>" }));
-        assert_eq!("906 <client> :SASL authentication aborted",
-            format!("{}", ErrSaslAborted906{ client: "<client>" }));
-        assert_eq!("907 <client> :You have already authenticated using SASL",
-            format!("{}", ErrSaslAlready907{ client: "<client>" }));
-        assert_eq!("908 <client> <mechanisms> :are available SASL mechanisms",
-            format!("{}", RplSaslMechs908{ client: "<client>",
-                mechanisms: "<mechanisms>" }));
+        //assert_eq!("900 <client> <nick>!~<user>@<host> <account> \
+        //    :You are now logged in as <username>",
+        //    format!("{}", RplLoggedIn900{ client: "<client>", nick: "<nick>",
+        //        user: "<user>", host: "<host>", account: "<account>",
+        //        username: "<username>" }));
+        //assert_eq!("901 <client> <nick>!~<user>@<host> :You are now logged out",
+        //    format!("{}", RplLoggedOut901{ client: "<client>", nick: "<nick>",
+        //        user: "<user>", host: "<host>" }));
+        //assert_eq!("902 <client> :You must use a nick assigned to you",
+        //    format!("{}", ErrNickLocked902{ client: "<client>" }));
+        //assert_eq!("903 <client> :SASL authentication successful",
+        //    format!("{}", RplSaslSuccess903{ client: "<client>" }));
+        //assert_eq!("904 <client> :SASL authentication failed",
+        //    format!("{}", ErrSaslFail904{ client: "<client>" }));
+        //assert_eq!("905 <client> :SASL message too long",
+        //    format!("{}", ErrSaslTooLong905{ client: "<client>" }));
+        //assert_eq!("906 <client> :SASL authentication aborted",
+        //    format!("{}", ErrSaslAborted906{ client: "<client>" }));
+        //assert_eq!("907 <client> :You have already authenticated using SASL",
+        //    format!("{}", ErrSaslAlready907{ client: "<client>" }));
+        //assert_eq!("908 <client> <mechanisms> :are available SASL mechanisms",
+        //    format!("{}", RplSaslMechs908{ client: "<client>",
+        //        mechanisms: "<mechanisms>" }));
         assert_eq!("972 <client> :Can not do command",
             format!("{}", ErrCannotDoCommand972{ client: "<client>" }));
     }
