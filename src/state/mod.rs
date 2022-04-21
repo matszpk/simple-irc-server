@@ -1029,6 +1029,86 @@ mod test {
                 [("diggy".to_string(), ChannelUserModes::new_for_created_channel())].into(),
             creation_time: channel.creation_time }, channel);
     }
+    
+    #[test]
+    fn test_channel_add_remove_mode() {
+        let mut channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
+        
+        let mut exp_channel = Channel{ name: "#bobby".to_string(), topic: None,
+            modes: ChannelModes::new_for_channel("dizzy".to_string()),
+            default_modes: ChannelDefaultModes::default(),
+            ban_info: HashMap::new(), users: [("dizzy".to_string(), 
+                        ChannelUserModes::new_for_created_channel()),
+                    ("inventor".to_string(), ChannelUserModes::default()),
+                    ("guru".to_string(), ChannelUserModes::default()),
+                    ("halfguru".to_string(), ChannelUserModes::default()),
+                    ("vip".to_string(), ChannelUserModes::default()),
+                    ("talker".to_string(), ChannelUserModes::default())].into(),
+            creation_time: channel.creation_time };
+        
+        channel.users.insert("inventor".to_string(), ChannelUserModes::default());
+        channel.users.insert("guru".to_string(), ChannelUserModes::default());
+        channel.users.insert("halfguru".to_string(), ChannelUserModes::default());
+        channel.users.insert("vip".to_string(), ChannelUserModes::default());
+        channel.users.insert("talker".to_string(), ChannelUserModes::default());
+        
+        channel.add_founder("inventor");
+        exp_channel.modes.founders =
+                Some([ "dizzy".to_string(), "inventor".to_string()].into());
+        exp_channel.users.insert("inventor".to_string(), ChannelUserModes{ founder: true,
+                protected: false, operator: false, half_oper: false, voice: false });
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_founder("inventor");
+        exp_channel.modes.founders = Some([ "dizzy".to_string()].into());
+        exp_channel.users.insert("inventor".to_string(), ChannelUserModes::default());
+        assert_eq!(exp_channel, channel);
+        
+        channel.add_operator("guru");
+        exp_channel.modes.operators =
+                Some([ "dizzy".to_string(), "guru".to_string()].into());
+        exp_channel.users.insert("guru".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: true, half_oper: false, voice: false });
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_operator("guru");
+        exp_channel.modes.operators = Some([ "dizzy".to_string()].into());
+        exp_channel.users.insert("guru".to_string(), ChannelUserModes::default());
+        assert_eq!(exp_channel, channel);
+        
+        channel.add_half_operator("halfguru");
+        exp_channel.modes.half_operators = Some(["halfguru".to_string()].into());
+        exp_channel.users.insert("halfguru".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: false, half_oper: true, voice: false });
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_half_operator("halfguru");
+        exp_channel.modes.half_operators = Some(HashSet::new());
+        exp_channel.users.insert("halfguru".to_string(), ChannelUserModes::default());
+        assert_eq!(exp_channel, channel);
+        
+        channel.add_protected("vip");
+        exp_channel.modes.protecteds = Some(["vip".to_string()].into());
+        exp_channel.users.insert("vip".to_string(), ChannelUserModes{ founder: false,
+                protected: true, operator: false, half_oper: false, voice: false });
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_protected("vip");
+        exp_channel.modes.protecteds = Some(HashSet::new());
+        exp_channel.users.insert("vip".to_string(), ChannelUserModes::default());
+        assert_eq!(exp_channel, channel);
+        
+        channel.add_voice("talker");
+        exp_channel.modes.voices = Some(["talker".to_string()].into());
+        exp_channel.users.insert("talker".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: false, half_oper: false, voice: true });
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_voice("talker");
+        exp_channel.modes.voices = Some(HashSet::new());
+        exp_channel.users.insert("talker".to_string(), ChannelUserModes::default());
+        assert_eq!(exp_channel, channel);
+    }
 }
 
 mod conn_cmds;
