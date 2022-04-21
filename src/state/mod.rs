@@ -218,7 +218,7 @@ struct BanInfo {
     who: String,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 struct ChannelDefaultModes {
     operators: HashSet<String>,
     half_operators: HashSet<String>,
@@ -970,6 +970,41 @@ mod test {
         assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("abc"));
         assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("#"));
         assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("&"));
+    }
+    
+    #[test]
+    fn test_channel_default_modes_new_from_modes_and_cleanup() {
+        let mut chm = ChannelModes::default();
+        chm.founders = Some(["founder".to_string()].into());
+        chm.protecteds = Some(["protected".to_string()].into());
+        chm.operators = Some(["operator".to_string()].into());
+        chm.half_operators = Some(["half_operator".to_string()].into());
+        chm.voices = Some(["voice".to_string()].into());
+        let exp_chdm = ChannelDefaultModes{
+            founders: ["founder".to_string()].into(),
+            protecteds: ["protected".to_string()].into(),
+            operators: ["operator".to_string()].into(),
+            half_operators: ["half_operator".to_string()].into(),
+            voices: ["voice".to_string()].into(),
+        };
+        let chdm = ChannelDefaultModes::new_from_modes_and_cleanup(&mut chm);
+        assert_eq!(exp_chdm, chdm);
+        assert_eq!(ChannelModes::default(), chm);
+        
+        let mut chm = ChannelModes::default();
+        chm.operators = Some(["operator".to_string()].into());
+        chm.half_operators = Some(["half_operator".to_string()].into());
+        chm.voices = Some(["voice".to_string()].into());
+        let exp_chdm = ChannelDefaultModes{
+            founders: HashSet::new(),
+            protecteds: HashSet::new(),
+            operators: ["operator".to_string()].into(),
+            half_operators: ["half_operator".to_string()].into(),
+            voices: ["voice".to_string()].into(),
+        };
+        let chdm = ChannelDefaultModes::new_from_modes_and_cleanup(&mut chm);
+        assert_eq!(exp_chdm, chdm);
+        assert_eq!(ChannelModes::default(), chm);
     }
 }
 

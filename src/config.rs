@@ -1119,6 +1119,14 @@ no_external_messages = false
     }
     
     #[test]
+    fn test_channelmodes_new_for_channel() {
+        let mut exp_chm = ChannelModes::default();
+        exp_chm.founders = Some(["biggy".to_string()].into());
+        exp_chm.operators = Some(["biggy".to_string()].into());
+        assert_eq!(exp_chm, ChannelModes::new_for_channel("biggy".to_string()));
+    }
+    
+    #[test]
     fn test_channelmodes_banned() {
         let mut chm = ChannelModes::default();
         chm.ban = Some(["bom!*@*".to_string()].into());
