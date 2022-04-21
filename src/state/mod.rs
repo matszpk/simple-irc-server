@@ -99,7 +99,7 @@ impl User {
     }
 }
 
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 struct ChannelUserModes {
     founder: bool,
     protected: bool,
@@ -193,7 +193,7 @@ fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
     (out, out_str)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ChannelTopic {
     topic: String,
     nick: String,
@@ -212,7 +212,7 @@ impl ChannelTopic{
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct BanInfo {
     set_time: u64,
     who: String,
@@ -238,7 +238,7 @@ impl ChannelDefaultModes {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
@@ -1005,6 +1005,29 @@ mod test {
         let chdm = ChannelDefaultModes::new_from_modes_and_cleanup(&mut chm);
         assert_eq!(exp_chdm, chdm);
         assert_eq!(ChannelModes::default(), chm);
+    }
+    
+    #[test]
+    fn test_channel_new() {
+        let channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
+        assert_eq!(Channel{ name: "#bobby".to_string(), topic: None,
+            modes: ChannelModes::new_for_channel("dizzy".to_string()),
+            default_modes: ChannelDefaultModes::default(),
+            ban_info: HashMap::new(), users:
+                [("dizzy".to_string(), ChannelUserModes::new_for_created_channel())].into(),
+            creation_time: channel.creation_time }, channel);
+    }
+    
+    #[test]
+    fn test_channel_rename_user() {
+        let mut channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
+        channel.rename_user(&"dizzy".to_string(), "diggy".to_string());
+        assert_eq!(Channel{ name: "#bobby".to_string(), topic: None,
+            modes: ChannelModes::new_for_channel("diggy".to_string()),
+            default_modes: ChannelDefaultModes::default(),
+            ban_info: HashMap::new(), users:
+                [("diggy".to_string(), ChannelUserModes::new_for_created_channel())].into(),
+            creation_time: channel.creation_time }, channel);
     }
 }
 
