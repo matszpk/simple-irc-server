@@ -71,7 +71,7 @@ impl User {
                 quit_sender: Some(quit_sender),
                 name: user_state.name.as_ref().unwrap().clone(),
                 realname: user_state.realname.as_ref().unwrap().clone(),
-                nick: user_state.name.as_ref().unwrap().clone(),
+                nick: user_state.nick.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
                 channels: HashSet::new(), invited_to: HashSet::new(),
@@ -334,7 +334,7 @@ impl Channel {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct NickHistoryEntry {
     username: String,
     hostname: String,
@@ -844,17 +844,30 @@ mod test {
     
     #[test]
     fn test_user_new() {
-//         let mut config = MainConfig::default();
-//         config.default_user_modes = UserModes{ invisible: true, oper: false,
-//                 local_oper: false, registered: true, wallops: false };
-//         let user_state = ConnUserState{
-//             hostname: "bobby.com".to_string(),
-//             name: Some("mati1".to_string()),
-//             realname: Some("Matthew Somebody".to_string()),
-//             nick: Some("matix".to_string()),
-//             source: "matix!mati1@bobby.com".to_string(),
-//             password: None, authenticated: true, registered: true, };
+        let mut config = MainConfig::default();
+        config.default_user_modes = UserModes{ invisible: true, oper: false,
+                local_oper: false, registered: true, wallops: false };
+        let user_state = ConnUserState{
+            hostname: "bobby.com".to_string(),
+            name: Some("mati1".to_string()),
+            realname: Some("Matthew Somebody".to_string()),
+            nick: Some("matix".to_string()),
+            source: "matix!mati1@bobby.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let user = User::new(&config, &user_state, sender, quit_sender);
         
+        assert_eq!(user_state.hostname, user.hostname);
+        assert_eq!(user_state.source, user.source);
+        assert_eq!(user_state.realname.unwrap(), user.realname);
+        assert_eq!(user_state.name.unwrap(), user.name);
+        assert_eq!(user_state.nick.unwrap(), user.nick);
+        assert_eq!(config.default_user_modes, user.modes);
+        
+        assert_eq!(NickHistoryEntry{ username: user.name.clone(),
+            hostname: user.hostname.clone(), realname: user.realname.clone(),
+            signon: user.signon }, user.history_entry);
     }
 }
 
