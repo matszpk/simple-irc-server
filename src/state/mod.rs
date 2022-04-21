@@ -869,6 +869,78 @@ mod test {
             hostname: user.hostname.clone(), realname: user.realname.clone(),
             signon: user.signon }, user.history_entry);
     }
+    
+    #[test]
+    fn test_channel_user_modes() {
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: false,
+                operator: false, half_oper: false };
+        assert!(!chum.is_protected());
+        assert!(!chum.is_operator());
+        assert!(!chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(!chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: true, protected: false, voice: false,
+                operator: false, half_oper: false };
+        assert!(chum.is_protected());
+        assert!(chum.is_operator());
+        assert!(chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: false, protected: true, voice: false,
+                operator: false, half_oper: false };
+        assert!(chum.is_protected());
+        assert!(chum.is_operator());
+        assert!(chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: false,
+                operator: true, half_oper: false };
+        assert!(!chum.is_protected());
+        assert!(chum.is_operator());
+        assert!(chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: false,
+                operator: true, half_oper: true };
+        assert!(!chum.is_protected());
+        assert!(chum.is_operator());
+        assert!(chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: false,
+                operator: false, half_oper: true };
+        assert!(!chum.is_protected());
+        assert!(!chum.is_operator());
+        assert!(chum.is_half_operator());
+        assert!(chum.is_only_half_operator());
+        assert!(chum.is_voice());
+        
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: true,
+                operator: false, half_oper: false };
+        assert!(!chum.is_protected());
+        assert!(!chum.is_operator());
+        assert!(!chum.is_half_operator());
+        assert!(!chum.is_only_half_operator());
+        assert!(chum.is_voice());
+    }
+    
+    #[test]
+    fn test_channel_user_modes_to_string() {
+        let chum = ChannelUserModes{ founder: true, protected: true, voice: false,
+                operator: true, half_oper: false };
+        assert_eq!("~", chum.to_string(&CapState{ multi_prefix: false }));
+        assert_eq!("~&@", chum.to_string(&CapState{ multi_prefix: true }));
+        
+        let chum = ChannelUserModes{ founder: false, protected: false, voice: true,
+                operator: false, half_oper: true };
+        assert_eq!("%", chum.to_string(&CapState{ multi_prefix: false }));
+        assert_eq!("%+", chum.to_string(&CapState{ multi_prefix: true }));
+    }
 }
 
 mod conn_cmds;
