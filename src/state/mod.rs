@@ -947,23 +947,27 @@ mod test {
     #[test]
     fn test_get_privmsg_target_type() {
         use PrivMsgTargetType::*;
-        assert_eq!((Channel.into(), "#aaa"), get_privmsg_target_type("#aaa"));
-        assert_eq!((Channel.into(), "&aaa"), get_privmsg_target_type("&aaa"));
-        assert_eq!((Channel | ChannelFounder, "#aaa"), get_privmsg_target_type("~#aaa"));
-        assert_eq!((Channel | ChannelFounder, "&aaa"), get_privmsg_target_type("~&aaa"));
-        assert_eq!((Channel | ChannelProtected, "#aaa"), get_privmsg_target_type("&#aaa"));
-        assert_eq!((Channel | ChannelProtected, "&aaa"), get_privmsg_target_type("&&aaa"));
-        assert_eq!((Channel | ChannelVoice, "#aaa"), get_privmsg_target_type("+#aaa"));
-        assert_eq!((Channel | ChannelVoice, "&aaa"), get_privmsg_target_type("+&aaa"));
-        assert_eq!((Channel | ChannelHalfOper, "#aaa"), get_privmsg_target_type("%#aaa"));
-        assert_eq!((Channel | ChannelHalfOper, "&aaa"), get_privmsg_target_type("%&aaa"));
-        assert_eq!((Channel | ChannelOper, "#aaa"), get_privmsg_target_type("@#aaa"));
-        assert_eq!((Channel | ChannelOper, "&aaa"), get_privmsg_target_type("@&aaa"));
-        assert_eq!((Channel | ChannelOper | ChannelProtected, "#aaa"),
-                    get_privmsg_target_type("&@#aaa"));
-        assert_eq!((Channel | ChannelOper | ChannelProtected, "&aaa"),
-                    get_privmsg_target_type("&@&aaa"));
-        assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("aaa"));
+        assert_eq!((Channel.into(), "#abc"), get_privmsg_target_type("#abc"));
+        assert_eq!((Channel.into(), "&abc"), get_privmsg_target_type("&abc"));
+        assert_eq!((Channel | ChannelFounder, "#abc"), get_privmsg_target_type("~#abc"));
+        assert_eq!((Channel | ChannelFounder, "&abc"), get_privmsg_target_type("~&abc"));
+        assert_eq!((Channel | ChannelProtected, "#abc"), get_privmsg_target_type("&#abc"));
+        assert_eq!((Channel | ChannelProtected, "&abc"), get_privmsg_target_type("&&abc"));
+        assert_eq!((Channel | ChannelVoice, "#abc"), get_privmsg_target_type("+#abc"));
+        assert_eq!((Channel | ChannelVoice, "&abc"), get_privmsg_target_type("+&abc"));
+        assert_eq!((Channel | ChannelHalfOper, "#abc"), get_privmsg_target_type("%#abc"));
+        assert_eq!((Channel | ChannelHalfOper, "&abc"), get_privmsg_target_type("%&abc"));
+        assert_eq!((Channel | ChannelVoice | ChannelFounder, "#abc"),
+                    get_privmsg_target_type("+~#abc"));
+        assert_eq!((Channel | ChannelVoice | ChannelFounder, "&abc"),
+                    get_privmsg_target_type("+~&abc"));
+        assert_eq!((Channel | ChannelOper, "#abc"), get_privmsg_target_type("@#abc"));
+        assert_eq!((Channel | ChannelOper, "&abc"), get_privmsg_target_type("@&abc"));
+        assert_eq!((Channel | ChannelOper | ChannelProtected, "#abc"),
+                    get_privmsg_target_type("&@#abc"));
+        assert_eq!((Channel | ChannelOper | ChannelProtected, "&abc"),
+                    get_privmsg_target_type("&@&abc"));
+        assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("abc"));
         assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("#"));
         assert_eq!((FlagSet::new(0).unwrap(), ""), get_privmsg_target_type("&"));
     }
