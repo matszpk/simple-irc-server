@@ -43,6 +43,7 @@ use crate::utils::*;
 
 use Reply::*;
 
+#[derive(Debug)]
 struct User {
     hostname: String,
     sender: UnboundedSender<String>,
@@ -99,7 +100,7 @@ impl User {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 struct ChannelUserModes {
     founder: bool,
     protected: bool,
@@ -191,6 +192,7 @@ fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
     (out, out_str)
 }
 
+#[derive(Debug, Clone)]
 struct ChannelTopic {
     topic: String,
     nick: String,
@@ -209,12 +211,13 @@ impl ChannelTopic{
     }
 }
 
+#[derive(Debug, Clone)]
 struct BanInfo {
     set_time: u64,
     who: String,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct ChannelDefaultModes {
     operators: HashSet<String>,
     half_operators: HashSet<String>,
@@ -234,6 +237,7 @@ impl ChannelDefaultModes {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Channel {
     name: String,
     topic: Option<ChannelTopic>,
@@ -331,7 +335,7 @@ impl Channel {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct NickHistoryEntry {
     username: String,
     hostname: String,
@@ -339,7 +343,7 @@ struct NickHistoryEntry {
     signon: u64,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct CapState {
     multi_prefix: bool,
 }
@@ -368,6 +372,7 @@ impl CapState {
     }
 }
 
+#[derive(Debug, Clone)]
 pub(crate) struct ConnUserState {
     hostname: String,
     name: Option<String>,
@@ -418,6 +423,7 @@ impl ConnUserState {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ConnState {
     stream: Framed<TcpStream, IRCLinesCodec>,
     sender: Option<UnboundedSender<String>>,
@@ -831,6 +837,11 @@ impl MainState {
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", source, t)).await
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
 }
 
 mod conn_cmds;
