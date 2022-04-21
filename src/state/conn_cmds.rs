@@ -189,12 +189,12 @@ impl super::MainState {
                     let mut user_state = &mut conn_state.user_state;
                     user_state.registered = registered;
                     let mut state = self.state.write().await;
-                    let user = User::new(&self.config, &user_state,
+                    let mut user = User::new(&self.config, &user_state,
                                 conn_state.sender.take().unwrap(), 
                                 conn_state.quit_sender.take().unwrap());
+                    user.modes = self.config.default_user_modes;
                     let umode_str = user.modes.to_string();
-                    state.users.insert(user_state.nick.as_ref().unwrap().clone(),
-                        user);
+                    state.add_user(user);
                     umode_str
                 };
                 

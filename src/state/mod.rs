@@ -541,6 +541,22 @@ impl VolatileState {
                 quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver) }
     }
     
+    fn add_user(&mut self, user: User) {
+        if user.modes.invisible {
+            self.invisible_users_count += 1;
+        }
+        if user.modes.wallops {
+            self.wallops_users.insert(user.nick.clone());
+        }
+        if user.modes.is_local_oper() {
+            self.operators_count += 1;
+        }
+        self.users.insert(user.nick.clone(), user);
+        if self.users.len() > self.max_users_count {
+            self.max_users_count = self.users.len();
+        }
+    }
+    
     fn remove_user(&mut self, nick: &str) {
         if let Some(user) = self.users.remove(nick) {
             if user.modes.is_local_oper() {
