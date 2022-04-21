@@ -31,7 +31,7 @@ use crate::command::CommandError::*;
 pub(crate) struct IRCLinesCodec(LinesCodec);
 
 impl IRCLinesCodec {
-    pub fn new_with_max_length(max_length: usize) -> IRCLinesCodec {
+    pub(crate) fn new_with_max_length(max_length: usize) -> IRCLinesCodec {
         IRCLinesCodec(LinesCodec::new_with_max_length(max_length))
     }
 }
@@ -58,7 +58,22 @@ impl Decoder for IRCLinesCodec {
     }
 }
 
-pub fn validate_username(username: &str) -> Result<(), ValidationError> {
+pub(crate) fn validate_source(s: &str) -> bool {
+    if s.contains(':') {
+        false
+    } else {
+        let excl = s.find('!');
+        let atchar = s.find('@');
+        if let Some(excl_pos) = excl {
+            if let Some(atchar_pos) = atchar {
+                return excl_pos < atchar_pos;
+            }
+        }
+        true
+    }
+}
+
+pub(crate) fn validate_username(username: &str) -> Result<(), ValidationError> {
     if username.len() != 0 && (username.as_bytes()[0] == b'#' ||
             username.as_bytes()[0] == b'&') {
         Err(ValidationError::new("Username must not have channel prefix."))
@@ -69,7 +84,7 @@ pub fn validate_username(username: &str) -> Result<(), ValidationError> {
     }
 }
 
-pub fn validate_channel(channel: &str) -> Result<(), ValidationError> {
+pub(crate) fn validate_channel(channel: &str) -> Result<(), ValidationError> {
     if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') &&
         (channel.as_bytes()[0] == b'#' || channel.as_bytes()[0] == b'&') {
         Ok(())
@@ -300,6 +315,15 @@ mod test {
         assert_eq!(codec.decode(&mut buf).map_err(|e| e.to_string()),
                 Ok(Some("my line 2".to_string())));
         assert_eq!(buf, BytesMut::new());
+    }
+    
+    #[test]
+    fn test_validate_source() {
+        assert_eq!(true, validate_source("bob!bobby@host.com"));
+        assert_eq!(true, validate_source("bobby@host.com"));
+        assert_eq!(true, validate_source("bob!bobby"));
+        assert_eq!(true, validate_source("host.com"));
+        assert_eq!(false, validate_source("bob@bobby!host.com"));
     }
     
     #[test]

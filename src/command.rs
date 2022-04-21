@@ -50,21 +50,6 @@ pub(crate) struct Message<'a> {
     params: Vec<&'a str>,
 }
 
-fn validate_source(s: &str) -> bool {
-    if s.contains(':') {
-        false
-    } else {
-        let excl = s.find('!');
-        let atchar = s.find('@');
-        if let Some(excl_pos) = excl {
-            if let Some(atchar_pos) = atchar {
-                return excl_pos < atchar_pos;
-            }
-        }
-        true
-    }
-}
-
 impl<'a> Message<'a> {
     pub(crate) fn from_shared_str(input: &'a str) -> Result<Self, MessageError> {
         let trimmed = input.trim_start();
