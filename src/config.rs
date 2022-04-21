@@ -95,7 +95,7 @@ impl UserModes {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Validate, Default)]
 pub(crate) struct ChannelModes {
     pub(crate) ban: Option<HashSet<String>>,
     pub(crate) exception: Option<HashSet<String>>,
@@ -150,16 +150,6 @@ impl ChannelModes {
             protecteds.remove(old_nick);
             protecteds.insert(nick);
         }
-    }
-}
-
-impl Default for ChannelModes {
-    fn default() -> Self {
-        ChannelModes{ ban: None, exception: None, invite_exception: None,
-            client_limit: None, key: None, operators: None, half_operators: None,
-            founders: None, protecteds: None,
-            voices: None, invite_only: false, moderated: false, secret: false,
-            protected_topic: false, no_external_messages: false }
     }
 }
 
@@ -1126,5 +1116,25 @@ no_external_messages = false
                     protected_topic: false, no_external_messages: true }.to_string();
         assert!("+imn +I somebody +a guy1 +a guy2".to_string() == chm_str ||
                 "+imn +I somebody +a guy2 +a guy1".to_string() == chm_str);
+    }
+    
+    #[test]
+    fn test_channelmodes_banned() {
+        let mut chm = ChannelModes::default();
+        chm.ban = Some(["bom!*@*".to_string()].into());
+        assert!(chm.banned("bom!bom@gugu.com"));
+        assert!(chm.banned("bom!bam@ggregi.com"));
+        assert!(!chm.banned("bam!bom@gugu.com"));
+        chm.exception = Some(["bom!*@ggregi*".to_string()].into());
+        assert!(chm.banned("bom!bom@gugu.com"));
+        assert!(!chm.banned("bom!bam@ggregi.com"));
+        chm.exception = Some(["*!*@ggregi*".to_string()].into());
+        assert!(chm.banned("bom!bom@gugu.com"));
+        assert!(!chm.banned("bom!bam@ggregi.com"));
+        chm.ban = Some(["bom!*@*".to_string(), "zigi!*@*".to_string()].into());
+        assert!(chm.banned("bom!bom@gugu.com"));
+        assert!(chm.banned("zigi!zigol@gugu.com"));
+        assert!(!chm.banned("bom!bam@ggregi.com"));
+        assert!(!chm.banned("zigi!zigol@ggregi.net"));
     }
 }
