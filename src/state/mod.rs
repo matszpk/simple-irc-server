@@ -1145,6 +1145,45 @@ mod test {
                 password: None, authenticated: false, registered: false }, cus);
         assert_eq!("boro", cus.client_name());
     }
+    
+    #[test]
+    fn test_volatile_state_new() {
+        let mut config = MainConfig::default();
+        config.channels = Some(vec![
+            ChannelConfig{ name: "#gooddays".to_string(),
+                topic: Some("About good days".to_string()),
+                modes: ChannelModes::default() },
+            ChannelConfig{ name: "#pets".to_string(),
+                topic: Some("About pets".to_string()),
+                modes: ChannelModes::default() },
+            ChannelConfig{ name: "&cactuses".to_string(), topic: None,
+                modes: ChannelModes::default() } ]);
+        let state = VolatileState::new_from_config(&config);
+        assert_eq!(HashMap::from([("#gooddays".to_string(),
+                    Channel{ name: "#gooddays".to_string(),
+                        topic: Some(ChannelTopic::new("About good days".to_string())),
+                        modes: ChannelModes::default(),
+                        default_modes: ChannelDefaultModes::default(),
+                        ban_info: HashMap::new(), users: HashMap::new(),
+                        creation_time: state.channels.get("#gooddays")
+                                    .unwrap().creation_time }),
+                    ("#pets".to_string(),
+                    Channel{ name: "#pets".to_string(),
+                        topic: Some(ChannelTopic::new("About pets".to_string())),
+                        modes: ChannelModes::default(),
+                        default_modes: ChannelDefaultModes::default(),
+                        ban_info: HashMap::new(), users: HashMap::new(),
+                        creation_time: state.channels.get("#pets")
+                                    .unwrap().creation_time }),
+                    ("&cactuses".to_string(),
+                    Channel{ name: "&cactuses".to_string(), topic: None,
+                        modes: ChannelModes::default(),
+                        default_modes: ChannelDefaultModes::default(),
+                        ban_info: HashMap::new(), users: HashMap::new(),
+                        creation_time: state.channels.get("&cactuses")
+                                    .unwrap().creation_time })]),
+                state.channels);
+    }
 }
 
 mod conn_cmds;
