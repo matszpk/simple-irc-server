@@ -526,4 +526,15 @@ mod test {
         assert!(match_wildcard("greg*@somehere*", "greg@@@@somehere@@@"));
         assert!(!match_wildcard("greg*@somehere*", "greg.somehere@@@"));
     }
+    
+    #[test]
+    fn test_normalize_sourcemask() {
+        assert_eq!("ax*!*bob*@*.com", &normalize_sourcemask("ax*!*bob*@*.com"));
+        assert_eq!("ax*!*@*.com", &normalize_sourcemask("ax*@*.com"));
+        assert_eq!("ax*!bo*@*", &normalize_sourcemask("ax*!bo*"));
+        assert_eq!("*ax!*@*.com", &normalize_sourcemask("*ax@*.com"));
+        assert_eq!("u*xn!b*o@*", &normalize_sourcemask("u*xn!b*o"));
+        assert_eq!("*!*@*", &normalize_sourcemask("*"));
+        assert_eq!("bob.com!*@*", &normalize_sourcemask("bob.com"));
+    }
 }
