@@ -1137,4 +1137,22 @@ no_external_messages = false
         assert!(!chm.banned("bom!bam@ggregi.com"));
         assert!(!chm.banned("zigi!zigol@ggregi.net"));
     }
+    
+    #[test]
+    fn test_channelmodes_rename_user() {
+        let mut chm = ChannelModes::default();
+        chm.operators = Some(["bobby".to_string(), "gugu".to_string()].into());
+        chm.half_operators = Some(["bobby".to_string(), "alice".to_string()].into());
+        chm.voices = Some(["bobby".to_string(), "nolan".to_string()].into());
+        chm.founders = Some(["bobby".to_string(), "ben".to_string()].into());
+        chm.protecteds = Some(["bobby".to_string(), "irek".to_string()].into());
+        chm.rename_user(&"bobby".to_string(), "robert".to_string());
+        let mut exp_chm = ChannelModes::default();
+        exp_chm.operators = Some(["robert".to_string(), "gugu".to_string()].into());
+        exp_chm.half_operators = Some(["robert".to_string(), "alice".to_string()].into());
+        exp_chm.voices = Some(["robert".to_string(), "nolan".to_string()].into());
+        exp_chm.founders = Some(["robert".to_string(), "ben".to_string()].into());
+        exp_chm.protecteds = Some(["robert".to_string(), "irek".to_string()].into());
+        assert_eq!(exp_chm, chm);
+    }
 }
