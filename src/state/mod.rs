@@ -352,7 +352,7 @@ pub(crate) struct CapState {
 impl fmt::Display for CapState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.multi_prefix {
-            f.write_str("multi_prefix")
+            f.write_str("multi-prefix")
         } else { Ok(()) }
     }
 }
