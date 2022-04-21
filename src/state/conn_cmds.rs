@@ -186,9 +186,10 @@ impl super::MainState {
         if let Some(good) = auth_opt {
             if good {
                 let user_modes = {   // add new user to hash map
-                    let user_state = &conn_state.user_state;
+                    let mut user_state = &mut conn_state.user_state;
+                    user_state.registered = registered;
                     let mut state = self.state.write().await;
-                    let user = User::new(&self.config, &user_state, registered,
+                    let user = User::new(&self.config, &user_state,
                                 conn_state.sender.take().unwrap(), 
                                 conn_state.quit_sender.take().unwrap());
                     let umode_str = user.modes.to_string();

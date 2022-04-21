@@ -62,11 +62,10 @@ struct User {
 }
 
 impl User {
-    fn new(config: &MainConfig, user_state: &ConnUserState, registered: bool,
-            sender: UnboundedSender<String>,
+    fn new(config: &MainConfig, user_state: &ConnUserState, sender: UnboundedSender<String>,
             quit_sender: oneshot::Sender<(String, String)>) -> User {
         let mut user_modes = config.default_user_modes;
-        user_modes.registered = registered;
+        user_modes.registered = user_state.registered;
         let now_ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         User{ hostname: user_state.hostname.clone(), sender,
                 quit_sender: Some(quit_sender),
@@ -842,6 +841,21 @@ impl MainState {
 #[cfg(test)]
 mod test {
     use super::*;
+    
+    #[test]
+    fn test_user_new() {
+//         let mut config = MainConfig::default();
+//         config.default_user_modes = UserModes{ invisible: true, oper: false,
+//                 local_oper: false, registered: true, wallops: false };
+//         let user_state = ConnUserState{
+//             hostname: "bobby.com".to_string(),
+//             name: Some("mati1".to_string()),
+//             realname: Some("Matthew Somebody".to_string()),
+//             nick: Some("matix".to_string()),
+//             source: "matix!mati1@bobby.com".to_string(),
+//             password: None, authenticated: true, registered: true, };
+        
+    }
 }
 
 mod conn_cmds;
