@@ -344,7 +344,7 @@ struct NickHistoryEntry {
     signon: u64,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub(crate) struct CapState {
     multi_prefix: bool,
 }
@@ -354,12 +354,6 @@ impl fmt::Display for CapState {
         if self.multi_prefix {
             f.write_str("multi-prefix")
         } else { Ok(()) }
-    }
-}
-
-impl Default for CapState {
-    fn default() -> Self {
-        CapState{ multi_prefix: false }
     }
 }
 
@@ -373,7 +367,7 @@ impl CapState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ConnUserState {
     hostname: String,
     name: Option<String>,
@@ -404,9 +398,10 @@ impl ConnUserState {
         let mut s = String::new();
         if let Some(ref nick) = self.nick {
             s.push_str(&nick);
+            s.push('!');
         }
         if let Some(ref name) = self.name {
-            s.push_str("!~");
+            s.push('~');
             s.push_str(&name);
         }
         s.push('@');
@@ -1108,6 +1103,47 @@ mod test {
         exp_channel.modes.voices = Some(HashSet::new());
         exp_channel.users.insert("talker".to_string(), ChannelUserModes::default());
         assert_eq!(exp_channel, channel);
+    }
+    
+    #[test]
+    fn test_conn_user_state() {
+        let mut cus = ConnUserState::new("192.168.1.7".parse().unwrap());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(), name: None,
+                realname: None, nick: None, source: "@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("192.168.1.7", cus.client_name());
+        cus.set_name("boro".to_string());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+                name: Some("boro".to_string()),
+                realname: None, nick: None, source: "~boro@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("boro", cus.client_name());
+        cus.set_nick("buru".to_string());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+                name: Some("boro".to_string()),
+                realname: None, nick: Some("buru".to_string()),
+                source: "buru!~boro@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("buru", cus.client_name());
+        
+        let mut cus = ConnUserState::new("192.168.1.7".parse().unwrap());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(), name: None,
+                realname: None, nick: None, source: "@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("192.168.1.7", cus.client_name());
+        cus.set_nick("boro".to_string());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+                nick: Some("boro".to_string()),
+                realname: None, name: None, source: "boro!@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("boro", cus.client_name());
+        cus.set_name("buru".to_string());
+        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+                nick: Some("boro".to_string()),
+                realname: None, name: Some("buru".to_string()),
+                source: "boro!~buru@192.168.1.7".to_string(),
+                password: None, authenticated: false, registered: false }, cus);
+        assert_eq!("boro", cus.client_name());
     }
 }
 
