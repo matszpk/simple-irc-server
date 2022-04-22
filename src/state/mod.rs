@@ -853,6 +853,7 @@ impl MainState {
 
 #[cfg(test)]
 mod test {
+    use std::iter::FromIterator;
     use super::*;
     
     #[test]
@@ -1199,6 +1200,48 @@ mod test {
                         creation_time: state.channels.get("&cactuses")
                                     .unwrap().creation_time })]),
                 state.channels);
+    }
+    
+    #[test]
+    fn test_volatile_state_add_user() {
+        let config = MainConfig::default();
+        let mut state = VolatileState::new_from_config(&config);
+        
+        let user_state = ConnUserState{
+            hostname: "bobby.com".to_string(),
+            name: Some("matix".to_string()),
+            realname: Some("Matthew Somebody".to_string()),
+            nick: Some("matixi".to_string()),
+            source: "matixi!matix@bobby.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let user = User::new(&config, &user_state, sender, quit_sender);
+        state.add_user(user);
+        assert_eq!(1, state.max_users_count);
+        
+        let user_state = ConnUserState{
+            hostname: "flowers.com".to_string(),
+            name: Some("tulip".to_string()),
+            realname: Some("Tulipan".to_string()),
+            nick: Some("tulipan".to_string()),
+            source: "tulipan!tulip@flowers.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let user = User::new(&config, &user_state, sender, quit_sender);
+        state.add_user(user);
+        assert_eq!(2, state.max_users_count);
+        
+        assert_eq!(HashSet::<String>::from(["matixi".to_string(), "tulipan".to_string()]),
+                    HashSet::<String>::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::<String>::from(["matix".to_string(), "tulip".to_string()]),
+                    HashSet::<String>::from_iter(state.users.values()
+                            .map(|u| u.name.clone())));
+        assert_eq!(HashSet::<String>::from(["Matthew Somebody".to_string(),
+                "Tulipan".to_string()]),
+                    HashSet::<String>::from_iter(state.users.values()
+                            .map(|u| u.realname.clone())));
     }
 }
 
