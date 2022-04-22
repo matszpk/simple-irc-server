@@ -670,8 +670,7 @@ impl MainState {
         }
     }
     
-    pub(crate) async fn process(&self, conn_state: &mut ConnState)
-                -> Result<(), String> {
+    pub(crate) async fn process(&self, conn_state: &mut ConnState) -> Result<(), String> {
         // use conversion error to string to avoid problems with thread safety
         let res = self.process_internal(conn_state).await.map_err(|e| e.to_string());
         conn_state.stream.flush().await.map_err(|e| e.to_string())?;
