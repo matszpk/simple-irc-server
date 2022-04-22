@@ -1068,6 +1068,74 @@ mod test {
     }
     
     #[test]
+    fn test_channel_join_remove_user() {
+        let mut channel = Channel::new("#bicycles".to_string(), "runner".to_string());
+        channel.default_modes.founders.insert("fasty".to_string());
+        channel.default_modes.protecteds.insert("quicker".to_string());
+        channel.default_modes.operators.insert("leader".to_string());
+        channel.default_modes.half_operators.insert("rover".to_string());
+        channel.default_modes.voices.insert("cyclist".to_string());
+        channel.join_user(&"fasty".to_string());
+        channel.join_user(&"quicker".to_string());
+        channel.join_user(&"leader".to_string());
+        channel.join_user(&"rover".to_string());
+        channel.join_user(&"cyclist".to_string());
+        channel.join_user(&"doer".to_string());
+        
+        let mut exp_channel = Channel::new("#bicycles".to_string(), "runner".to_string());
+        exp_channel.default_modes = channel.default_modes.clone();
+        exp_channel.users.insert("fasty".to_string(), ChannelUserModes{ founder: true,
+                protected: false, operator: false, half_oper: false, voice: false });
+        exp_channel.users.insert("quicker".to_string(), ChannelUserModes{ founder: false,
+                protected: true, operator: false, half_oper: false, voice: false });
+        exp_channel.users.insert("leader".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: true, half_oper: false, voice: false });
+        exp_channel.users.insert("rover".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: false, half_oper: true, voice: false });
+        exp_channel.users.insert("cyclist".to_string(), ChannelUserModes{ founder: false,
+                protected: false, operator: false, half_oper: false, voice: true });
+        exp_channel.users.insert("doer".to_string(), ChannelUserModes::default());
+        exp_channel.modes.founders = Some(["fasty".to_string(),
+                    "runner".to_string()].into());
+        exp_channel.modes.protecteds= Some(["quicker".to_string()].into());
+        exp_channel.modes.operators = Some(["leader".to_string(),
+                    "runner".to_string()].into());
+        exp_channel.modes.half_operators = Some(["rover".to_string()].into());
+        exp_channel.modes.voices = Some(["cyclist".to_string()].into());
+        
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"doer".to_string());
+        exp_channel.users.remove(&"doer".to_string());
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"cyclist".to_string());
+        exp_channel.users.remove(&"cyclist".to_string());
+        exp_channel.modes.voices = Some(HashSet::new());
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"rover".to_string());
+        exp_channel.users.remove(&"rover".to_string());
+        exp_channel.modes.half_operators = Some(HashSet::new());
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"leader".to_string());
+        exp_channel.users.remove(&"leader".to_string());
+        exp_channel.modes.operators = Some(["runner".to_string()].into());
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"quicker".to_string());
+        exp_channel.users.remove(&"quicker".to_string());
+        exp_channel.modes.protecteds = Some(HashSet::new());
+        assert_eq!(exp_channel, channel);
+        
+        channel.remove_user(&"fasty".to_string());
+        exp_channel.users.remove(&"fasty".to_string());
+        exp_channel.modes.founders = Some(["runner".to_string()].into());
+        assert_eq!(exp_channel, channel);
+    }
+    
+    #[test]
     fn test_channel_rename_user() {
         let mut channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
         channel.rename_user(&"dizzy".to_string(), "diggy".to_string());
