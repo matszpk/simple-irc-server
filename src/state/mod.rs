@@ -1203,7 +1203,7 @@ mod test {
     }
     
     #[test]
-    fn test_volatile_state_add_user() {
+    fn test_volatile_state_add_remove_user() {
         let config = MainConfig::default();
         let mut state = VolatileState::new_from_config(&config);
         
@@ -1264,15 +1264,97 @@ mod test {
         assert_eq!(1, state.invisible_users_count);
         assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
         
+        let user_state = ConnUserState{
+            hostname: "guru.com".to_string(),
+            name: Some("admin".to_string()),
+            realname: Some("Great Admin".to_string()),
+            nick: Some("admini".to_string()),
+            source: "admini!admin@guru.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let mut user = User::new(&config, &user_state, sender, quit_sender);
+        user.modes.oper = true;
+        state.add_user(user);
+        assert_eq!(5, state.max_users_count);
+        assert_eq!(1, state.invisible_users_count);
+        assert_eq!(1, state.operators_count);
+        
         assert_eq!(HashSet::from(["matixi".to_string(), "tulipan".to_string(),
-                    "greg".to_string(), "john".to_string()]),
+                    "greg".to_string(), "john".to_string(), "admini".to_string()]),
                     HashSet::from_iter(state.users.keys().cloned()));
         assert_eq!(HashSet::from(["matix".to_string(), "tulip".to_string(),
-                    "greggy".to_string(), "johnny".to_string()]),
+                    "greggy".to_string(), "johnny".to_string(), "admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
         assert_eq!(HashSet::from(["Matthew Somebody".to_string(), "Tulipan".to_string(),
-                    "Gregory Digger".to_string(), "John Miller".to_string()]),
+                    "Gregory Digger".to_string(), "John Miller".to_string(),
+                    "Great Admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.realname.clone())));
+        
+        // create channels and add channel to user structure
+        [("#matixichan", "matixi"), ("#tulipchan", "tulipan"),
+         ("#gregchan", "greg"), ("#johnchan", "john"), ("#guruchan", "admini")].iter()
+            .for_each(|(chname, nick)| {
+            state.channels.insert(chname.to_string(),
+                    Channel::new(chname.to_string(), nick.to_string()));
+            state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
+                        chname.to_string());
+        });
+        
+        // removing users
+        state.remove_user("matixi");
+        assert_eq!(5, state.max_users_count);
+        assert_eq!(1, state.invisible_users_count);
+        assert_eq!(1, state.operators_count);
+        assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
+        
+        assert_eq!(HashSet::from(["tulipan".to_string(),
+                    "greg".to_string(), "john".to_string(), "admini".to_string()]),
+                    HashSet::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::from(["tulip".to_string(),
+                    "greggy".to_string(), "johnny".to_string(), "admin".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#matixichan")
+                        .unwrap().users.keys()));
+        
+        state.remove_user("greg");
+        assert_eq!(5, state.max_users_count);
+        assert_eq!(0, state.invisible_users_count);
+        assert_eq!(1, state.operators_count);
+        assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
+        
+        assert_eq!(HashSet::from(["tulipan".to_string(), "john".to_string(),
+                    "admini".to_string()]), HashSet::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::from(["tulip".to_string(), "johnny".to_string(),
+                    "admin".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#gregchan")
+                        .unwrap().users.keys()));
+        
+        state.remove_user("john");
+        assert_eq!(5, state.max_users_count);
+        assert_eq!(0, state.invisible_users_count);
+        assert_eq!(1, state.operators_count);
+        assert_eq!(HashSet::new(), state.wallops_users);
+        
+        assert_eq!(HashSet::from(["tulipan".to_string(), "admini".to_string()]),
+                    HashSet::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::from(["tulip".to_string(), "admin".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#johnchan")
+                        .unwrap().users.keys()));
+        
+        state.remove_user("admini");
+        assert_eq!(5, state.max_users_count);
+        assert_eq!(0, state.invisible_users_count);
+        assert_eq!(0, state.operators_count);
+        assert_eq!(HashSet::new(), state.wallops_users);
+        assert_eq!(HashSet::from(["tulipan".to_string()]),
+                    HashSet::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::from(["tulip".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#guruchan")
+                        .unwrap().users.keys()));
     }
 }
 
