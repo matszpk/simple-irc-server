@@ -259,7 +259,7 @@ impl Channel {
             creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
     }
     
-    fn join_user(&mut self, user_nick: &String) {
+    fn add_user(&mut self, user_nick: &String) {
         let mut chum = ChannelUserModes::default();
         if self.default_modes.half_operators.contains(user_nick) {
             chum.half_oper = true;
@@ -1074,12 +1074,12 @@ mod test {
         channel.default_modes.operators.insert("leader".to_string());
         channel.default_modes.half_operators.insert("rover".to_string());
         channel.default_modes.voices.insert("cyclist".to_string());
-        channel.join_user(&"fasty".to_string());
-        channel.join_user(&"quicker".to_string());
-        channel.join_user(&"leader".to_string());
-        channel.join_user(&"rover".to_string());
-        channel.join_user(&"cyclist".to_string());
-        channel.join_user(&"doer".to_string());
+        channel.add_user(&"fasty".to_string());
+        channel.add_user(&"quicker".to_string());
+        channel.add_user(&"leader".to_string());
+        channel.add_user(&"rover".to_string());
+        channel.add_user(&"cyclist".to_string());
+        channel.add_user(&"doer".to_string());
         
         let mut exp_channel = Channel::new("#bicycles".to_string(), "runner".to_string());
         exp_channel.default_modes = channel.default_modes.clone();

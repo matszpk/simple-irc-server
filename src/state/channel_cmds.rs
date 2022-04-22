@@ -121,7 +121,7 @@ impl super::MainState {
                     state.channels.insert(chname.clone(), Channel::new(
                                 chname.clone(), user_nick.clone()));
                 } else {
-                    state.channels.get_mut(&chname).unwrap().join_user(&user_nick);
+                    state.channels.get_mut(&chname).unwrap().add_user(&user_nick);
                     
                 }
             }
