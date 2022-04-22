@@ -259,6 +259,43 @@ impl Channel {
             creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
     }
     
+    fn join_user(&mut self, user_nick: &String) {
+        let mut chum = ChannelUserModes::default();
+        if self.default_modes.half_operators.contains(user_nick) {
+            chum.half_oper = true;
+            let mut half_ops = self.modes.half_operators.take()
+                    .unwrap_or_default();
+            half_ops.insert(user_nick.clone());
+            self.modes.half_operators = Some(half_ops);
+        }
+        if self.default_modes.operators.contains(user_nick) {
+            chum.operator = true;
+            let mut ops = self.modes.operators.take().unwrap_or_default();
+            ops.insert(user_nick.clone());
+            self.modes.operators = Some(ops);
+        }
+        if self.default_modes.founders.contains(user_nick) {
+            chum.founder = true;
+            let mut founders = self.modes.founders.take().unwrap_or_default();
+            founders.insert(user_nick.clone());
+            self.modes.founders = Some(founders);
+        }
+        if self.default_modes.voices.contains(user_nick) {
+            chum.voice = true;
+            let mut voices = self.modes.voices.take().unwrap_or_default();
+            voices.insert(user_nick.clone());
+            self.modes.voices = Some(voices);
+        }
+        if self.default_modes.protecteds.contains(user_nick) {
+            chum.protected = true;
+            let mut protecteds = self.modes.protecteds.take()
+                    .unwrap_or_default();
+            protecteds.insert(user_nick.clone());
+            self.modes.protecteds = Some(protecteds);
+        }
+        self.users.insert(user_nick.clone(), chum);
+    }
+    
     fn rename_user(&mut self, old_nick: &String, nick: String) {
         let oldchumode = self.users.remove(old_nick).unwrap();
         self.users.insert(nick.clone(), oldchumode);
