@@ -1233,15 +1233,46 @@ mod test {
         state.add_user(user);
         assert_eq!(2, state.max_users_count);
         
-        assert_eq!(HashSet::<String>::from(["matixi".to_string(), "tulipan".to_string()]),
-                    HashSet::<String>::from_iter(state.users.keys().cloned()));
-        assert_eq!(HashSet::<String>::from(["matix".to_string(), "tulip".to_string()]),
-                    HashSet::<String>::from_iter(state.users.values()
-                            .map(|u| u.name.clone())));
-        assert_eq!(HashSet::<String>::from(["Matthew Somebody".to_string(),
-                "Tulipan".to_string()]),
-                    HashSet::<String>::from_iter(state.users.values()
-                            .map(|u| u.realname.clone())));
+        let user_state = ConnUserState{
+            hostname: "digger.com".to_string(),
+            name: Some("greggy".to_string()),
+            realname: Some("Gregory Digger".to_string()),
+            nick: Some("greg".to_string()),
+            source: "greg!greggy@digger.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let mut user = User::new(&config, &user_state, sender, quit_sender);
+        user.modes.invisible = true;
+        state.add_user(user);
+        assert_eq!(3, state.max_users_count);
+        assert_eq!(1, state.invisible_users_count);
+        
+        let user_state = ConnUserState{
+            hostname: "miller.com".to_string(),
+            name: Some("johnny".to_string()),
+            realname: Some("John Miller".to_string()),
+            nick: Some("john".to_string()),
+            source: "john!johnny@miller.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let mut user = User::new(&config, &user_state, sender, quit_sender);
+        user.modes.wallops = true;
+        state.add_user(user);
+        assert_eq!(4, state.max_users_count);
+        assert_eq!(1, state.invisible_users_count);
+        assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
+        
+        assert_eq!(HashSet::from(["matixi".to_string(), "tulipan".to_string(),
+                    "greg".to_string(), "john".to_string()]),
+                    HashSet::from_iter(state.users.keys().cloned()));
+        assert_eq!(HashSet::from(["matix".to_string(), "tulip".to_string(),
+                    "greggy".to_string(), "johnny".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+        assert_eq!(HashSet::from(["Matthew Somebody".to_string(), "Tulipan".to_string(),
+                    "Gregory Digger".to_string(), "John Miller".to_string()]),
+                    HashSet::from_iter(state.users.values().map(|u| u.realname.clone())));
     }
 }
 
