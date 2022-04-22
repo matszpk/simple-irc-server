@@ -609,8 +609,8 @@ impl VolatileState {
         }
     }
     
-    fn insert_to_nick_history<'a>(&mut self, old_nick: &'a String, nhe: NickHistoryEntry) {
-        if self.nick_histories.contains_key(old_nick) {
+    fn insert_to_nick_history(&mut self, old_nick: &String, nhe: NickHistoryEntry) {
+        if !self.nick_histories.contains_key(old_nick) {
             self.nick_histories.insert(old_nick.to_string(), vec![]);
         }
         let nick_hist = self.nick_histories.get_mut(old_nick).unwrap();
@@ -1459,6 +1459,25 @@ mod test {
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
         assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#guruchan")
                         .unwrap().users.keys()));
+    }
+    
+    #[test]
+    fn test_volatile_state_insert_to_nick_history() {
+        let config = MainConfig::default();
+        let mut state = VolatileState::new_from_config(&config);
+        state.insert_to_nick_history(&"mati".to_string(), NickHistoryEntry{
+                username: "mati1".to_string(), hostname: "gugg.com".to_string(),
+                realname: "Mati1".to_string(), signon: 12344555555 });
+        state.insert_to_nick_history(&"mati".to_string(), NickHistoryEntry{
+                username: "mati2".to_string(), hostname: "bip.com".to_string(),
+                realname: "Mati2".to_string(), signon: 12377411100 });
+        assert_eq!(HashMap::from([("mati".to_string(), vec![NickHistoryEntry{
+                username: "mati1".to_string(), hostname: "gugg.com".to_string(),
+                realname: "Mati1".to_string(), signon: 12344555555 },
+                NickHistoryEntry{
+                username: "mati2".to_string(), hostname: "bip.com".to_string(),
+                realname: "Mati2".to_string(), signon: 12377411100 }])]),
+                state.nick_histories);
     }
 }
 
