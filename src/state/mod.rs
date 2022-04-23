@@ -1683,6 +1683,24 @@ mod test {
             line_stream.send("PING :bumbum".to_string()).await.unwrap();
             assert_eq!(":irc.irc PONG irc.irc :bumbum".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            time::pause();
+            time::advance(Duration::from_millis(119900)).await;
+            time::resume();
+            assert_eq!(":irc.irc PING :LALAL".to_string(), 
+                    line_stream.next().await.unwrap().unwrap());
+            line_stream.send("PONG :LALAL".to_string()).await.unwrap();
+            
+            // test timeout
+            time::pause();
+            time::advance(Duration::from_millis(119900)).await;
+            time::resume();
+            assert_eq!(":irc.irc PING :LALAL".to_string(), 
+                    line_stream.next().await.unwrap().unwrap());
+            time::pause();
+            time::advance(Duration::from_millis(19900)).await;
+            time::resume();
+            assert_eq!(":irc.irc ERROR :Pong timeout, connection will \
+                be closed.".to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
