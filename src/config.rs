@@ -331,7 +331,7 @@ impl MainConfig {
 
 impl Default for MainConfig {
     fn default() -> Self {
-        MainConfig{ name: "irc".to_string(),
+        MainConfig{ name: "irc.irc".to_string(),
             admin_info: "ircadmin is IRC admin".to_string(),
             admin_info2: None,
             admin_email: None,

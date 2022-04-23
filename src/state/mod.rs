@@ -716,8 +716,7 @@ impl MainState {
                             Err(e) => {
                                 match e {
                                     MessageError::Empty => {
-                                        self.feed_msg(&mut conn_state.stream,
-                                            "ERROR :Empty message").await?;
+                                        return Ok(())   // ignore empties
                                     }
                                     MessageError::WrongSource => {
                                         self.feed_msg(&mut conn_state.stream,
@@ -1534,8 +1533,17 @@ mod test {
             let stream = TcpStream::connect(("127.0.0.1", SRV_PORT)).await.unwrap();
             let mut line_stream = Framed::new(stream,
                         IRCLinesCodec::new_with_max_length(2000));
+            line_stream.send("POG :welcome".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 421 127.0.0.1 POG :Unknown command".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("".to_string()).await.unwrap();
+            line_stream.send("    ".to_string()).await.unwrap();
+            line_stream.send("PART aaa".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR :Wrong parameter 0 in command 'PART'".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
             line_stream.send("PING :welcome".to_string()).await.unwrap();
-            println!("Answer: {:?}", line_stream.next().await);
+            assert_eq!(":irc.irc 451 127.0.0.1 :You have not registered".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
