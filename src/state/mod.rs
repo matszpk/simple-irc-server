@@ -22,12 +22,12 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
-use tokio::net::TcpStream;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
@@ -887,9 +887,44 @@ impl MainState {
     }
 }
 
+pub(crate) async fn user_state_process(main_state: Arc<MainState>,
+            stream: TcpStream, addr: SocketAddr) {
+    let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
+    if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
+        while !conn_state.is_quit() {
+            if let Err(e) = main_state.process(&mut conn_state).await {
+                eprintln!("Error: {}" , e);
+            }
+        }
+        main_state.remove_user(&conn_state).await;
+    }
+}
+
+pub(crate) async fn run_server(config: MainConfig) -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind((config.listen, config.port)).await?;
+    let main_state = Arc::new(MainState::new_from_config(config));
+    
+    let mut quit_receiver = main_state.get_quit_receiver().await;
+    let mut do_quit = false;
+    while !do_quit {
+        tokio::select! {
+            res = listener.accept() => {
+                let (stream, addr) = res?;
+                tokio::spawn(user_state_process(main_state.clone(), stream, addr));
+            }
+            Ok(msg) = &mut quit_receiver => {
+                println!("Server quit: {}", msg);
+                do_quit = true;
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use std::iter::FromIterator;
+    use tokio::net::TcpListener;
     use super::*;
     
     #[test]
@@ -1478,6 +1513,10 @@ mod test {
                 username: "mati2".to_string(), hostname: "bip.com".to_string(),
                 realname: "Mati2".to_string(), signon: 12377411100 }])]),
                 state.nick_histories);
+    }
+    
+    #[tokio::test]
+    async fn test_process_command0() {
     }
 }
 
