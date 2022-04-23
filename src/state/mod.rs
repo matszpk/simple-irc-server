@@ -1524,7 +1524,7 @@ mod test {
     const SRV_PORT: u16 = 7888;
     
     #[tokio::test]
-    async fn test_process_command0() {
+    async fn test_server_command0() {
         let mut config = MainConfig::default();
         config.port = SRV_PORT;
         let (main_state, handle) = run_server(config).await.unwrap();
@@ -1574,6 +1574,17 @@ mod test {
             assert_eq!(":irc.irc 696 127.0.0.1 #bam l xxx :invalid digit found in string"
                         .to_string(), line_stream.next().await.unwrap().unwrap());
         }
+        
+        main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
+                .unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_server_authentication() {
+        let mut config = MainConfig::default();
+        config.port = SRV_PORT+1;
+        let (main_state, handle) = run_server(config).await.unwrap();
         
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
                 .unwrap();
