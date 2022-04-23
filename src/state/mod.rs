@@ -887,7 +887,7 @@ impl MainState {
     }
 }
 
-pub(crate) async fn user_state_process(main_state: Arc<MainState>,
+async fn user_state_process(main_state: Arc<MainState>,
             stream: TcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
