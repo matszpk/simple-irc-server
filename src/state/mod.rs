@@ -1601,6 +1601,60 @@ mod test {
                     version ", env!("CARGO_PKG_NAME"), "-",
                     env!("CARGO_PKG_VERSION")).to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            assert_eq!(format!(":irc.irc 003 mati :This server was created {}",
+                    main_state.created),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(concat!(":irc.irc 004 mati irc.irc ", env!("CARGO_PKG_NAME"), "-",
+                    env!("CARGO_PKG_VERSION"), " Oiorw Iabehiklmnopqstv"),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati AWAYLEN=1000 CASEMAPPING=ascii \
+                    CHANMODES=Iabehiklmnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
+                    HOSTLEN=1000 INVEX=I KEYLEN=1000 :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati KICKLEN=1000 LINELEN=2000 MAXLIST=beI:1000 \
+                    MAXNICKLEN=200 MAXPARA=500 MAXTARGETS=500 MODES=500 NETWORK=IRCnetwork \
+                    NICKLEN=200 PREFIX=(qaohv)~&@%+ :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati SAFELIST STATUSMSG=~&@%+ TOPICLEN=1000 USERLEN=200 \
+                    USERMODES=Oiorw :are supported by this server".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 251 mati :There are 1 users and 0 invisible \
+                    on 1 servers".to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 252 mati 0 :operator(s) online".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 253 mati 0 :unknown connection(s)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 254 mati 0 :channels formed".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 255 mati :I have 1 clients and 1 servers".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 265 mati 1 1 :Current local users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 266 mati 1 1 :Current global users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 375 mati :- irc.irc Message of the day - ".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 372 mati :Hello, world!".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 376 mati :End of /MOTD command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 221 mati +".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            let state = main_state.state.read().await;
+            assert_eq!(HashSet::from([ "mati".to_string() ]),
+                        HashSet::from_iter(state.users.keys().cloned()));
+            assert_eq!(HashSet::from([ "mat".to_string() ]),
+                        HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
+            assert_eq!(HashSet::from([ "MatiSzpaki".to_string() ]),
+                    HashSet::from_iter(state.users.values().map(|u| u.realname.clone())));
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        time::sleep(Duration::from_millis(50)).await;
+        {   // after close
+            let state = main_state.state.read().await;
+            assert_eq!(HashSet::new(), HashSet::from_iter(state.users.keys().cloned()));
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
