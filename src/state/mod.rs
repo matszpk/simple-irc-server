@@ -1562,6 +1562,17 @@ mod test {
             line_stream.send("MODE #bum +T".to_string()).await.unwrap();
             assert_eq!(":irc.irc 472 127.0.0.1 T :is unknown mode char for #bum"
                         .to_string(), line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE #bum +l xxx".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 696 127.0.0.1 #bum l xxx :invalid digit found in string"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+            let mut toolong = String::new();
+            for _ in 0..4000 { toolong.push('c'); }
+            line_stream.send(toolong).await.unwrap();
+            assert_eq!(":irc.irc 417 127.0.0.1 :Input line was too long".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE #bam +l xxx".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 696 127.0.0.1 #bam l xxx :invalid digit found in string"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
