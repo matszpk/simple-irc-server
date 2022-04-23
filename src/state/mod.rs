@@ -912,8 +912,12 @@ pub(crate) async fn run_server(config: MainConfig) ->
         while !do_quit {
             tokio::select! {
                 res = listener.accept() => {
-                    let (stream, addr) = res.unwrap();
-                    tokio::spawn(user_state_process(main_state.clone(), stream, addr));
+                    match res {
+                        Ok((stream, addr)) => {
+                            tokio::spawn(user_state_process(
+                                        main_state.clone(), stream, addr)); }
+                        Err(e) => { eprintln!("Accept connection error: {}", e); }
+                    };
                 }
                 Ok(msg) = &mut quit_receiver => {
                     println!("Server quit: {}", msg);
@@ -1520,7 +1524,9 @@ mod test {
     
     #[tokio::test]
     async fn test_process_command0() {
-        let (main_state, handle) = run_server(MainConfig::default()).await.unwrap();
+        let mut config = MainConfig::default();
+        config.port = 7888;
+        let (main_state, handle) = run_server(config).await.unwrap();
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
                 .unwrap();
         handle.await.unwrap();
