@@ -790,9 +790,11 @@ impl MainState {
                     CAP{ .. } | AUTHENTICATE{ } | PASS{ .. } | NICK{ .. } |
                             USER{ .. } | QUIT{ } => {},
                     _ => {
-                        self.feed_msg(&mut conn_state.stream, ErrNotRegistered451{         
+                        if !conn_state.user_state.authenticated {
+                            self.feed_msg(&mut conn_state.stream, ErrNotRegistered451{         
                                     client: conn_state.user_state.client_name() }).await?;
-                        return Ok(())
+                            return Ok(())
+                        }
                     }
                 }
                 
@@ -1591,7 +1593,7 @@ mod test {
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
             let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(10000));
+                        IRCLinesCodec::new_with_max_length(2000));
             line_stream.send("NICK mati".to_string()).await.unwrap();
             line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
             assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
@@ -1655,6 +1657,32 @@ mod test {
         {   // after close
             let state = main_state.state.read().await;
             assert_eq!(HashSet::new(), HashSet::from_iter(state.users.keys().cloned()));
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_server_timeouts() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+2;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("PING :bumbum".to_string()).await.unwrap();
+            assert_eq!(":irc.irc PONG irc.irc :bumbum".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()

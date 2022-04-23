@@ -177,7 +177,10 @@ impl super::MainState {
                             
                             user_state.authenticated = good;
                             (Some(good), registered)
-                        } else { (Some(true), registered) }
+                        } else {
+                            user_state.authenticated = true;
+                            (Some(true), registered)
+                        }
                     } else { (None, false) }
                 } else { (None, false) }
             } else { (None, false) }
@@ -324,8 +327,8 @@ impl super::MainState {
     
     pub(super) async fn process_ping<'a>(&self, conn_state: &mut ConnState, token: &'a str)
             -> Result<(), Box<dyn Error>> {
-        self.feed_msg(&mut conn_state.stream, format!("PONG {} {} :{}", self.config.name,
-                    self.config.name, token)).await?;
+        self.feed_msg(&mut conn_state.stream, format!("PONG {} :{}", self.config.name,
+                    token)).await?;
         Ok(())
     }
     
