@@ -1538,11 +1538,29 @@ mod test {
                         line_stream.next().await.unwrap().unwrap());
             line_stream.send("".to_string()).await.unwrap();
             line_stream.send("    ".to_string()).await.unwrap();
+            line_stream.send(":welcome".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR :No command supplied".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send(":@! PING :welcome".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR :Wrong source".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
             line_stream.send("PART aaa".to_string()).await.unwrap();
             assert_eq!(":irc.irc ERROR :Wrong parameter 0 in command 'PART'".to_string(),
                         line_stream.next().await.unwrap().unwrap());
             line_stream.send("PING :welcome".to_string()).await.unwrap();
             assert_eq!(":irc.irc 451 127.0.0.1 :You have not registered".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("CAP XXX".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR :Unknown subcommand 'XXX' in command 'CAP'"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+            line_stream.send("PRIVMSG".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 461 127.0.0.1 PRIVMSG :Not enough parameters".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE lol +T".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 501 127.0.0.1 :Unknown MODE flag".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE #bum +T".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 472 127.0.0.1 T :is unknown mode char to me".to_string(),
                         line_stream.next().await.unwrap().unwrap());
         }
         
