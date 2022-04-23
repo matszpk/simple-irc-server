@@ -36,5 +36,6 @@ use state::*;
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let config = MainConfig::new(cli)?;
-    run_server(config).await
+    run_server(config).await?;
+    Ok(())
 }

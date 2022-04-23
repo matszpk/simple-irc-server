@@ -900,7 +900,7 @@ pub(crate) async fn user_state_process(main_state: Arc<MainState>,
     }
 }
 
-pub(crate) async fn run_server(config: MainConfig) -> Result<(), Box<dyn Error>> {
+pub(crate) async fn run_server(config: MainConfig) -> Result<Arc<MainState>, Box<dyn Error>> {
     let listener = TcpListener::bind((config.listen, config.port)).await?;
     let main_state = Arc::new(MainState::new_from_config(config));
     
@@ -918,7 +918,7 @@ pub(crate) async fn run_server(config: MainConfig) -> Result<(), Box<dyn Error>>
             }
         }
     }
-    Ok(())
+    Ok(main_state.clone())
 }
 
 #[cfg(test)]
