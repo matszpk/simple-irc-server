@@ -763,10 +763,10 @@ impl MainState {
                                         ErrNeedMoreParams461{ client,
                                         command: command.name }).await?;
                             }
-                            UnknownMode(_, modechar) => {
+                            UnknownMode(_, modechar, ref channel) => {
                                 self.feed_msg(&mut conn_state.stream,
                                         ErrUnknownMode472{ client,
-                                        modechar }).await?;
+                                        modechar, channel: channel }).await?;
                             }
                             UnknownUModeFlag(_) => {
                                 self.feed_msg(&mut conn_state.stream,
@@ -1560,8 +1560,8 @@ mod test {
             assert_eq!(":irc.irc 501 127.0.0.1 :Unknown MODE flag".to_string(),
                         line_stream.next().await.unwrap().unwrap());
             line_stream.send("MODE #bum +T".to_string()).await.unwrap();
-            assert_eq!(":irc.irc 472 127.0.0.1 T :is unknown mode char to me".to_string(),
-                        line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 472 127.0.0.1 T :is unknown mode char for #bum"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())

@@ -163,7 +163,7 @@ pub(crate) enum CommandError {
     NeedMoreParams(CommandId),
     ParameterDoesntMatch(CommandId, usize),
     WrongParameter(CommandId, usize),
-    UnknownMode(usize, char),
+    UnknownMode(usize, char, String),
     UnknownUModeFlag(usize),
     InvalidModeParam{ target: String, modechar: char, param: String, description: String },
 }
@@ -183,8 +183,8 @@ impl fmt::Display for CommandError {
                 write!(f, "Parameter {} doesn't match for command '{}'", i, s.name),
             WrongParameter(s, i) =>
                 write!(f, "Wrong parameter {} in command '{}'", i, s.name),
-            UnknownMode(i, c) =>
-                write!(f, "Unknown mode {} in parameter {}", c, i),
+            UnknownMode(i, c, ch) =>
+                write!(f, "Unknown mode {} in parameter {} for {}", c, i, ch),
             UnknownUModeFlag(i) =>
                 write!(f, "Unknown umode flag in parameter {}", i),
             InvalidModeParam{ modechar, param, target, description } =>

@@ -132,7 +132,7 @@ pub(crate) enum Reply<'a> {
     ErrPasswdMismatch464{ client: &'a str },
     //ErrYoureBannedCreep465{ client: &'a str },
     ErrChannelIsFull471{ client: &'a str, channel: &'a str },
-    ErrUnknownMode472{ client: &'a str, modechar: char },
+    ErrUnknownMode472{ client: &'a str, modechar: char, channel: &'a str },
     ErrInviteOnlyChan473{ client: &'a str, channel: &'a str },
     ErrBannedFromChan474{ client: &'a str, channel: &'a str },
     ErrBadChannelKey475{ client: &'a str, channel: &'a str },
@@ -363,8 +363,9 @@ impl<'a> fmt::Display for Reply<'a> {
             //    write!(f, "465 {} :You are banned from this server.", client) }
             ErrChannelIsFull471{ client, channel } => {
                 write!(f, "471 {} {} :Cannot join channel (+l)", client, channel) }
-            ErrUnknownMode472{ client, modechar } => {
-                write!(f, "472 {} {} :is unknown mode char to me", client, modechar) }
+            ErrUnknownMode472{ client, modechar, channel } => {
+                write!(f, "472 {} {} :is unknown mode char for {}", client, modechar,
+                    channel) }
             ErrInviteOnlyChan473{ client, channel } => {
                 write!(f, "473 {} {} :Cannot join channel (+i)", client, channel) }
             ErrBannedFromChan474{ client, channel } => {
@@ -665,8 +666,9 @@ mod test {
         //    format!("{}", ErrYoureBannedCreep465{ client: "<client>" }));
         assert_eq!("471 <client> <channel> :Cannot join channel (+l)",
             format!("{}", ErrChannelIsFull471{ client: "<client>", channel: "<channel>" }));
-        assert_eq!("472 <client> x :is unknown mode char to me",
-            format!("{}", ErrUnknownMode472{ client: "<client>", modechar: 'x' }));
+        assert_eq!("472 <client> x :is unknown mode char for <channel>",
+            format!("{}", ErrUnknownMode472{ client: "<client>", modechar: 'x',
+                    channel: "<channel>" }));
         assert_eq!("473 <client> <channel> :Cannot join channel (+i)",
             format!("{}", ErrInviteOnlyChan473{ client: "<client>", channel: "<channel>" }));
         assert_eq!("474 <client> <channel> :Cannot join channel (+b)",

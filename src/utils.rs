@@ -214,7 +214,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                         }
                     }
                     'i'|'m'|'t'|'n'|'s' => { },
-                    c => { return Err(UnknownMode(param_idx, c)); }
+                    c => { return Err(UnknownMode(param_idx, c, target.to_string())); }
                 }
                 Ok(())
             })?;
@@ -450,7 +450,7 @@ mod test {
         assert_eq!(Ok(()), validate_channelmodes("#xchan", &vec![
             ("-to", vec!["barry"]), ("+an", vec!["guru"]), ("-mq", vec!["jerry"])])
                 .map_err(|e| e.to_string()));
-        assert_eq!(Err("Unknown mode u in parameter 2".to_string()),
+        assert_eq!(Err("Unknown mode u in parameter 2 for #xchan".to_string()),
             validate_channelmodes("#xchan", &vec![("+nt", vec![]), ("-sum", vec![])])
                 .map_err(|e| e.to_string()));
         assert_eq!(Err("Invalid mode parameter: #xchan l  No argument".to_string()),
