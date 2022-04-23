@@ -1594,9 +1594,13 @@ mod test {
                         IRCLinesCodec::new_with_max_length(10000));
             line_stream.send("NICK mati".to_string()).await.unwrap();
             line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
-            for i in 0..18 {
-                println!("Answer{}: {}", i, line_stream.next().await.unwrap().unwrap());
-            }
+            assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
+                    Network, mati!~mat@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(concat!(":irc.irc 002 mati :Your host is irc.irc, running \
+                    version ", env!("CARGO_PKG_NAME"), "-",
+                    env!("CARGO_PKG_VERSION")).to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
