@@ -1522,11 +1522,22 @@ mod test {
                 state.nick_histories);
     }
     
+    const SRV_PORT: u16 = 7888;
+    
     #[tokio::test]
     async fn test_process_command0() {
         let mut config = MainConfig::default();
-        config.port = 7888;
+        config.port = SRV_PORT;
         let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", SRV_PORT)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            line_stream.send("PING :welcome".to_string()).await.unwrap();
+            println!("Answer: {:?}", line_stream.next().await);
+        }
+        
         main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
                 .unwrap();
         handle.await.unwrap();
