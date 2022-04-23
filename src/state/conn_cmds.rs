@@ -204,7 +204,7 @@ impl super::MainState {
                     // welcome
                     self.feed_msg(&mut conn_state.stream, RplWelcome001{ client,
                         networkname: &self.config.network,
-                                nick: user_state.name.as_deref().unwrap_or_default(),
+                                nick: user_state.nick.as_deref().unwrap_or_default(),
                                 user: user_state.name.as_deref().unwrap_or_default(),
                                 host: &user_state.hostname }).await?;
                     self.feed_msg(&mut conn_state.stream, RplYourHost002{ client,

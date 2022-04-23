@@ -1521,18 +1521,19 @@ mod test {
                 state.nick_histories);
     }
     
-    const SRV_PORT: u16 = 7888;
+    const SRV_PORT_BASE: u16 = 7888;
     
     #[tokio::test]
     async fn test_server_command0() {
         let mut config = MainConfig::default();
-        config.port = SRV_PORT;
+        let port = SRV_PORT_BASE;
+        config.port = port;
         let (main_state, handle) = run_server(config).await.unwrap();
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", SRV_PORT)).await.unwrap();
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
             let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+                        IRCLinesCodec::new_with_max_length(10000));
             line_stream.send("POG :welcome".to_string()).await.unwrap();
             assert_eq!(":irc.irc 421 127.0.0.1 POG :Unknown command".to_string(),
                         line_stream.next().await.unwrap().unwrap());
@@ -1575,19 +1576,31 @@ mod test {
                         .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
-                .unwrap();
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
         handle.await.unwrap();
     }
     
     #[tokio::test]
     async fn test_server_authentication() {
         let mut config = MainConfig::default();
-        config.port = SRV_PORT+1;
+        let port = SRV_PORT_BASE+1;
+        config.port = port;
         let (main_state, handle) = run_server(config).await.unwrap();
         
-        main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
-                .unwrap();
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(10000));
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            for i in 0..18 {
+                println!("Answer{}: {}", i, line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
         handle.await.unwrap();
     }
 }
