@@ -31,6 +31,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
+use tokio::task::JoinHandle;
 use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
@@ -900,31 +901,33 @@ pub(crate) async fn user_state_process(main_state: Arc<MainState>,
     }
 }
 
-pub(crate) async fn run_server(config: MainConfig) -> Result<Arc<MainState>, Box<dyn Error>> {
+pub(crate) async fn run_server(config: MainConfig) ->
+        Result<(Arc<MainState>, JoinHandle<()>), Box<dyn Error>> {
     let listener = TcpListener::bind((config.listen, config.port)).await?;
     let main_state = Arc::new(MainState::new_from_config(config));
-    
-    let mut quit_receiver = main_state.get_quit_receiver().await;
-    let mut do_quit = false;
-    while !do_quit {
-        tokio::select! {
-            res = listener.accept() => {
-                let (stream, addr) = res?;
-                tokio::spawn(user_state_process(main_state.clone(), stream, addr));
-            }
-            Ok(msg) = &mut quit_receiver => {
-                println!("Server quit: {}", msg);
-                do_quit = true;
-            }
+    let main_state_to_return = main_state.clone();
+    let handle = tokio::spawn(async move {
+        let mut quit_receiver = main_state.get_quit_receiver().await;
+        let mut do_quit = false;
+        while !do_quit {
+            tokio::select! {
+                res = listener.accept() => {
+                    let (stream, addr) = res.unwrap();
+                    tokio::spawn(user_state_process(main_state.clone(), stream, addr));
+                }
+                Ok(msg) = &mut quit_receiver => {
+                    println!("Server quit: {}", msg);
+                    do_quit = true;
+                }
+            };
         }
-    }
-    Ok(main_state.clone())
+    });
+    Ok((main_state_to_return, handle))
 }
 
 #[cfg(test)]
 mod test {
     use std::iter::FromIterator;
-    use tokio::net::TcpListener;
     use super::*;
     
     #[test]
@@ -1517,6 +1520,10 @@ mod test {
     
     #[tokio::test]
     async fn test_process_command0() {
+        let (main_state, handle) = run_server(MainConfig::default()).await.unwrap();
+        main_state.state.write().await.quit_sender.take().unwrap().send("Test".to_string())
+                .unwrap();
+        handle.await.unwrap();
     }
 }
 
