@@ -800,7 +800,7 @@ mod test {
             
             line_stream.send("NICK aliver".to_string()).await.unwrap();
             line_stream2.send("NICK aliver".to_string()).await.unwrap();
-            time::sleep(Duration::from_millis(50)).await;
+            time::sleep(Duration::from_millis(100)).await;
             
             line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
             line_stream2.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
@@ -825,9 +825,9 @@ mod test {
             line_stream.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
             line_stream2.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
             
-            time::sleep(Duration::from_millis(50)).await;
+            time::sleep(Duration::from_millis(100)).await;
             line_stream.send("NICK uliver".to_string()).await.unwrap();
-            time::sleep(Duration::from_millis(50)).await;
+            time::sleep(Duration::from_millis(100)).await;
             line_stream2.send("NICK uliver".to_string()).await.unwrap();
             
             assert_eq!(":irc.irc 001 uliver :Welcome to the IRCnetwork \
