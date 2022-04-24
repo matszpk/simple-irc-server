@@ -612,9 +612,85 @@ mod test {
     }
     
     #[tokio::test]
-    async fn test_auth_with_default_user_modes() {
+    async fn test_auth_with_user_configs_2() {
         let mut config = MainConfig::default();
         let port = SRV_PORT_BASE+3;
+        config.port = port;
+        config.users = Some(vec![
+            UserConfig{ name: "lucky".to_string(), nick: "luckboy".to_string(),
+                password: Some("top_secret".to_string()), mask: None },
+            UserConfig{ name: "mati".to_string(), nick: "mat".to_string(),
+                password: None, mask: None },
+            UserConfig{ name: "mati2".to_string(), nick: "mat2".to_string(),
+                password: None, mask: Some("mat2!~mati2@*".to_string()) },   // fail
+        ]);
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
+                        (Some("blamblam"), false), (Some("top_secret"), true)] {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            if let Some(p) = pass {
+                line_stream.send(format!("PASS {}", p)).await.unwrap();
+            }
+            line_stream.send("NICK luckboy".to_string()).await.unwrap();
+            line_stream.send("USER lucky 8 * :LuckBoy".to_string()).await.unwrap();
+            
+            if succeed {
+                assert_eq!(":irc.irc 001 luckboy :Welcome to the IRCnetwork \
+                        Network, luckboy!~lucky@127.0.0.1".to_string(),
+                        line_stream.next().await.unwrap().unwrap(),
+                        "AuthTrial: {:?}", pass);
+                for _ in 1..17 { line_stream.next().await.unwrap().unwrap(); }
+                assert_eq!(":irc.irc 221 luckboy +r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            } else {
+                assert_eq!(":irc.irc 464 luckboy :Password incorrect".to_string(),
+                        line_stream.next().await.unwrap().unwrap(),
+                        "AuthTrial: {:?}", pass);
+            }
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        for (pass, succeed) in [(None, true), (Some("blamblam2"), true),
+                        (Some("top_secret"), true), (Some("blamblam"), true)] {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            if let Some(p) = pass {
+                line_stream.send(format!("PASS {}", p)).await.unwrap();
+            }
+            line_stream.send("NICK mat".to_string()).await.unwrap();
+            line_stream.send("USER mati 8 * :MatiX".to_string()).await.unwrap();
+            
+            if succeed {
+                assert_eq!(":irc.irc 001 mat :Welcome to the IRCnetwork \
+                        Network, mat!~mati@127.0.0.1".to_string(),
+                        line_stream.next().await.unwrap().unwrap(),
+                        "AuthTrial: {:?}", pass);
+                for _ in 1..17 { line_stream.next().await.unwrap().unwrap(); }
+                assert_eq!(":irc.irc 221 mat +r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            } else {
+                assert_eq!(":irc.irc 464 mat :Password incorrect".to_string(),
+                        line_stream.next().await.unwrap().unwrap(),
+                        "AuthTrial: {:?}", pass);
+            }
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_auth_with_default_user_modes() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+4;
         config.default_user_modes = UserModes{
                 registered: true, invisible: true, local_oper: false,
                 oper: false, wallops: false };
