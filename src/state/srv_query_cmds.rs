@@ -21,10 +21,7 @@ use std::error::Error;
 use std::ops::DerefMut;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use super::{ConnState, Channel, ChannelUserModes, BanInfo, VolatileState};
-use crate::reply::*;
-use crate::utils::*;
-use Reply::*;
+use super::*;
 
 static HELP_TOPICS: [(&'static str, &'static str); 1] = [
     ("COMMANDS", "List of commands

@@ -22,12 +22,7 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
-use super::{ConnState, ChannelUserModes, User};
-use super::{PrivMsgTargetType, get_privmsg_target_type};
-use crate::reply::*;
-use crate::command::*;
-use crate::utils::*;
-use Reply::*;
+use super::*;
 
 impl super::MainState {
     async fn process_privmsg_notice<'a>(&self, conn_state: &mut ConnState,
