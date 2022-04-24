@@ -835,4 +835,32 @@ mod test {
                 .send("Test".to_string()).unwrap();
         handle.await.unwrap();
     }
+    
+    #[tokio::test]
+    async fn test_auth_after_user_failed() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+6;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK oliver".to_string()).await.unwrap();
+            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 462 oliver :You may not reregister".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
 }
