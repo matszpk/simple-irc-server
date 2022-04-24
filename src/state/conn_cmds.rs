@@ -1013,10 +1013,86 @@ mod test {
                                     .unwrap().modes.oper,
                         "OperTest {} {}", opname, pass);
                 }
-                _ => {}
+                _ => { assert!(false); }
             }
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
             time::sleep(Duration::from_millis(50)).await;
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_command_quit() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+9;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK brian".to_string()).await.unwrap();
+            line_stream.send("USER brianx 8 * :BrianX".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK brian".to_string()).await.unwrap();
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_command_ping() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+10;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK brian".to_string()).await.unwrap();
+            line_stream.send("USER brianx 8 * :BrianX".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("PING aarrgghhh!!!".to_string()).await.unwrap();
+            assert_eq!(":irc.irc PONG irc.irc :aarrgghhh!!!".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
