@@ -812,18 +812,9 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = connect_to_test(port).await;
-            let mut line_stream2 = connect_to_test(port).await;
-            let mut line_stream3 = connect_to_test(port).await;
-            
-            line_stream.send("NICK mati".to_string()).await.unwrap();
-            line_stream.send("USER mat 8 * :MatSzpak".to_string()).await.unwrap();
-            
-            line_stream2.send("NICK lucki".to_string()).await.unwrap();
-            line_stream2.send("USER luck 8 * :LuckBoy".to_string()).await.unwrap();
-            
-            line_stream3.send("NICK dam".to_string()).await.unwrap();
-            line_stream3.send("USER dam 8 * :Damon".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "mati", "mat", "MatSzpak").await;
+            let mut line_stream2 = login_as_test(port, "lucki", "luck", "LuckBoy").await;
+            let mut line_stream3 = login_as_test(port, "dam", "dam", "Damon").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             for _ in 0..18 { line_stream2.next().await.unwrap().unwrap(); }
