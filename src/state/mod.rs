@@ -1549,7 +1549,7 @@ mod test {
         Framed::new(stream, IRCLinesCodec::new_with_max_length(2000))
     }
     
-    pub(crate) async fn login_as_test<'a>(port: u16, nick: &'a str, name: &'a str,
+    pub(crate) async fn login_to_test<'a>(port: u16, nick: &'a str, name: &'a str,
                 realname: &'a str) -> Framed<TcpStream, IRCLinesCodec> {
         let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         let mut line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
@@ -1616,7 +1616,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "mati", "mat", "MatiSzpaki").await;
+            let mut line_stream = login_to_test(port, "mati", "mat", "MatiSzpaki").await;
             assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
                     Network, mati!~mat@127.0.0.1".to_string(),
                     line_stream.next().await.unwrap().unwrap());
@@ -1694,7 +1694,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "mati", "mat", "MatiSzpaki").await;
+            let mut line_stream = login_to_test(port, "mati", "mat", "MatiSzpaki").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             

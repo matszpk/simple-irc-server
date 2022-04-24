@@ -679,7 +679,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(config).await;
         
         {
-            let mut line_stream = login_as_test(port, "oliver", "oliverk",
+            let mut line_stream = login_to_test(port, "oliver", "oliverk",
                     "Oliver Kittson").await;
             
             assert_eq!(":irc.irc 001 oliver :Welcome to the IRCnetwork \
@@ -783,7 +783,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "oliver", "aliverk",
+            let mut line_stream = login_to_test(port, "oliver", "aliverk",
                     "Oliver Kittson").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
@@ -794,7 +794,7 @@ mod test {
         }
         
         {
-            let mut line_stream = login_as_test(port, "uliver", "aliverk",
+            let mut line_stream = login_to_test(port, "uliver", "aliverk",
                     "Oliver Kittson").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
@@ -812,9 +812,9 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "mati", "mat", "MatSzpak").await;
-            let mut line_stream2 = login_as_test(port, "lucki", "luck", "LuckBoy").await;
-            let mut line_stream3 = login_as_test(port, "dam", "dam", "Damon").await;
+            let mut line_stream = login_to_test(port, "mati", "mat", "MatSzpak").await;
+            let mut line_stream2 = login_to_test(port, "lucki", "luck", "LuckBoy").await;
+            let mut line_stream3 = login_to_test(port, "dam", "dam", "Damon").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             for _ in 0..18 { line_stream2.next().await.unwrap().unwrap(); }
@@ -877,7 +877,7 @@ mod test {
         for (opname, pass, res) in [("guru", "NoWay", 2), ("guru", "NoWayX", 1),
                 ("guru2", "NoWay2", 2), ("guru2", "NoWayn", 1),
                 ("gurux", "NoWay", 0), ("guru3", "NoWay3", 0)] {
-            let mut line_stream = login_as_test(port, "guruv", "guruvx",
+            let mut line_stream = login_to_test(port, "guruv", "guruvx",
                     "SuperGuruV").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
@@ -925,7 +925,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "brian", "brianx", "BrianX").await;
+            let mut line_stream = login_to_test(port, "brian", "brianx", "BrianX").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
@@ -964,7 +964,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_as_test(port, "brian", "brianx", "BrianX").await;
+            let mut line_stream = login_to_test(port, "brian", "brianx", "BrianX").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
