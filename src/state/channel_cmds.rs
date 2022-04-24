@@ -484,7 +484,27 @@ impl super::MainState {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use super::super::test::*;
+    
     #[tokio::test]
     async fn test_command_join() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test(port, "charlie", "charlie2",
+                    "Charlie Brown").await;
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            assert_eq!(":charlie!~charlie2@127.0.0.1 JOIN #fruits".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 353 charlie @ #fruits :~charlie".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 366 charlie #fruits :End of /NAMES list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
     }
 }
