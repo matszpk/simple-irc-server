@@ -707,8 +707,8 @@ impl MainState {
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
+            
             msg_str_res = conn_state.stream.next() => {
-                
                 let msg = match msg_str_res {
                     Some(Ok(ref msg_str)) => {
                         match Message::from_shared_str(&msg_str) {
