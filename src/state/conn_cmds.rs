@@ -807,6 +807,30 @@ mod test {
                     .to_string(), line_stream2.next().await.unwrap().unwrap());
         }
         
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream2 = Framed::new(stream2,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            line_stream2.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream.send("NICK uliver".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream2.send("NICK uliver".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 001 uliver :Welcome to the IRCnetwork \
+                    Network, uliver!~uliverk@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 433 uliverk uliver :Nickname is already in use"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+        }
+        
         main_state.state.write().await.quit_sender.take().unwrap()
                 .send("Test".to_string()).unwrap();
         handle.await.unwrap();
