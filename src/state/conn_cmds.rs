@@ -996,6 +996,7 @@ mod test {
                     assert!(main_state.state.read().await.users.get("guruv")
                                     .unwrap().modes.oper,
                         "OperTest {} {}", opname, pass);
+                    assert_eq!(1, main_state.state.read().await.operators_count);
                 }
                 0 => {
                     assert_eq!(":irc.irc 491 guruv :No O-lines for your host"
@@ -1004,6 +1005,7 @@ mod test {
                     assert!(!main_state.state.read().await.users.get("guruv")
                                     .unwrap().modes.oper,
                         "OperTest {} {}", opname, pass);
+                    assert_eq!(0, main_state.state.read().await.operators_count);
                 }
                 1 => {
                     assert_eq!(":irc.irc 464 guruv :Password incorrect"
@@ -1012,6 +1014,7 @@ mod test {
                     assert!(!main_state.state.read().await.users.get("guruv")
                                     .unwrap().modes.oper,
                         "OperTest {} {}", opname, pass);
+                    assert_eq!(0, main_state.state.read().await.operators_count);
                 }
                 _ => { assert!(false); }
             }
