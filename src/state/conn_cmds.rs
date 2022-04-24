@@ -359,19 +359,24 @@ impl super::MainState {
             let op_cfg_opt = self.config.operators.as_ref().unwrap().get(*oper_idx);
             let op_config = op_cfg_opt.as_ref().unwrap();
             
-            if op_config.password != password {
+            let do_it = if op_config.password != password {
                 self.feed_msg(&mut conn_state.stream,
                         ErrPasswdMismatch464{ client }).await?;
+                false
             }
-            if let Some(ref op_mask) = op_config.mask {
-                if match_wildcard(&op_mask, &conn_state.user_state.source) {
+            else if let Some(ref op_mask) = op_config.mask {
+                if !match_wildcard(&op_mask, &conn_state.user_state.source) {
                     self.feed_msg(&mut conn_state.stream,
                             ErrNoOperHost491{ client }).await?;
-                }
+                    false
+                } else { true }
+            } else { true };
+            
+            if do_it {
+                user.modes.oper = true;
+                state.operators_count += 1;
+                self.feed_msg(&mut conn_state.stream, RplYoureOper381{ client }).await?;
             }
-            user.modes.oper = true;
-            state.operators_count += 1;
-            self.feed_msg(&mut conn_state.stream, RplYoureOper381{ client }).await?;
         } else {
             self.feed_msg(&mut conn_state.stream, ErrNoOperHost491{ client }).await?;
         }
@@ -946,6 +951,72 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
             line_stream2.send("QUIT :Bye".to_string()).await.unwrap();
             line_stream3.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_command_oper() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+8;
+        config.port = port;
+        config.operators = Some(vec![
+            OperatorConfig{ name: "guru".to_string(),
+                    password: "NoWay".to_string(), mask: None },
+            OperatorConfig{ name: "guru2".to_string(),
+                    password: "NoWay2".to_string(),
+                    mask: Some("guruv*@*".to_string()) },
+            OperatorConfig{ name: "guru3".to_string(),
+                    password: "NoWay3".to_string(),
+                    mask: Some("guru4*@*".to_string()) },
+        ]);
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        for (opname, pass, res) in [("guru", "NoWay", 2), ("guru", "NoWayX", 1),
+                ("guru2", "NoWay2", 2), ("guru2", "NoWayn", 1),
+                ("gurux", "NoWay", 0), ("guru3", "NoWay3", 0)] {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK guruv".to_string()).await.unwrap();
+            line_stream.send("USER guruvx 8 * :SuperGuruV".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send(format!("OPER {} {}", opname, pass)).await.unwrap();
+            match res {
+                2 => {
+                    assert_eq!(":irc.irc 381 guruv :You are now an IRC operator"
+                        .to_string(), line_stream.next().await.unwrap().unwrap(),
+                        "OperTest {} {}", opname, pass);
+                    assert!(main_state.state.read().await.users.get("guruv")
+                                    .unwrap().modes.oper,
+                        "OperTest {} {}", opname, pass);
+                }
+                0 => {
+                    assert_eq!(":irc.irc 491 guruv :No O-lines for your host"
+                        .to_string(), line_stream.next().await.unwrap().unwrap(),
+                        "OperTest {} {}", opname, pass);
+                    assert!(!main_state.state.read().await.users.get("guruv")
+                                    .unwrap().modes.oper,
+                        "OperTest {} {}", opname, pass);
+                }
+                1 => {
+                    assert_eq!(":irc.irc 464 guruv :Password incorrect"
+                        .to_string(), line_stream.next().await.unwrap().unwrap(),
+                        "OperTest {} {}", opname, pass);
+                    assert!(!main_state.state.read().await.users.get("guruv")
+                                    .unwrap().modes.oper,
+                        "OperTest {} {}", opname, pass);
+                }
+                _ => {}
+            }
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
