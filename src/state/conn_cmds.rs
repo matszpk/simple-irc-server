@@ -20,12 +20,7 @@
 use std::error::Error;
 use std::ops::DerefMut;
 use std::sync::atomic::Ordering;
-use super::ConnState;
-use crate::command::*;
-use crate::reply::*;
-use crate::utils::*;
-use Reply::*;
-use super::User;
+use super::*;
 
 struct SupportTokenIntValue{ name: &'static str, value: usize }
 
@@ -375,5 +370,58 @@ impl super::MainState {
         conn_state.quit.store(1, Ordering::SeqCst);
         self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    
+    const SRV_PORT_BASE: u16 = 7900;
+    
+    #[tokio::test]
+    async fn test_auth_with_caps() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc CAP * LS :multi-prefix".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc CAP * ACK :multi-prefix".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
+                    Network, mati!~mat@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(concat!(":irc.irc 002 mati :Your host is irc.irc, running \
+                    version ", env!("CARGO_PKG_NAME"), "-",
+                    env!("CARGO_PKG_VERSION")).to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(format!(":irc.irc 003 mati :This server was created {}",
+                    main_state.created),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            for _ in 3..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("CAP LIST".to_string()).await.unwrap();
+            assert_eq!(":irc.irc CAP * LIST :multi-prefix".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
     }
 }

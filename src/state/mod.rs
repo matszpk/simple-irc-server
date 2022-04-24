@@ -1651,6 +1651,10 @@ mod test {
             assert_eq!(HashSet::from([ "MatiSzpaki".to_string() ]),
                     HashSet::from_iter(state.users.values().map(|u| u.realname.clone())));
             
+            line_stream.send("CAP LIST".to_string()).await.unwrap();
+            assert_eq!(":irc.irc CAP * LIST :".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         time::sleep(Duration::from_millis(50)).await;
