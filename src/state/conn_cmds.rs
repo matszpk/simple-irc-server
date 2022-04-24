@@ -610,4 +610,57 @@ mod test {
                 .send("Test".to_string()).unwrap();
         handle.await.unwrap();
     }
+    
+    #[tokio::test]
+    async fn test_auth_with_default_user_modes() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+3;
+        config.default_user_modes = UserModes{
+                registered: true, invisible: true, local_oper: false,
+                oper: false, wallops: false };
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK oliver".to_string()).await.unwrap();
+            line_stream.send("USER oliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 001 oliver :Welcome to the IRCnetwork \
+                    Network, oliver!~oliverk@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            for _ in 1..7 { line_stream.next().await.unwrap().unwrap(); }
+            
+            assert_eq!(":irc.irc 251 oliver :There are 0 users and 1 \
+                    invisible on 1 servers".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 252 oliver 0 :operator(s) online".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 253 oliver 0 :unknown connection(s)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 254 oliver 0 :channels formed".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 255 oliver :I have 1 clients and 1 servers".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 265 oliver 1 1 :Current local users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 266 oliver 1 1 :Current global users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 375 oliver :- irc.irc Message of the day - ".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 372 oliver :Hello, world!".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 376 oliver :End of /MOTD command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 221 oliver +ir".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
 }
