@@ -1656,6 +1656,8 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
             
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         time::sleep(Duration::from_millis(50)).await;
         {   // after close
