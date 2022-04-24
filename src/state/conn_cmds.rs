@@ -420,6 +420,69 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            line_stream.send("USER mat2 8 * :MatiSzpaki2".to_string()).await.unwrap();
+            line_stream.send("NICK mati2".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc CAP * LS :multi-prefix".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc CAP * ACK :multi-prefix".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 001 mati2 :Welcome to the IRCnetwork \
+                    Network, mati2!~mat2@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_auth_with_password() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+1;
+        config.port = port;
+        config.password = Some("blamblam".to_string());
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 464 mati :Password incorrect".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("PASS blamblam".to_string()).await.unwrap();
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
+                    Network, mati!~mat@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            for i in 1..18 {
+                println!("AnswerY {}: {}", i, line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
         main_state.state.write().await.quit_sender.take().unwrap()
                 .send("Test".to_string()).unwrap();
         handle.await.unwrap();
