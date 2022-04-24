@@ -1543,6 +1543,21 @@ mod test {
         handle.await.unwrap();
     }
     
+    pub(crate) async fn connect_to_test(port: u16)
+                    -> Framed<TcpStream, IRCLinesCodec> {
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        Framed::new(stream, IRCLinesCodec::new_with_max_length(2000))
+    }
+    
+    pub(crate) async fn login_as_test<'a>(port: u16, nick: &'a str, name: &'a str,
+                realname: &'a str) -> Framed<TcpStream, IRCLinesCodec> {
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let mut line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
+        line_stream.send(format!("NICK {}", nick)).await.unwrap();
+        line_stream.send(format!("USER {} 8 * :{}", name, realname)).await.unwrap();
+        line_stream
+    }
+    
     #[tokio::test]
     async fn test_server_command0() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
@@ -1601,11 +1616,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            line_stream.send("NICK mati".to_string()).await.unwrap();
-            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "mati", "mat", "MatiSzpaki").await;
             assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
                     Network, mati!~mat@127.0.0.1".to_string(),
                     line_stream.next().await.unwrap().unwrap());
@@ -1683,11 +1694,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            line_stream.send("NICK mati".to_string()).await.unwrap();
-            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "mati", "mat", "MatiSzpaki").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             

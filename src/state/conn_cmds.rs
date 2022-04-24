@@ -396,16 +396,12 @@ mod test {
     use super::*;
     use super::super::test::*;
     
-    const SRV_PORT_BASE: u16 = 7900;
-    
     #[tokio::test]
     async fn test_auth_with_caps() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             line_stream.send("CAP LS 302".to_string()).await.unwrap();
             line_stream.send("NICK mati".to_string()).await.unwrap();
             line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
@@ -437,9 +433,7 @@ mod test {
         }
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             line_stream.send("CAP LS 302".to_string()).await.unwrap();
             line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
             line_stream.send("CAP END".to_string()).await.unwrap();
@@ -468,9 +462,7 @@ mod test {
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                                 (Some("blamblam"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -515,9 +507,7 @@ mod test {
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("blamblam"), false), (Some("top_secret"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -543,9 +533,7 @@ mod test {
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("top_secret"), false), (Some("blamblam"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -571,9 +559,7 @@ mod test {
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("top_secret"), false), (Some("blamblam"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -599,9 +585,7 @@ mod test {
         
         for pass in [None, Some("blamblam2"), Some("top_secret"),
                                 Some("blamblam")] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -633,9 +617,7 @@ mod test {
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("blamblam"), false), (Some("top_secret"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -661,9 +643,7 @@ mod test {
         
         for (pass, succeed) in [(None, true), (Some("blamblam2"), true),
                         (Some("top_secret"), true), (Some("blamblam"), true)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
             
             if let Some(p) = pass {
                 line_stream.send(format!("PASS {}", p)).await.unwrap();
@@ -699,12 +679,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(config).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK oliver".to_string()).await.unwrap();
-            line_stream.send("USER oliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "oliver", "oliverk",
+                    "Oliver Kittson").await;
             
             assert_eq!(":irc.irc 001 oliver :Welcome to the IRCnetwork \
                     Network, oliver!~oliverk@127.0.0.1".to_string(),
@@ -744,13 +720,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream2 = Framed::new(stream2,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
+            let mut line_stream2 = connect_to_test(port).await;
             
             line_stream.send("NICK oliver".to_string()).await.unwrap();
             line_stream.send("USER oliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
@@ -767,13 +738,8 @@ mod test {
         }
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream2 = Framed::new(stream2,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
+            let mut line_stream2 = connect_to_test(port).await;
             
             line_stream.send("NICK aliver".to_string()).await.unwrap();
             line_stream2.send("NICK aliver".to_string()).await.unwrap();
@@ -791,13 +757,8 @@ mod test {
         }
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream2 = Framed::new(stream2,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
+            let mut line_stream2 = connect_to_test(port).await;
             
             line_stream.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
             line_stream2.send("USER uliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
@@ -822,12 +783,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK oliver".to_string()).await.unwrap();
-            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "oliver", "aliverk",
+                    "Oliver Kittson").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
@@ -837,12 +794,8 @@ mod test {
         }
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK uliver".to_string()).await.unwrap();
-            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "uliver", "aliverk",
+                    "Oliver Kittson").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
@@ -859,17 +812,9 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream2 = Framed::new(stream2,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            let stream3 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream3 = Framed::new(stream3,
-                        IRCLinesCodec::new_with_max_length(2000));
+            let mut line_stream = connect_to_test(port).await;
+            let mut line_stream2 = connect_to_test(port).await;
+            let mut line_stream3 = connect_to_test(port).await;
             
             line_stream.send("NICK mati".to_string()).await.unwrap();
             line_stream.send("USER mat 8 * :MatSzpak".to_string()).await.unwrap();
@@ -941,12 +886,8 @@ mod test {
         for (opname, pass, res) in [("guru", "NoWay", 2), ("guru", "NoWayX", 1),
                 ("guru2", "NoWay2", 2), ("guru2", "NoWayn", 1),
                 ("gurux", "NoWay", 0), ("guru3", "NoWay3", 0)] {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK guruv".to_string()).await.unwrap();
-            line_stream.send("USER guruvx 8 * :SuperGuruV".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "guruv", "guruvx",
+                    "SuperGuruV").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
@@ -993,12 +934,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK brian".to_string()).await.unwrap();
-            line_stream.send("USER brianx 8 * :BrianX".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "brian", "brianx", "BrianX").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
@@ -1037,12 +973,7 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-            let mut line_stream = Framed::new(stream,
-                        IRCLinesCodec::new_with_max_length(2000));
-            
-            line_stream.send("NICK brian".to_string()).await.unwrap();
-            line_stream.send("USER brianx 8 * :BrianX".to_string()).await.unwrap();
+            let mut line_stream = login_as_test(port, "brian", "brianx", "BrianX").await;
             
             for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
