@@ -394,15 +394,13 @@ impl super::MainState {
 #[cfg(test)]
 mod test {
     use super::*;
+    use super::super::test::*;
     
     const SRV_PORT_BASE: u16 = 7900;
     
     #[tokio::test]
     async fn test_auth_with_caps() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -459,18 +457,14 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_with_password() {
         let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+1;
-        config.port = port;
         config.password = Some("blamblam".to_string());
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(config).await;
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                                 (Some("blamblam"), true)] {
@@ -500,16 +494,12 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_with_user_configs() {
         let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+2;
-        config.port = port;
         config.password = Some("blamblam".to_string());
         config.users = Some(vec![
             UserConfig{ name: "lucky".to_string(), nick: "luckboy".to_string(),
@@ -521,7 +511,7 @@ mod test {
             UserConfig{ name: "mati3".to_string(), nick: "mat3".to_string(),
                 password: None, mask: Some("mat4!~mati3@*".to_string()) },   // fail
         ]);
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(config).await;
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("blamblam"), false), (Some("top_secret"), true)] {
@@ -625,16 +615,12 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_with_user_configs_2() {
         let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+3;
-        config.port = port;
         config.users = Some(vec![
             UserConfig{ name: "lucky".to_string(), nick: "luckboy".to_string(),
                 password: Some("top_secret".to_string()), mask: None },
@@ -643,7 +629,7 @@ mod test {
             UserConfig{ name: "mati2".to_string(), nick: "mat2".to_string(),
                 password: None, mask: Some("mat2!~mati2@*".to_string()) },   // fail
         ]);
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(config).await;
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
                         (Some("blamblam"), false), (Some("top_secret"), true)] {
@@ -701,20 +687,16 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_with_default_user_modes() {
         let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+4;
         config.default_user_modes = UserModes{
                 registered: true, invisible: true, local_oper: false,
                 oper: false, wallops: false };
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(config).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -754,17 +736,12 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_failed_nick_used() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+5;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -837,17 +814,12 @@ mod test {
                     .to_string(), line_stream2.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_auth_after_user_pass_failed() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+6;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -879,17 +851,12 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_nick_rename() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+7;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -953,16 +920,12 @@ mod test {
             line_stream3.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_command_oper() {
         let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+8;
-        config.port = port;
         config.operators = Some(vec![
             OperatorConfig{ name: "guru".to_string(),
                     password: "NoWay".to_string(), mask: None },
@@ -973,7 +936,7 @@ mod test {
                     password: "NoWay3".to_string(),
                     mask: Some("guru4*@*".to_string()) },
         ]);
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(config).await;
         
         for (opname, pass, res) in [("guru", "NoWay", 2), ("guru", "NoWayX", 1),
                 ("guru2", "NoWay2", 2), ("guru2", "NoWayn", 1),
@@ -1022,17 +985,12 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_command_quit() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+9;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -1071,17 +1029,12 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_command_ping() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+10;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -1098,8 +1051,6 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
 }

@@ -481,3 +481,10 @@ impl super::MainState {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[tokio::test]
+    async fn test_command_join() {
+    }
+}

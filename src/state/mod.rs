@@ -1523,14 +1523,29 @@ mod test {
                 state.nick_histories);
     }
     
-    const SRV_PORT_BASE: u16 = 7888;
+    use std::sync::atomic::AtomicU16;
+    
+    static PORT_COUNTER :AtomicU16 = AtomicU16::new(7888);
+    
+    pub(crate) async fn run_test_server(config: MainConfig)
+            -> (Arc<MainState>, JoinHandle<()>, u16) {
+        let mut config = config;
+        config.port = PORT_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let port = config.port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        (main_state, handle, port)
+    }
+    
+    pub(crate) async fn quit_test_server(main_state: Arc<MainState>,
+                        handle: JoinHandle<()>) {
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
     
     #[tokio::test]
     async fn test_server_command0() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -1578,17 +1593,12 @@ mod test {
                         .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_server_authentication() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+1;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -1665,17 +1675,12 @@ mod test {
             assert_eq!(HashSet::new(), HashSet::from_iter(state.users.keys().cloned()));
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]
     async fn test_server_timeouts() {
-        let mut config = MainConfig::default();
-        let port = SRV_PORT_BASE+2;
-        config.port = port;
-        let (main_state, handle) = run_server(config).await.unwrap();
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
             let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
@@ -1709,9 +1714,7 @@ mod test {
                 be closed.".to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
-        main_state.state.write().await.quit_sender.take().unwrap()
-                .send("Test".to_string()).unwrap();
-        handle.await.unwrap();
+        quit_test_server(main_state, handle).await;
     }
 }
 
