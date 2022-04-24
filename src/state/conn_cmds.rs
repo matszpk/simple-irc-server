@@ -286,6 +286,7 @@ impl super::MainState {
             if nick != old_nick {
                 let nick_str = nick.to_string();
                 if !state.users.contains_key(&nick_str) {
+                    let old_source = conn_state.user_state.source.clone();
                     let mut user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
@@ -305,7 +306,7 @@ impl super::MainState {
                     
                     for (_,u) in &state.users {
                         if !u.modes.invisible || u.nick == nick {
-                            u.send_message(msg, &conn_state.user_state.source)?;
+                            u.send_message(msg, &old_source)?;
                         }
                     }
                 } else {    // if nick in use
@@ -871,6 +872,80 @@ mod test {
             line_stream.send("PASS xxxx".to_string()).await.unwrap();
             assert_eq!(":irc.irc 462 uliver :You may not reregister".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_nick_rename() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+7;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream2 = Framed::new(stream2,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            let stream3 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream3 = Framed::new(stream3,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatSzpak".to_string()).await.unwrap();
+            
+            line_stream2.send("NICK lucki".to_string()).await.unwrap();
+            line_stream2.send("USER luck 8 * :LuckBoy".to_string()).await.unwrap();
+            
+            line_stream3.send("NICK dam".to_string()).await.unwrap();
+            line_stream3.send("USER dam 8 * :Damon".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            for _ in 0..18 { line_stream2.next().await.unwrap().unwrap(); }
+            for _ in 0..18 { line_stream3.next().await.unwrap().unwrap(); }
+            
+            line_stream2.send("NICK luke".to_string()).await.unwrap();
+            
+            assert_eq!(":lucki!~luck@127.0.0.1 NICK luke".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":lucki!~luck@127.0.0.1 NICK luke".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":lucki!~luck@127.0.0.1 NICK luke".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
+            
+            {
+                let state = main_state.state.read().await;
+                assert!(state.users.contains_key("luke"));
+                assert!(!state.users.contains_key("lucki"));
+                assert_eq!("luck", state.users.get("luke").unwrap().name);
+                assert_eq!("LuckBoy", state.users.get("luke").unwrap().realname);
+            }
+            
+            // if nothing
+            line_stream2.send("NICK luke".to_string()).await.unwrap();
+            {
+                let state = main_state.state.read().await;
+                assert!(state.users.contains_key("luke"));
+                assert!(!state.users.contains_key("lucki"));
+                assert_eq!("luck", state.users.get("luke").unwrap().name);
+                assert_eq!("LuckBoy", state.users.get("luke").unwrap().realname);
+            }
+            
+            line_stream2.send("NICK dam".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 433 luke dam :Nickname is already in use".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            line_stream2.send("QUIT :Bye".to_string()).await.unwrap();
+            line_stream3.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
