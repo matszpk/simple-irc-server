@@ -191,8 +191,15 @@ impl super::MainState {
                                 conn_state.sender.take().unwrap(), 
                                 conn_state.quit_sender.take().unwrap());
                     let umode_str = user.modes.to_string();
-                    state.add_user(user);
-                    umode_str
+                    if !state.users.contains_key(&user.nick) {
+                        state.add_user(user);
+                        umode_str
+                    } else {
+                        let client = conn_state.user_state.client_name();
+                        self.feed_msg(&mut conn_state.stream,
+                                ErrNicknameInUse433{ client, nick: &user.nick }).await?;
+                        return Ok(())
+                    }
                 };
                 
                 {
@@ -264,15 +271,21 @@ impl super::MainState {
     pub(super) async fn process_nick<'a>(&self, conn_state: &mut ConnState, nick: &'a str,
                 msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
-            conn_state.user_state.set_nick(nick.to_string());
-            self.authenticate(conn_state).await?;
+            if !self.state.read().await.users.contains_key(nick) {
+                conn_state.user_state.set_nick(nick.to_string());
+                self.authenticate(conn_state).await?;
+            } else {
+                let client = conn_state.user_state.client_name();
+                self.feed_msg(&mut conn_state.stream,
+                        ErrNicknameInUse433{ client, nick }).await?;
+            }
         } else {
             let mut statem = self.state.write().await;
             let state = statem.deref_mut();
             let old_nick = conn_state.user_state.nick.as_ref().unwrap().to_string();
             if nick != old_nick {
                 let nick_str = nick.to_string();
-                if !state.users.get(&nick_str).is_some() {
+                if !state.users.contains_key(&nick_str) {
                     let mut user = state.users.remove(&old_nick).unwrap();
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
@@ -733,6 +746,65 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 221 oliver +ir".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        main_state.state.write().await.quit_sender.take().unwrap()
+                .send("Test".to_string()).unwrap();
+        handle.await.unwrap();
+    }
+    
+    #[tokio::test]
+    async fn test_auth_failed_nick_used() {
+        let mut config = MainConfig::default();
+        let port = SRV_PORT_BASE+5;
+        config.port = port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream2 = Framed::new(stream2,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK oliver".to_string()).await.unwrap();
+            line_stream.send("USER oliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            line_stream2.send("NICK oliver".to_string()).await.unwrap();
+            line_stream2.send("USER oliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 001 oliver :Welcome to the IRCnetwork \
+                    Network, oliver!~oliverk@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            assert_eq!(":irc.irc 433 127.0.0.1 oliver :Nickname is already in use"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+        }
+        
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            let stream2 = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream2 = Framed::new(stream2,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK aliver".to_string()).await.unwrap();
+            line_stream2.send("NICK aliver".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            
+            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            line_stream2.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 001 aliver :Welcome to the IRCnetwork \
+                    Network, aliver!~aliverk@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            assert_eq!(":irc.irc 433 aliver aliver :Nickname is already in use"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
         }
         
         main_state.state.write().await.quit_sender.take().unwrap()
