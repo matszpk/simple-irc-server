@@ -837,7 +837,7 @@ mod test {
     }
     
     #[tokio::test]
-    async fn test_auth_after_user_failed() {
+    async fn test_auth_after_user_pass_failed() {
         let mut config = MainConfig::default();
         let port = SRV_PORT_BASE+6;
         config.port = port;
@@ -858,6 +858,20 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
         }
         
+        {
+            let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let mut line_stream = Framed::new(stream,
+                        IRCLinesCodec::new_with_max_length(2000));
+            
+            line_stream.send("NICK uliver".to_string()).await.unwrap();
+            line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
+            
+            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("PASS xxxx".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 462 uliver :You may not reregister".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
         
         main_state.state.write().await.quit_sender.take().unwrap()
                 .send("Test".to_string()).unwrap();
