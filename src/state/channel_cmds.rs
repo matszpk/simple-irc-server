@@ -294,7 +294,7 @@ impl super::MainState {
         let in_channel = channel.users.contains_key(&conn_user.nick);
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
-            let symbol = if channel.modes.secret { "=" } else { "@" };
+            let symbol = if channel.modes.secret { "@" } else { "=" };
             
             let mut name_chunk = vec![];
             name_chunk.reserve(NAMES_COUNT);
@@ -487,6 +487,24 @@ mod test {
     use super::*;
     use super::super::test::*;
     
+    fn equal_channel_names<'a>(exp_msg: &'a str, exp_names: &'a[&'a str],
+                names_replies: &'a[&'a str]) -> bool {
+        let mut match_count = 0;
+        let mut exp_names_sorted = Vec::from(exp_names);
+        exp_names_sorted.sort();
+        names_replies.iter().all(|reply| {
+            if reply.starts_with(exp_msg) {
+                println!("xxx {} {}", reply, exp_msg);
+                reply[exp_msg.len()..].split_terminator(" ").all(|c| {
+                    if exp_names_sorted.binary_search(&c).is_ok() {
+                        match_count += 1;
+                        true
+                    } else { false }
+                })
+            } else { false }
+        }) && match_count == exp_names.len()
+    }
+    
     #[tokio::test]
     async fn test_command_join() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
@@ -498,10 +516,21 @@ mod test {
             line_stream.send("JOIN #fruits".to_string()).await.unwrap();
             assert_eq!(":charlie!~charlie2@127.0.0.1 JOIN #fruits".to_string(),
                     line_stream.next().await.unwrap().unwrap());
-            assert_eq!(":irc.irc 353 charlie @ #fruits :~charlie".to_string(),
+            assert_eq!(":irc.irc 353 charlie = #fruits :~charlie".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 366 charlie #fruits :End of /NAMES list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "eddix", "eddie",
+                    "Eddie Flower").await;
+            line_stream2.send("JOIN #fruits".to_string()).await.unwrap();
+            assert_eq!(":eddix!~eddie@127.0.0.1 JOIN #fruits".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 eddix = #fruits :",
+                    &["eddix", "~charlie"],
+                    &[&line_stream2.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 eddix #fruits :End of /NAMES list".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
