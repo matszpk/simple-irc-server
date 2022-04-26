@@ -603,6 +603,13 @@ mod test {
             }
         }
         
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_limit_check() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
         const CLIENT_LIMIT: usize = 10;
         // limit check
         {
@@ -642,6 +649,12 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_ban() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         // ban and ban exception
         {
             let mut line_stream = login_to_test_and_skip(port, "expert", "expertx",
@@ -680,6 +693,12 @@ mod test {
                     angel_stream.next().await.unwrap().unwrap());
         }
         
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_invite() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         // invite
         {
             let mut line_stream = login_to_test_and_skip(port, "damian", "damian",
@@ -715,7 +734,12 @@ mod test {
             assert_eq!(":henry!~henryk@127.0.0.1 JOIN #exclusive".to_string(),
                     henry_stream.next().await.unwrap().unwrap());
         }
-        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_key_check() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         // key check
         {
             let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
