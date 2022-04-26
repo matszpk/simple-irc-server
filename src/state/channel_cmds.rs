@@ -544,6 +544,52 @@ mod test {
                     &[&line_stream3.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 366 logan #fruits :End of /NAMES list".to_string(),
                     line_stream3.next().await.unwrap().unwrap());
+            
+            let mut exp_channel = Channel{ name: "#fruits".to_string(), topic: None,
+                        creation_time: 0,
+                        modes: ChannelModes::new_for_channel("charlie".to_string()),
+                        default_modes: ChannelDefaultModes::default(),
+                        ban_info: HashMap::new(),
+                        users: [
+                        ("charlie".to_string(), ChannelUserModes{ founder: true,
+                            protected: false, voice: false, operator: true,
+                            half_oper: false }),
+                        ("eddix".to_string(), ChannelUserModes{ founder: false,
+                            protected: false, voice: false, operator: false,
+                            half_oper: false }),
+                        ("logan".to_string(), ChannelUserModes{ founder: false,
+                            protected: false, voice: false, operator: false,
+                            half_oper: false })].into() };
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#fruits").unwrap();
+                exp_channel.creation_time = channel.creation_time;
+                assert_eq!(exp_channel, *channel);
+            }
+            line_stream3.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                exp_channel.remove_user("logan");
+                let channel = state.channels.get("#fruits").unwrap();
+                assert_eq!(exp_channel, *channel);
+            }
+            line_stream2.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                exp_channel.remove_user("eddix");
+                let channel = state.channels.get("#fruits").unwrap();
+                assert_eq!(exp_channel, *channel);
+            }
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                exp_channel.remove_user("charlie");
+                let channel = state.channels.get("#fruits").unwrap();
+                assert_eq!(exp_channel, *channel);
+            }
         }
         
         quit_test_server(main_state, handle).await;
