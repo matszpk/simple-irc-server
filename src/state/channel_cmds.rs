@@ -116,7 +116,6 @@ impl super::MainState {
                                 chname.clone(), user_nick.clone()));
                 } else {
                     state.channels.get_mut(&chname).unwrap().add_user(&user_nick);
-                    
                 }
             }
         }
