@@ -598,6 +598,83 @@ mod test {
             }
         }
         
+        const CLIENT_LIMIT: usize = 10;
+        // limit check
+        {
+            let mut line_stream = login_to_test_and_skip(port, "charlie", "charlie2",
+                    "Charlie Brown").await;
+            
+            line_stream.send("JOIN #oranges".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(70)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#oranges").unwrap().modes.client_limit = 
+                            Some(CLIENT_LIMIT);
+            }
+            
+            let mut line_streams = vec![];
+            for i in 0..CLIENT_LIMIT {
+                line_streams.push(login_to_test_and_skip(port, &format!("FInni{}", i),
+                    &format!("FInnix{}", i), &format!("FInni Somewhere {}", i)).await);
+                if i == CLIENT_LIMIT-2 {
+                    time::sleep(Duration::from_millis(70)).await;
+                }
+            }
+            for (i, line_streamx) in line_streams.iter_mut().enumerate() {
+                line_streamx.send("JOIN #oranges".to_string()).await.unwrap();
+                if i != CLIENT_LIMIT-1 {
+                    assert_eq!(format!(":FInni{}!~FInnix{}@127.0.0.1 JOIN #oranges", i, i),
+                            line_streamx.next().await.unwrap().unwrap());
+                } else {
+                    assert_eq!(":irc.irc 471 FInni9 #oranges :Cannot join channel (+l)"
+                        .to_string(), line_streamx.next().await.unwrap().unwrap());
+                }
+            }
+            
+            for (_, line_streamx) in line_streams.iter_mut().enumerate() {
+                line_streamx.send("QUIT :Bye".to_string()).await.unwrap();
+            }
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+        }
+        
+        // ban and ban exception
+        {
+            let mut line_stream = login_to_test_and_skip(port, "expert", "expertx",
+                    "SuperExpert").await;
+            line_stream.send("JOIN #secrets".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(70)).await;
+            {
+                let mut state = main_state.state.write().await;
+                let mut chmodes = &mut state.channels.get_mut("#secrets").unwrap().modes;
+                chmodes.ban = Some(["roland!*@*".to_string(), "gugu!*@*".to_string(),
+                        "devil!*@*".to_string()].into());
+                chmodes.exception = Some(["devil!*@*".to_string()].into());
+            }
+            
+            let mut roland_stream = login_to_test_and_skip(port, "roland", "Roland",
+                    "Roland XX").await;
+            let mut gugu_stream = login_to_test_and_skip(port, "gugu", "gugu",
+                    "GuuGuu").await;
+            let mut devil_stream = login_to_test_and_skip(port, "devil", "scary_devil",
+                    "Very Scary Devil").await;
+            let mut angel_stream = login_to_test_and_skip(port, "angel", "good_angel",
+                    "Very Good Angel").await;
+            
+            roland_stream.send("JOIN #secrets".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 474 roland #secrets :Cannot join channel (+b)".to_string(),
+                    roland_stream.next().await.unwrap().unwrap());
+            gugu_stream.send("JOIN #secrets".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 474 gugu #secrets :Cannot join channel (+b)".to_string(),
+                    gugu_stream.next().await.unwrap().unwrap());
+            devil_stream.send("JOIN #secrets".to_string()).await.unwrap();
+            assert_eq!(":devil!~scary_devil@127.0.0.1 JOIN #secrets".to_string(),
+                    devil_stream.next().await.unwrap().unwrap());
+            angel_stream.send("JOIN #secrets".to_string()).await.unwrap();
+            assert_eq!(":angel!~good_angel@127.0.0.1 JOIN #secrets".to_string(),
+                    angel_stream.next().await.unwrap().unwrap());
+        }
+        
         quit_test_server(main_state, handle).await;
     }
 }
