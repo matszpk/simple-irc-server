@@ -494,7 +494,6 @@ mod test {
         exp_names_sorted.sort();
         names_replies.iter().all(|reply| {
             if reply.starts_with(exp_msg) {
-                println!("xxx {} {}", reply, exp_msg);
                 reply[exp_msg.len()..].split_terminator(" ").all(|c| {
                     if exp_names_sorted.binary_search(&c).is_ok() {
                         match_count += 1;
@@ -531,6 +530,20 @@ mod test {
                     &[&line_stream2.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 366 eddix #fruits :End of /NAMES list".to_string(),
                     line_stream2.next().await.unwrap().unwrap());
+            
+            assert_eq!(":eddix!~eddie@127.0.0.1 JOIN #fruits".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            let mut line_stream3 = login_to_test_and_skip(port, "logan", "logan",
+                    "Logan Powers").await;
+            line_stream3.send("JOIN #fruits".to_string()).await.unwrap();
+            assert_eq!(":logan!~logan@127.0.0.1 JOIN #fruits".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 logan = #fruits :",
+                    &["eddix", "~charlie", "logan"],
+                    &[&line_stream3.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 logan #fruits :End of /NAMES list".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
