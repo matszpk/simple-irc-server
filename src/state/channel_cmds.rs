@@ -104,10 +104,8 @@ impl super::MainState {
                 join_count < max_joins
             } else { true };
             
-            if do_join {
-                joined_created.push((join, create));
-                join_count += 1;
-            }
+            joined_created.push((join, create));
+            if do_join { join_count += 1; }
         }
         
         for ((join, create), chname_str) in joined_created.iter().zip(channels.iter()) {
