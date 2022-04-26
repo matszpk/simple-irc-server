@@ -783,10 +783,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "oliver", "aliverk",
+            let mut line_stream = login_to_test_and_skip(port, "oliver", "aliverk",
                     "Oliver Kittson").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
             line_stream.send("USER aliverk 8 * :Oliver Kittson".to_string()).await.unwrap();
             assert_eq!(":irc.irc 462 oliver :You may not reregister".to_string(),
@@ -794,10 +792,8 @@ mod test {
         }
         
         {
-            let mut line_stream = login_to_test(port, "uliver", "aliverk",
+            let mut line_stream = login_to_test_and_skip(port, "uliver", "aliverk",
                     "Oliver Kittson").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
             line_stream.send("PASS xxxx".to_string()).await.unwrap();
             assert_eq!(":irc.irc 462 uliver :You may not reregister".to_string(),
@@ -812,13 +808,12 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "mati", "mat", "MatSzpak").await;
-            let mut line_stream2 = login_to_test(port, "lucki", "luck", "LuckBoy").await;
-            let mut line_stream3 = login_to_test(port, "dam", "dam", "Damon").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
-            for _ in 0..18 { line_stream2.next().await.unwrap().unwrap(); }
-            for _ in 0..18 { line_stream3.next().await.unwrap().unwrap(); }
+            let mut line_stream = login_to_test_and_skip(port,
+                                "mati", "mat", "MatSzpak").await;
+            let mut line_stream2 = login_to_test_and_skip(port,
+                                "lucki", "luck", "LuckBoy").await;
+            let mut line_stream3 = login_to_test_and_skip(port,
+                                "dam", "dam", "Damon").await;
             
             line_stream2.send("NICK luke".to_string()).await.unwrap();
             
@@ -877,10 +872,8 @@ mod test {
         for (opname, pass, res) in [("guru", "NoWay", 2), ("guru", "NoWayX", 1),
                 ("guru2", "NoWay2", 2), ("guru2", "NoWayn", 1),
                 ("gurux", "NoWay", 0), ("guru3", "NoWay3", 0)] {
-            let mut line_stream = login_to_test(port, "guruv", "guruvx",
+            let mut line_stream = login_to_test_and_skip(port, "guruv", "guruvx",
                     "SuperGuruV").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
             line_stream.send(format!("OPER {} {}", opname, pass)).await.unwrap();
             match res {
@@ -925,9 +918,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "brian", "brianx", "BrianX").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            let mut line_stream = login_to_test_and_skip(port,
+                            "brian", "brianx", "BrianX").await;
             
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
             assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
@@ -964,9 +956,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "brian", "brianx", "BrianX").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            let mut line_stream = login_to_test_and_skip(port,
+                                "brian", "brianx", "BrianX").await;
             
             line_stream.send("PING aarrgghhh!!!".to_string()).await.unwrap();
             assert_eq!(":irc.irc PONG irc.irc :aarrgghhh!!!".to_string(),

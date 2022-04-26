@@ -492,9 +492,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "charlie", "charlie2",
+            let mut line_stream = login_to_test_and_skip(port, "charlie", "charlie2",
                     "Charlie Brown").await;
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
             
             line_stream.send("JOIN #fruits".to_string()).await.unwrap();
             assert_eq!(":charlie!~charlie2@127.0.0.1 JOIN #fruits".to_string(),

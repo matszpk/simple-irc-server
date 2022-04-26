@@ -1558,6 +1558,13 @@ mod test {
         line_stream
     }
     
+    pub(crate) async fn login_to_test_and_skip<'a>(port: u16, nick: &'a str, name: &'a str,
+                realname: &'a str) -> Framed<TcpStream, IRCLinesCodec> {
+        let mut line_stream = login_to_test(port, nick, name, realname).await;
+        for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+        line_stream
+    }
+    
     #[tokio::test]
     async fn test_server_command0() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
@@ -1694,9 +1701,8 @@ mod test {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test(port, "mati", "mat", "MatiSzpaki").await;
-            
-            for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+            let mut line_stream = login_to_test_and_skip(
+                            port, "mati", "mat", "MatiSzpaki").await;
             
             line_stream.send("PING :bumbum".to_string()).await.unwrap();
             assert_eq!(":irc.irc PONG irc.irc :bumbum".to_string(),
