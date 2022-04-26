@@ -565,6 +565,13 @@ mod test {
                 let channel = state.channels.get("#fruits").unwrap();
                 exp_channel.creation_time = channel.creation_time;
                 assert_eq!(exp_channel, *channel);
+                
+                assert_eq!(HashSet::from(["#fruits".to_string()]),
+                        state.users.get("charlie").unwrap().channels);
+                assert_eq!(HashSet::from(["#fruits".to_string()]),
+                        state.users.get("eddix").unwrap().channels);
+                assert_eq!(HashSet::from(["#fruits".to_string()]),
+                        state.users.get("logan").unwrap().channels);
             }
             line_stream3.send("QUIT :Bye".to_string()).await.unwrap();
             time::sleep(Duration::from_millis(50)).await;
