@@ -43,7 +43,11 @@ impl super::MainState {
                 // if already created
                 let do_join = if let Some(key) = &channel.modes.key {
                     if let Some(ref keys) = keys_opt {
-                        key == keys[i]
+                        if key != keys[i] {
+                            self.feed_msg(&mut conn_state.stream, ErrBadChannelKey475{
+                            client, channel: chname_str }).await?;
+                            false
+                        } else { true }
                     } else {
                         self.feed_msg(&mut conn_state.stream, ErrBadChannelKey475{
                             client, channel: chname_str }).await?;
@@ -130,6 +134,7 @@ impl super::MainState {
         let user = state.users.get(user_nick.as_str()).unwrap();
         for ((join, _), chname_str) in joined_created.iter().zip(channels.iter()) {
             if *join {
+                println!("JOined to {} {}", chname_str, user_nick);
                 let chanobj = state.channels.get(&chname_str.to_string()).unwrap();
                 let join_msg = "JOIN ".to_string() + chname_str;
                 {
@@ -673,6 +678,70 @@ mod test {
             angel_stream.send("JOIN #secrets".to_string()).await.unwrap();
             assert_eq!(":angel!~good_angel@127.0.0.1 JOIN #secrets".to_string(),
                     angel_stream.next().await.unwrap().unwrap());
+        }
+        
+        // invite
+        {
+            let mut line_stream = login_to_test_and_skip(port, "damian", "damian",
+                    "Damian Kozlowski").await;
+            line_stream.send("JOIN #exclusive".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(70)).await;
+            {
+                let mut state = main_state.state.write().await;
+                let mut chmodes = &mut state.channels.get_mut("#exclusive").unwrap().modes;
+                chmodes.invite_only = true;
+                chmodes.invite_exception = Some([ "ex*!*@*".to_string() ].into());
+            }
+            
+            let mut henry_stream = login_to_test_and_skip(port, "henry", "henryk",
+                    "Henri Stones").await;
+            let mut excel_stream = login_to_test_and_skip(port, "excel", "excel",
+                    "Excel Total").await;
+            
+            henry_stream.send("JOIN #exclusive".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 473 henry #exclusive :Cannot join channel (+i)".to_string(),
+                    henry_stream.next().await.unwrap().unwrap());
+            excel_stream.send("JOIN #exclusive".to_string()).await.unwrap();
+            assert_eq!(":excel!~excel@127.0.0.1 JOIN #exclusive".to_string(),
+                    excel_stream.next().await.unwrap().unwrap());
+            
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("henry").unwrap().invited_to =
+                        ["#exclusive".to_string()].into();
+            }
+            henry_stream.send("JOIN #exclusive".to_string()).await.unwrap();
+            assert_eq!(":henry!~henryk@127.0.0.1 JOIN #exclusive".to_string(),
+                    henry_stream.next().await.unwrap().unwrap());
+        }
+        
+        // key check
+        {
+            let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
+                    "Garry NextSomebody").await;
+            line_stream.send("JOIN #protected".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(70)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#protected").unwrap().modes.key =
+                        Some("longpassword!!".to_string());
+            }
+            
+            let mut jobe_stream = login_to_test_and_skip(port, "jobe", "jobe",
+                    "Jobe Smith").await;
+            jobe_stream.send("JOIN #protected".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 475 jobe #protected :Cannot join channel (+k)".to_string(),
+                    jobe_stream.next().await.unwrap().unwrap());
+            
+            jobe_stream.send("JOIN #protected longpass".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 475 jobe #protected :Cannot join channel (+k)".to_string(),
+                    jobe_stream.next().await.unwrap().unwrap());
+            
+            jobe_stream.send("JOIN #protected longpassword!!".to_string()).await.unwrap();
+            assert_eq!(":jobe!~jobe@127.0.0.1 JOIN #protected".to_string(),
+                    jobe_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
