@@ -134,7 +134,6 @@ impl super::MainState {
         let user = state.users.get(user_nick.as_str()).unwrap();
         for ((join, _), chname_str) in joined_created.iter().zip(channels.iter()) {
             if *join {
-                println!("JOined to {} {}", chname_str, user_nick);
                 let chanobj = state.channels.get(&chname_str.to_string()).unwrap();
                 let join_msg = "JOIN ".to_string() + chname_str;
                 {
@@ -766,6 +765,42 @@ mod test {
             jobe_stream.send("JOIN #protected longpassword!!".to_string()).await.unwrap();
             assert_eq!(":jobe!~jobe@127.0.0.1 JOIN #protected".to_string(),
                     jobe_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_max_joins() {
+        let mut config = MainConfig::default();
+        const MAX_JOINS: usize = 10;
+        config.max_joins = Some(MAX_JOINS);
+        let (main_state, handle, port) = run_test_server(config).await;
+        // key check
+        {
+            let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
+                    "Garry NextSomebody").await;
+            for i in 0..(MAX_JOINS+1) {
+                line_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            
+            let mut jobe_stream = login_to_test_and_skip(port, "jobe", "jobe",
+                    "Jobe Smith").await;
+            for i in 0..(MAX_JOINS+1) {
+                println!("Ffff {}", i);
+                jobe_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
+                if i<MAX_JOINS {
+                    assert_eq!(format!(":jobe!~jobe@127.0.0.1 JOIN #chan{}", i),
+                            jobe_stream.next().await.unwrap().unwrap());
+                    jobe_stream.next().await.unwrap().unwrap();
+                    jobe_stream.next().await.unwrap().unwrap();
+                } else {
+                    assert_eq!(":irc.irc 405 jobe #chan10 :You have joined too many channels"
+                            .to_string(), jobe_stream.next().await.unwrap().unwrap());
+                }
+            }
         }
         
         quit_test_server(main_state, handle).await;
