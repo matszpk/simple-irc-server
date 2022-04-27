@@ -901,6 +901,28 @@ mod test {
                     &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 366 greg #cloaths :End of /NAMES list".to_string(),
                     greg_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.write().await;
+                assert!(!state.channels.get("#finances").unwrap()
+                            .users.contains_key("greg"));
+                assert!(!state.channels.get("#stocks").unwrap()
+                            .users.contains_key("greg"));
+                assert!(!state.channels.get("#hardware").unwrap()
+                            .users.contains_key("greg"));
+                assert!(!state.channels.get("#software").unwrap()
+                            .users.contains_key("greg"));
+                assert!(state.channels.get("#furnitures").unwrap()
+                            .users.contains_key("greg"));
+                assert!(state.channels.get("#tools").unwrap()
+                            .users.contains_key("greg"));
+                assert!(state.channels.get("#cloaths").unwrap()
+                            .users.contains_key("greg"));
+                assert_eq!(HashSet::from(["#tools".to_string(), "#furnitures".to_string(),
+                        "#cloaths".to_string()]),
+                        state.users.get("greg").unwrap().channels);
+            }
         }
         
         quit_test_server(main_state, handle).await;
