@@ -986,16 +986,11 @@ mod test {
         time::sleep(Duration::from_millis(50)).await;
         {
             let state = main_state.state.write().await;
-            assert!(!state.channels.get("#crypto").unwrap()
-                        .users.contains_key("greg"));
-            assert!(!state.channels.get("#cars").unwrap()
-                        .users.contains_key("greg"));
-            assert!(state.channels.get("#servers").unwrap()
-                        .users.contains_key("greg"));
-            assert!(state.channels.get("#drinks").unwrap()
-                        .users.contains_key("greg"));
-            assert!(state.channels.get("#job").unwrap()
-                        .users.contains_key("greg"));
+            assert!(!state.channels.get("#crypto").unwrap().users.contains_key("greg"));
+            assert!(!state.channels.get("#cars").unwrap().users.contains_key("greg"));
+            assert!(state.channels.get("#servers").unwrap().users.contains_key("greg"));
+            assert!(state.channels.get("#drinks").unwrap().users.contains_key("greg"));
+            assert!(state.channels.get("#job").unwrap().users.contains_key("greg"));
             assert_eq!(HashSet::from(["#servers".to_string(), "#drinks".to_string(),
                     "#job".to_string()]), state.users.get("greg").unwrap().channels);
         }
