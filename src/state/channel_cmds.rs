@@ -927,4 +927,79 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_join_multiple_with_key() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "derek", "derek-z",
+                    "Derek Zinni").await;
+            
+            line_stream.send("JOIN #crypto".to_string()).await.unwrap();
+            line_stream.send("JOIN #servers".to_string()).await.unwrap();
+            line_stream.send("JOIN #drinks".to_string()).await.unwrap();
+            line_stream.send("JOIN #job".to_string()).await.unwrap();
+            line_stream.send("JOIN #cars".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#crypto").unwrap().modes.key = 
+                        Some("altcoin".to_string());
+                state.channels.get_mut("#servers").unwrap().modes.key =
+                        Some("amd_epyc".to_string());
+                state.channels.get_mut("#cars").unwrap().modes.key =
+                        Some("Buggatti".to_string());
+            }
+            
+            let mut greg_stream = login_to_test_and_skip(port, "greg", "gregory",
+                    "Gregory Powerful").await;
+            greg_stream.send(
+                "JOIN #crypto,#servers,#drinks,#job,#cars ZRX,amd_epyc,tequilla,,Lambo"
+                .to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 475 greg #crypto :Cannot join channel (+k)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 475 greg #cars :Cannot join channel (+k)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #servers".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #servers :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #servers :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #drinks".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #drinks :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #drinks :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #job".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #job :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #job :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+        }
+        
+        time::sleep(Duration::from_millis(50)).await;
+        {
+            let state = main_state.state.write().await;
+            assert!(!state.channels.get("#crypto").unwrap()
+                        .users.contains_key("greg"));
+            assert!(!state.channels.get("#cars").unwrap()
+                        .users.contains_key("greg"));
+            assert!(state.channels.get("#servers").unwrap()
+                        .users.contains_key("greg"));
+            assert!(state.channels.get("#drinks").unwrap()
+                        .users.contains_key("greg"));
+            assert!(state.channels.get("#job").unwrap()
+                        .users.contains_key("greg"));
+            assert_eq!(HashSet::from(["#servers".to_string(), "#drinks".to_string(),
+                    "#job".to_string()]), state.users.get("greg").unwrap().channels);
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
