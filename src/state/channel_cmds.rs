@@ -1329,4 +1329,71 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_part_multiple() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "joel", "mrjoel",
+                    "Joel Dickson").await;
+            line_stream.send("JOIN #math,#algebra,#physics".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "marty1", "marty1",
+                    "Marty XXX 1").await;
+            let mut line_stream3 = login_to_test_and_skip(port, "lucky1", "lucky1",
+                    "Lucky XXX 1").await;
+            
+            line_stream2.send("JOIN #math,#algebra".to_string()).await.unwrap();
+            line_stream3.send("JOIN #physics,#algebra".to_string()).await.unwrap();
+            for _ in 0..7 { line_stream2.next().await.unwrap().unwrap(); }
+            for _ in 0..6 { line_stream3.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let (mut exp_math, mut exp_algebra, mut exp_physics) = {
+                let state = main_state.state.read().await;
+                (state.channels.get("#math").unwrap().clone(),
+                    state.channels.get("#algebra").unwrap().clone(),
+                    state.channels.get("#physics").unwrap().clone())
+            };
+            
+            line_stream2.send("PART #math,#algebra :Return".to_string()).await.unwrap();
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #math :Return".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #algebra :Return".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #algebra :Return".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
+            
+            exp_math.remove_user("marty1");
+            exp_algebra.remove_user("marty1");
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(exp_math, *state.channels.get("#math").unwrap());
+                assert_eq!(exp_algebra, *state.channels.get("#algebra").unwrap());
+                assert_eq!(HashSet::new(), state.users.get("marty1").unwrap().channels);
+            }
+            
+            line_stream3.send("PART #physics,#algebra :Return".to_string()).await.unwrap();
+            assert_eq!(":lucky1!~lucky1@127.0.0.1 PART #physics :Return".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
+            assert_eq!(":lucky1!~lucky1@127.0.0.1 PART #algebra :Return".to_string(),
+                    line_stream3.next().await.unwrap().unwrap());
+            
+            exp_physics.remove_user("lucky1");
+            exp_algebra.remove_user("lucky1");
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(exp_physics, *state.channels.get("#physics").unwrap());
+                assert_eq!(exp_algebra, *state.channels.get("#algebra").unwrap());
+                assert_eq!(HashSet::new(), state.users.get("lucky1").unwrap().channels);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
