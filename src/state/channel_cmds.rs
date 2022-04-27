@@ -1239,7 +1239,6 @@ mod test {
             line_stream2.send("JOIN #math".to_string()).await.unwrap();
             for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
             line_stream.next().await.unwrap().unwrap();
-            //line_stream2.next().await.unwrap().unwrap();
             
             time::sleep(Duration::from_millis(50)).await;
             let mut exp_channel = {
@@ -1265,6 +1264,59 @@ mod test {
             
             line_stream2.send("PART #math".to_string()).await.unwrap();
             assert_eq!(":noah!~z_noah@127.0.0.1 PART #math".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(exp_channel, *state.channels.get("#math").unwrap());
+                assert_eq!(HashSet::new(), state.users.get("noah").unwrap().channels);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_part_with_reason() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "joel", "mrjoel",
+                    "Joel Dickson").await;
+            line_stream.send("JOIN #math".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "noah", "z_noah",
+                    "Noah Monus").await;
+            line_stream2.send("JOIN #math".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            line_stream.next().await.unwrap().unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let mut exp_channel = {
+                let state = main_state.state.read().await;
+                state.channels.get("#math").unwrap().clone()
+            };
+            exp_channel.remove_user("joel");
+            
+            line_stream.send("PART #math :I don't have".to_string()).await.unwrap();
+            assert_eq!(":joel!~mrjoel@127.0.0.1 PART #math :I don't have".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":joel!~mrjoel@127.0.0.1 PART #math :I don't have".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(exp_channel, *state.channels.get("#math").unwrap());
+                assert_eq!(HashSet::new(), state.users.get("joel").unwrap().channels);
+            }
+            
+            exp_channel.remove_user("noah");
+            
+            line_stream2.send("PART #math :I don't have too".to_string()).await.unwrap();
+            assert_eq!(":noah!~z_noah@127.0.0.1 PART #math :I don't have too".to_string(),
                     line_stream2.next().await.unwrap().unwrap());
             
             time::sleep(Duration::from_millis(50)).await;
