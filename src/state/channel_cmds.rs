@@ -1405,4 +1405,57 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_part_multiple_activity() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "joel", "mrjoel",
+                    "Joel Dickson").await;
+            line_stream.send("JOIN #biology,#technics".to_string()).await.unwrap();
+            for _ in 0..6 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "marty1", "marty1",
+                    "Marty XXX 1").await;
+            
+            line_stream2.send("JOIN #biology".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("marty1").unwrap().last_activity -= 10;
+                state.users.get("marty1").unwrap().last_activity
+            };
+            line_stream2.send("PART #physics,#algebra :Return".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 403 marty1 #physics :No such channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 403 marty1 #algebra :No such channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(activity, state.users.get("marty1").unwrap().last_activity);
+            }
+            
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("marty1").unwrap().last_activity -= 10;
+                state.users.get("marty1").unwrap().last_activity
+            };
+            
+            line_stream2.send("PART #technics,#biology :Return".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 442 marty1 #technics :You're not on that channel"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #biology :Return".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {   // has some activity
+                let state = main_state.state.read().await;
+                assert_ne!(activity, state.users.get("marty1").unwrap().last_activity);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
