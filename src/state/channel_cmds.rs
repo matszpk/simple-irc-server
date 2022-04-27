@@ -1194,4 +1194,30 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_join_multi_prefix_names() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = connect_to_test(port).await;
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mat 8 * :MatiSzpaki".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            
+            for _ in 0..20 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("JOIN #oldhardware".to_string()).await.unwrap();
+            assert_eq!(":mati!~mat@127.0.0.1 JOIN #oldhardware".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 353 mati = #oldhardware :~@mati".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 366 mati #oldhardware :End of /NAMES list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
