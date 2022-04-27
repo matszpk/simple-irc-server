@@ -1458,4 +1458,48 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_topic_write() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "robbie", "robbie",
+                    "Robbie Williams").await;
+            line_stream.send("JOIN #hifi,#techno,#trance".to_string()).await.unwrap();
+            for _ in 0..9 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("TOPIC #hifi :About HiFi".to_string()).await.unwrap();
+            line_stream.send("TOPIC #techno :About Techno Music".to_string()).await.unwrap();
+            line_stream.send("TOPIC #trance :About Trance Music".to_string()).await.unwrap();
+            
+            assert_eq!(":robbie!~robbie@127.0.0.1 TOPIC #hifi :About HiFi".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":robbie!~robbie@127.0.0.1 TOPIC #techno :About Techno Music"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":robbie!~robbie@127.0.0.1 TOPIC #trance :About Trance Music"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#trance").unwrap().modes.protected_topic = true;
+                state.channels.get_mut("#techno").unwrap().modes.protected_topic = true;
+            }
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let topic = state.channels.get("#hifi").unwrap().topic.clone().unwrap();
+                assert_eq!(("About HiFi".to_string(), "robbie".to_string()),
+                        (topic.topic, topic.nick));
+                let topic = state.channels.get("#techno").unwrap().topic.clone().unwrap();
+                assert_eq!(("About Techno Music".to_string(), "robbie".to_string()),
+                        (topic.topic, topic.nick));
+                let topic = state.channels.get("#trance").unwrap().topic.clone().unwrap();
+                assert_eq!(("About Trance Music".to_string(), "robbie".to_string()),
+                        (topic.topic, topic.nick));
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
