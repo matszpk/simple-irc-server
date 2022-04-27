@@ -30,7 +30,8 @@ impl super::MainState {
         let mut statem = self.state.write().await;
         let state = statem.deref_mut();
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
-        let mut join_count = state.users.get(&user_nick).unwrap().channels.len();
+        let user_joined = state.users.get(&user_nick).unwrap().channels.len();
+        let mut join_count = user_joined;
         
         let mut joined_created = vec![];
         
@@ -101,10 +102,10 @@ impl super::MainState {
                     self.feed_msg(&mut conn_state.stream, ErrTooManyChannels405{
                             client, channel: chname_str }).await?;
                 }
-                join_count < max_joins
-            } else { true };
+                join && join_count < max_joins
+            } else { join };
             
-            joined_created.push((join, create));
+            joined_created.push((do_join, create));
             if do_join { join_count += 1; }
         }
         
@@ -121,7 +122,7 @@ impl super::MainState {
                 }
             }
         }
-        if join_count!=0 {
+        if join_count != user_joined {
             user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
                         .unwrap().as_secs();
         }
@@ -945,7 +946,7 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
             {
                 let mut state = main_state.state.write().await;
-                state.channels.get_mut("#crypto").unwrap().modes.key = 
+                state.channels.get_mut("#crypto").unwrap().modes.key =
                         Some("altcoin".to_string());
                 state.channels.get_mut("#servers").unwrap().modes.key =
                         Some("amd_epyc".to_string());
@@ -993,6 +994,56 @@ mod test {
             assert!(state.channels.get("#job").unwrap().users.contains_key("greg"));
             assert_eq!(HashSet::from(["#servers".to_string(), "#drinks".to_string(),
                     "#job".to_string()]), state.users.get("greg").unwrap().channels);
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_activity() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "florian", "florian-f",
+                    "Florian Fabian").await;
+            
+            line_stream.send("JOIN #roses".to_string()).await.unwrap();
+            line_stream.send("JOIN #tulipans".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#roses").unwrap().modes.key =
+                        Some("whiterose".to_string());
+            }
+            
+            let mut line_stream = login_to_test_and_skip(port, "rosy", "rosy-f",
+                    "Rosy Red").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("rosy").unwrap().last_activity -= 10;
+                state.users.get("rosy").unwrap().last_activity
+            };
+            
+            line_stream.send("JOIN #roses".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(":irc.irc 475 rosy #roses :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(activity, state.users.get("rosy").unwrap().last_activity);
+            }
+            
+            line_stream.send("JOIN #tulipans".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(":rosy!~rosy-f@127.0.0.1 JOIN #tulipans".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_ne!(activity, state.users.get("rosy").unwrap().last_activity);
+            }
         }
         
         quit_test_server(main_state, handle).await;
