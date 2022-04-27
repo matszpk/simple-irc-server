@@ -1534,6 +1534,63 @@ mod test {
                 assert_eq!(("About Trance Music".to_string(), "robbie".to_string()),
                         (topic.topic, topic.nick));
             }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "djtechno", "djtechno0",
+                    "DJ Techno Maniac").await;
+            line_stream2.send("TOPIC #hifi :About HiFi equipment"
+                            .to_string()).await.unwrap();
+            assert_eq!(":irc.irc 442 djtechno #hifi :You're not on that channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {   // old topic
+                let state = main_state.state.read().await;
+                let topic = state.channels.get("#hifi").unwrap().topic.clone().unwrap();
+                assert_eq!(("About HiFi".to_string(), "robbie".to_string()),
+                        (topic.topic, topic.nick));
+            }
+            
+            line_stream2.send("JOIN #hifi,#techno,#trance".to_string()).await.unwrap();
+            for _ in 0..(4*3) { line_stream2.next().await.unwrap().unwrap(); }
+            // skip JOIN messages for robbie
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream2.send("TOPIC #hifi :About HiFi hardware"
+                            .to_string()).await.unwrap();
+            assert_eq!(":djtechno!~djtechno0@127.0.0.1 TOPIC #hifi :About HiFi hardware"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":djtechno!~djtechno0@127.0.0.1 TOPIC #hifi :About HiFi hardware"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let topic = state.channels.get("#hifi").unwrap().topic.clone().unwrap();
+                assert_eq!(("About HiFi hardware".to_string(), "djtechno".to_string()),
+                        (topic.topic, topic.nick));
+            }
+            
+            line_stream2.send("TOPIC #techno :About Techno genre"
+                            .to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 djtechno #techno :You're not channel operator"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+            line_stream2.send("TOPIC #trance :About Trance genre"
+                            .to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 djtechno #trance :You're not channel operator"
+                    .to_string(), line_stream2.next().await.unwrap().unwrap());
+            
+            // unset topic
+            line_stream2.send("TOPIC #hifi :".to_string()).await.unwrap();
+            assert_eq!(":djtechno!~djtechno0@127.0.0.1 TOPIC #hifi :".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":djtechno!~djtechno0@127.0.0.1 TOPIC #hifi :".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(None, state.channels.get("#hifi").unwrap().topic);
+            }
         }
         
         quit_test_server(main_state, handle).await;

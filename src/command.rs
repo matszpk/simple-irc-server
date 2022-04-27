@@ -99,7 +99,8 @@ impl<'a> Message<'a> {
                 out += s;
             });
             let last = self.params[self.params.len()-1];
-            if last.find(|c|  c==':' || c == ' ' || c == '\t').is_some() {
+            if last.find(|c|  c==':' || c == ' ' || c == '\t').is_some() ||
+                            last.len() == 0 {
                 out += " :";
             } else {
                 out.push(' ');
@@ -1452,10 +1453,14 @@ mod test {
     }
     
     #[test]
-    fn test_message_format() {
+    fn test_message_to_string_with_source() {
         assert_eq!(":buru USER guest 0 * :Ronnie Reagan".to_string(),
                 Message{ source: None, command: "USER",
                     params: vec!["guest", "0", "*", "Ronnie Reagan"] }
+                            .to_string_with_source("buru"));
+        assert_eq!(":buru USER guest 0 * :".to_string(),
+                Message{ source: None, command: "USER",
+                    params: vec!["guest", "0", "*", ""] }
                             .to_string_with_source("buru"));
         assert_eq!(":sonny INVITE mati1 #xxx".to_string(),
                 Message{ source: Some("xxxx"), command: "INVITE",
