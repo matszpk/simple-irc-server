@@ -1338,7 +1338,7 @@ mod test {
             let mut line_stream = login_to_test_and_skip(port, "joel", "mrjoel",
                     "Joel Dickson").await;
             line_stream.send("JOIN #math,#algebra,#physics".to_string()).await.unwrap();
-            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            for _ in 0..9 { line_stream.next().await.unwrap().unwrap(); }
             
             let mut line_stream2 = login_to_test_and_skip(port, "marty1", "marty1",
                     "Marty XXX 1").await;
@@ -1349,6 +1349,7 @@ mod test {
             line_stream3.send("JOIN #physics,#algebra".to_string()).await.unwrap();
             for _ in 0..7 { line_stream2.next().await.unwrap().unwrap(); }
             for _ in 0..6 { line_stream3.next().await.unwrap().unwrap(); }
+            for _ in 0..4 { line_stream.next().await.unwrap().unwrap(); }
             
             time::sleep(Duration::from_millis(50)).await;
             let (mut exp_math, mut exp_algebra, mut exp_physics) = {
@@ -1365,6 +1366,10 @@ mod test {
                     line_stream2.next().await.unwrap().unwrap());
             assert_eq!(":marty1!~marty1@127.0.0.1 PART #algebra :Return".to_string(),
                     line_stream3.next().await.unwrap().unwrap());
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #math :Return".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":marty1!~marty1@127.0.0.1 PART #algebra :Return".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
             
             exp_math.remove_user("marty1");
             exp_algebra.remove_user("marty1");
@@ -1382,6 +1387,10 @@ mod test {
                     line_stream3.next().await.unwrap().unwrap());
             assert_eq!(":lucky1!~lucky1@127.0.0.1 PART #algebra :Return".to_string(),
                     line_stream3.next().await.unwrap().unwrap());
+            assert_eq!(":lucky1!~lucky1@127.0.0.1 PART #physics :Return".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":lucky1!~lucky1@127.0.0.1 PART #algebra :Return".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
             
             exp_physics.remove_user("lucky1");
             exp_algebra.remove_user("lucky1");
