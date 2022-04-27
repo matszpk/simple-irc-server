@@ -774,7 +774,7 @@ mod test {
         const MAX_JOINS: usize = 10;
         config.max_joins = Some(MAX_JOINS);
         let (main_state, handle, port) = run_test_server(config).await;
-        // key check
+        
         {
             let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
                     "Garry NextSomebody").await;
@@ -787,7 +787,6 @@ mod test {
             let mut jobe_stream = login_to_test_and_skip(port, "jobe", "jobe",
                     "Jobe Smith").await;
             for i in 0..(MAX_JOINS+1) {
-                println!("Ffff {}", i);
                 jobe_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
                 if i<MAX_JOINS {
                     assert_eq!(format!(":jobe!~jobe@127.0.0.1 JOIN #chan{}", i),
@@ -799,6 +798,109 @@ mod test {
                             .to_string(), jobe_stream.next().await.unwrap().unwrap());
                 }
             }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_no_max_joins() {
+        const MAX_JOINS: usize = 10;
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
+                    "Garry NextSomebody").await;
+            for i in 0..(MAX_JOINS+1) {
+                line_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            
+            let mut jobe_stream = login_to_test_and_skip(port, "jobe", "jobe",
+                    "Jobe Smith").await;
+            for i in 0..(MAX_JOINS+1) {
+                jobe_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
+                assert_eq!(format!(":jobe!~jobe@127.0.0.1 JOIN #chan{}", i),
+                        jobe_stream.next().await.unwrap().unwrap());
+                jobe_stream.next().await.unwrap().unwrap();
+                jobe_stream.next().await.unwrap().unwrap();
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_multiple() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "derek", "derek-z",
+                    "Derek Zinni").await;
+            
+            line_stream.send("JOIN #finances".to_string()).await.unwrap();
+            line_stream.send("JOIN #stocks".to_string()).await.unwrap();
+            line_stream.send("JOIN #hardware".to_string()).await.unwrap();
+            line_stream.send("JOIN #software".to_string()).await.unwrap();
+            line_stream.send("JOIN #furnitures".to_string()).await.unwrap();
+            line_stream.send("JOIN #tools".to_string()).await.unwrap();
+            line_stream.send("JOIN #cloaths".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#finances").unwrap().modes.client_limit = Some(2);
+                state.channels.get_mut("#stocks").unwrap().modes.client_limit = Some(3);
+                state.channels.get_mut("#hardware").unwrap().modes.ban =
+                            Some(["*g*!*@*".to_string()].into());
+                state.channels.get_mut("#software").unwrap().modes.invite_only = true;
+                let mut modes = &mut state.channels.get_mut("#furnitures").unwrap().modes;
+                modes.invite_only = true;
+                modes.invite_exception = Some(["*g*!*@*".to_string()].into());
+            }
+            
+            let mut robby_stream = login_to_test_and_skip(port, "robby", "robbie",
+                    "Robbie Runnie").await;
+            robby_stream.send("JOIN #finances".to_string()).await.unwrap();
+            robby_stream.send("JOIN #stocks".to_string()).await.unwrap();
+            
+            let mut zephyr_stream = login_to_test_and_skip(port, "zephyr", "zephyr",
+                    "Zephyr Somewhere").await;
+            zephyr_stream.send("JOIN #stocks".to_string()).await.unwrap();
+            
+            let mut greg_stream = login_to_test_and_skip(port, "greg", "gregory",
+                    "Gregory Powerful").await;
+            greg_stream.send(
+                "JOIN #finances,#stocks,#hardware,#software,#furnitures,#tools,#cloaths"
+                .to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 471 greg #finances :Cannot join channel (+l)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 471 greg #stocks :Cannot join channel (+l)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 474 greg #hardware :Cannot join channel (+b)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 473 greg #software :Cannot join channel (+i)".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #furnitures".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #furnitures :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #furnitures :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #tools".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #tools :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #tools :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert_eq!(":greg!~gregory@127.0.0.1 JOIN #cloaths".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 greg = #cloaths :",
+                    &["~derek", "greg"], &[&greg_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 greg #cloaths :End of /NAMES list".to_string(),
+                    greg_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
