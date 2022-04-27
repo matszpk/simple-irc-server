@@ -1000,6 +1000,37 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_join_multiple_no_max_joins() {
+        const MAX_JOINS: usize = 10;
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "garry", "garry",
+                    "Garry NextSomebody").await;
+            for i in 0..(MAX_JOINS+1) {
+                line_stream.send(format!("JOIN #chan{}", i)).await.unwrap();
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            
+            let mut jobe_stream = login_to_test_and_skip(port, "jobe", "jobe",
+                    "Jobe Smith").await;
+            jobe_stream.send(format!("JOIN {}", (0..(MAX_JOINS+1))
+                    .map(|x| format!("#chan{}", x))
+                        .collect::<Vec<_>>().join(","))).await.unwrap();
+            
+            for i in 0..(MAX_JOINS+1) {
+                assert_eq!(format!(":jobe!~jobe@127.0.0.1 JOIN #chan{}", i),
+                        jobe_stream.next().await.unwrap().unwrap());
+                jobe_stream.next().await.unwrap().unwrap();
+                jobe_stream.next().await.unwrap().unwrap();
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_join_activity() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
@@ -1009,12 +1040,16 @@ mod test {
             
             line_stream.send("JOIN #roses".to_string()).await.unwrap();
             line_stream.send("JOIN #tulipans".to_string()).await.unwrap();
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            line_stream.send("JOIN #flowers".to_string()).await.unwrap();
             
             time::sleep(Duration::from_millis(50)).await;
             {
                 let mut state = main_state.state.write().await;
                 state.channels.get_mut("#roses").unwrap().modes.key =
                         Some("whiterose".to_string());
+                state.channels.get_mut("#fruits").unwrap().modes.key =
+                        Some("cocoa".to_string());
             }
             
             let mut line_stream = login_to_test_and_skip(port, "rosy", "rosy-f",
@@ -1039,6 +1074,32 @@ mod test {
             line_stream.send("JOIN #tulipans".to_string()).await.unwrap();
             time::sleep(Duration::from_millis(50)).await;
             assert_eq!(":rosy!~rosy-f@127.0.0.1 JOIN #tulipans".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_ne!(activity, state.users.get("rosy").unwrap().last_activity);
+                line_stream.next().await.unwrap().unwrap();
+                line_stream.next().await.unwrap().unwrap();
+            }
+            
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("rosy").unwrap().last_activity -= 10;
+                state.users.get("rosy").unwrap().last_activity
+            };
+            
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(":irc.irc 475 rosy #fruits :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(activity, state.users.get("rosy").unwrap().last_activity);
+            }
+            
+            line_stream.send("JOIN #flowers".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(":rosy!~rosy-f@127.0.0.1 JOIN #flowers".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             {
                 let state = main_state.state.read().await;
