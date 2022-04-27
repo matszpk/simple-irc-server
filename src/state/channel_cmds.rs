@@ -608,6 +608,42 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_join_with_topic() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "charlie", "charlie2",
+                    "Charlie Brown").await;
+            
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#fruits").unwrap().topic = Some(
+                        ChannelTopic::new_with_nick("This topic".to_string(), 
+                                    "charlie".to_string()));
+            }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "eddix", "eddie",
+                    "Eddie Flower").await;
+            line_stream2.send("JOIN #fruits".to_string()).await.unwrap();
+            assert_eq!(":eddix!~eddie@127.0.0.1 JOIN #fruits".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 332 eddix #fruits :This topic".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert!(equal_channel_names(":irc.irc 353 eddix = #fruits :",
+                    &["eddix", "~charlie"],
+                    &[&line_stream2.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 366 eddix #fruits :End of /NAMES list".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_join_limit_check() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
