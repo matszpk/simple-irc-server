@@ -1109,4 +1109,89 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_join_multiple_activity() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "mobiler", "mobilerx",
+                    "Mobiler Smartphone").await;
+            
+            line_stream.send("JOIN #smartphones".to_string()).await.unwrap();
+            line_stream.send("JOIN #smartwatches".to_string()).await.unwrap();
+            line_stream.send("JOIN #ebooks".to_string()).await.unwrap();
+            line_stream.send("JOIN #smartglasses".to_string()).await.unwrap();
+            line_stream.send("JOIN #wearables".to_string()).await.unwrap();
+            line_stream.send("JOIN #fitbits".to_string()).await.unwrap();
+            line_stream.send("JOIN #huawei".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#ebooks").unwrap().modes.key =
+                        Some("Neuromancer".to_string());
+                state.channels.get_mut("#wearables").unwrap().modes.key =
+                        Some("Cyberpunk".to_string());
+                state.channels.get_mut("#fitbits").unwrap().modes.key =
+                        Some("training".to_string());
+                state.channels.get_mut("#huawei").unwrap().modes.key =
+                        Some("secretpass".to_string());
+            }
+            
+            let mut line_stream = login_to_test_and_skip(port, "geek", "geeker",
+                    "Young Geek").await;
+            
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("geek").unwrap().last_activity -= 10;
+                state.users.get("geek").unwrap().last_activity
+            };
+            
+            line_stream.send("JOIN #smartphones".to_string()).await.unwrap();
+            assert_eq!(":geek!~geeker@127.0.0.1 JOIN #smartphones".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("JOIN #smartwatches,#ebooks,#smartglasses,#wearables"
+                        .to_string()).await.unwrap();
+            assert_eq!(":irc.irc 475 geek #ebooks :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 475 geek #wearables :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":geek!~geeker@127.0.0.1 JOIN #smartwatches".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            assert_eq!(":geek!~geeker@127.0.0.1 JOIN #smartglasses".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_ne!(activity, state.users.get("geek").unwrap().last_activity);
+            }
+            
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("geek").unwrap().last_activity -= 10;
+                state.users.get("geek").unwrap().last_activity
+            };
+            
+            line_stream.send("JOIN #fitbits,#huawei".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 475 geek #fitbits :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 475 geek #huawei :Cannot join channel (+k)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(activity, state.users.get("geek").unwrap().last_activity);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
