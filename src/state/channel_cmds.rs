@@ -1874,6 +1874,19 @@ mod test {
             
             gold_stream.send("NAMES #forex,#gold,#coins".to_string()).await.unwrap();
             assert_names_lists_chanlist(&exp_names, &mut gold_stream, 4, "goldy").await;
+            
+            let exp_names = HashMap::from([
+                ("#coins", (":irc.irc 353 ", " = #coins :",
+                        vec![ "~forexman".to_string() ], false)),
+                ("#forex", (":irc.irc 353 ", " @ #forex :",
+                        vec![ "~forexman".to_string(), "goldy".to_string() ], false)),
+                ("#gold", (":irc.irc 353 ", " @ #gold :",
+                        vec![ "~forexman".to_string() ], false)),
+            ]);
+            
+            line_stream.send("NAMES".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            assert_names_lists_all(&exp_names, &mut line_stream, 4, "forexman").await;
         }
         
         quit_test_server(main_state, handle).await;
