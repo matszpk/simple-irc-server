@@ -1638,4 +1638,39 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_names() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "maniac", "maniac",
+                    "SuperGeek").await;
+            line_stream.send("JOIN #cpus,#gpus,#sdds,#psus,#mobos"
+                        .to_string()).await.unwrap();
+            for _ in 0..3*5 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_streams = vec![];
+            for i in 0..60 {
+                line_streams.push(login_to_test_and_skip(port, &format!("geek{}", i),
+                        &format!("geekx{}", i), &format!("MainGeek{}", i)).await);
+            }
+            for (i, line_stream) in line_streams.iter_mut().enumerate() {
+                if (i&1) == 0 {
+                    line_stream.send("JOIN #cpus".to_string()).await.unwrap();
+                } else {
+                    line_stream.send("JOIN #gpus".to_string()).await.unwrap();
+                }
+                match i%3 {
+                    0 => line_stream.send("JOIN #sdds".to_string()).await.unwrap(),
+                    1 => line_stream.send("JOIN #psus".to_string()).await.unwrap(),
+                    2 => line_stream.send("JOIN #mobos".to_string()).await.unwrap(),
+                    _ => {}
+                }
+                for _ in 0..6 { line_stream.next().await.unwrap().unwrap(); }
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
