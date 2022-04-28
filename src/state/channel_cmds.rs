@@ -197,6 +197,9 @@ impl super::MainState {
                 
                 if do_it {
                     chanobj.remove_user(&user_nick);
+                    if chanobj.users.len() == 0 {
+                        state.channels.remove(&channel.to_string());
+                    }
                     removed_from.push(true);
                 }
             } else {
@@ -495,6 +498,9 @@ impl super::MainState {
                 state.users.get_mut(&ku.to_string()).unwrap().channels
                     .remove(&channel.to_string());
             }
+            if chanobj.users.len() == 0 {
+                state.channels.remove(&channel.to_string());
+            }
         }
         Ok(())
     }
@@ -612,8 +618,7 @@ mod test {
             {
                 let state = main_state.state.read().await;
                 exp_channel.remove_user("charlie");
-                let channel = state.channels.get("#fruits").unwrap();
-                assert_eq!(exp_channel, *channel);
+                assert!(!state.channels.contains_key("#fruits"));
             }
         }
         
@@ -1309,8 +1314,6 @@ mod test {
                 assert_eq!(HashSet::new(), state.users.get("joel").unwrap().channels);
             }
             
-            exp_channel.remove_user("noah");
-            
             line_stream2.send("PART #math".to_string()).await.unwrap();
             assert_eq!(":noah!~z_noah@127.0.0.1 PART #math".to_string(),
                     line_stream2.next().await.unwrap().unwrap());
@@ -1318,7 +1321,7 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
             {
                 let state = main_state.state.read().await;
-                assert_eq!(exp_channel, *state.channels.get("#math").unwrap());
+                assert!(!state.channels.contains_key("#math"));
                 assert_eq!(HashSet::new(), state.users.get("noah").unwrap().channels);
             }
         }
@@ -1362,8 +1365,6 @@ mod test {
                 assert_eq!(HashSet::new(), state.users.get("joel").unwrap().channels);
             }
             
-            exp_channel.remove_user("noah");
-            
             line_stream2.send("PART #math :I don't have too".to_string()).await.unwrap();
             assert_eq!(":noah!~z_noah@127.0.0.1 PART #math :I don't have too".to_string(),
                     line_stream2.next().await.unwrap().unwrap());
@@ -1371,7 +1372,7 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
             {
                 let state = main_state.state.read().await;
-                assert_eq!(exp_channel, *state.channels.get("#math").unwrap());
+                assert!(!state.channels.contains_key("#math"));
                 assert_eq!(HashSet::new(), state.users.get("noah").unwrap().channels);
             }
         }

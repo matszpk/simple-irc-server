@@ -605,7 +605,11 @@ impl VolatileState {
             }
             self.wallops_users.remove(nick);
             user.channels.iter().for_each(|chname| {
-                self.channels.get_mut(chname).unwrap().remove_user(nick);
+                let channel = self.channels.get_mut(chname).unwrap();
+                channel.remove_user(nick);
+                if channel.users.len() == 0 {
+                    self.channels.remove(chname);
+                }
             });
         }
     }
@@ -1461,8 +1465,7 @@ mod test {
         assert_eq!(HashSet::from(["tulip".to_string(),
                     "greggy".to_string(), "johnny".to_string(), "admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
-        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#matixichan")
-                        .unwrap().users.keys()));
+        assert!(!state.channels.contains_key("#matixichan"));
         
         state.remove_user("greg");
         assert_eq!(5, state.max_users_count);
@@ -1475,8 +1478,7 @@ mod test {
         assert_eq!(HashSet::from(["tulip".to_string(), "johnny".to_string(),
                     "admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
-        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#gregchan")
-                        .unwrap().users.keys()));
+        assert!(!state.channels.contains_key("#gregchan"));
         
         state.remove_user("john");
         assert_eq!(5, state.max_users_count);
@@ -1488,8 +1490,7 @@ mod test {
                     HashSet::from_iter(state.users.keys().cloned()));
         assert_eq!(HashSet::from(["tulip".to_string(), "admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
-        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#johnchan")
-                        .unwrap().users.keys()));
+        assert!(!state.channels.contains_key("#johnchan"));
         
         state.remove_user("admini");
         assert_eq!(5, state.max_users_count);
@@ -1500,8 +1501,7 @@ mod test {
                     HashSet::from_iter(state.users.keys().cloned()));
         assert_eq!(HashSet::from(["tulip".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
-        assert_eq!(HashSet::new(), HashSet::from_iter(state.channels.get("#guruchan")
-                        .unwrap().users.keys()));
+        assert!(!state.channels.contains_key("#guruchan"));
     }
     
     #[test]
