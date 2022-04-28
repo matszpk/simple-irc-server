@@ -1409,7 +1409,10 @@ mod test {
     
     #[test]
     fn test_volatile_state_add_remove_user() {
-        let config = MainConfig::default();
+        let mut config = MainConfig::default();
+        config.channels = Some(vec![
+            ChannelConfig{ name: "#something".to_string(), topic: None,
+                        modes: ChannelModes::default() } ]);
         let mut state = VolatileState::new_from_config(&config);
         
         let user_state = ConnUserState{
@@ -1505,6 +1508,9 @@ mod test {
             state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
                         chname.to_string());
         });
+        state.channels.get_mut("#something").unwrap().users.insert("john".to_string(),
+                        ChannelUserModes::default());
+        state.users.get_mut("john").unwrap().channels.insert("#something".to_string());
         
         // removing users
         state.remove_user("matixi");
@@ -1545,6 +1551,7 @@ mod test {
         assert_eq!(HashSet::from(["tulip".to_string(), "admin".to_string()]),
                     HashSet::from_iter(state.users.values().map(|u| u.name.clone())));
         assert!(!state.channels.contains_key("#johnchan"));
+        assert!(state.channels.contains_key("#something"));
         
         state.remove_user("admini");
         assert_eq!(5, state.max_users_count);
