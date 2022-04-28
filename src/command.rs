@@ -359,7 +359,7 @@ impl<'a> Command<'a> {
                 if message.params.len() >= 1 {
                     Ok(NAMES{ channels: message.params[0].split(',').collect::<Vec<_>>() })
                 } else {
-                    Err(NeedMoreParams(NAMESId)) }
+                    Ok(NAMES{ channels: vec![] }) }
             }
             "LIST" => {
                 if message.params.len() >= 1 {
@@ -913,12 +913,12 @@ mod test {
         assert_eq!(Ok(NAMES{ channels: vec![ "#dogs", "&juices", "#hardware" ] }),
             Command::from_message(&Message{ source: None, command: "NAMES",
                 params: vec![ "#dogs,&juices,#hardware" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(NAMES{ channels: vec![] }),
+            Command::from_message(&Message{ source: None, command: "NAMES",
+                params: vec![] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'NAMES'".to_string()),
             Command::from_message(&Message{ source: None, command: "NAMES",
                 params: vec![ "#dogs,&juices,#hard:ware" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Command 'NAMES' needs more parameters".to_string()),
-            Command::from_message(&Message{ source: None, command: "NAMES",
-                params: vec![] }).map_err(|e| e.to_string()));
         
         assert_eq!(Ok(LIST{ channels: vec![ "#dogs", "&juices", "#hardware" ],
                         server: None }),
