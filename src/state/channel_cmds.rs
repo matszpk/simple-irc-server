@@ -320,10 +320,10 @@ impl super::MainState {
                 self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
                                 channel: &channel.name, replies: &name_chunk }).await?;
             }
-        }
-        if end {
-            self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
-                        channel: &channel.name }).await?;
+            if end {
+                self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
+                            channel: &channel.name }).await?;
+            }
         }
         Ok(())
     }
@@ -1672,12 +1672,12 @@ mod test {
         let mut last_chan = None;
         let mut chan_replies = vec![];
         let mut exp_names = exp_names_input.clone();
-        let reply_start = format!(":irc.irc 353 {} = ", nick);
+        let reply_start = format!(":irc.irc 353 {} ", nick);
         
         for i in 0..total_count {
             let reply = line_stream.next().await.unwrap().unwrap();
             if reply.starts_with(&reply_start) {
-                let chan = reply[reply_start.len()..]
+                let chan = reply[reply_start.len()+2..]
                             .split_ascii_whitespace().next().unwrap();
                 if let Some(ref prev_chan) = last_chan {
                     assert_eq!(prev_chan, chan, "order chan test {}", i);
@@ -1719,12 +1719,12 @@ mod test {
         let mut last_chan = None;
         let mut chan_replies = vec![];
         let mut exp_names = exp_names_input.clone();
-        let reply_start = format!(":irc.irc 353 {} = ", nick);
+        let reply_start = format!(":irc.irc 353 {} ", nick);
         
         for _ in 0..total_count {
             let reply = line_stream.next().await.unwrap().unwrap();
             if reply.starts_with(&reply_start) {
-                let chan = reply[reply_start.len()..]
+                let chan = reply[reply_start.len()+2..]
                             .split_ascii_whitespace().next().unwrap();
                 if last_chan == Some(chan.to_string()) {
                     chan_replies.push(reply.clone());
@@ -1835,6 +1835,45 @@ mod test {
             line_streams[0].send("NAMES".to_string()).await.unwrap();
             for _ in 0..48 { line_streams[0].next().await.unwrap().unwrap(); }
             assert_names_lists_all(&exp_names, &mut line_streams[0], 11, "geek0").await;
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_names_secret() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "forexman", "forexman",
+                    "Forex Maniac").await;
+            line_stream.send("JOIN #coins,#forex,#gold".to_string()).await.unwrap();
+            for _ in 0..3*3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.channels.get_mut("#forex").unwrap().modes.secret = true;
+                state.channels.get_mut("#gold").unwrap().modes.secret = true;
+            }
+            
+            let mut gold_stream = login_to_test_and_skip(port, "goldy", "goldie",
+                    "Gold Maniac").await;
+            gold_stream.send("JOIN #forex".to_string()).await.unwrap();
+            for _ in 0..3 { gold_stream.next().await.unwrap().unwrap(); }
+            
+            let exp_names = HashMap::from([
+                ("#coins", (":irc.irc 353 ", " = #coins :",
+                        vec![ "~forexman".to_string() ], false)),
+                ("#forex", (":irc.irc 353 ", " @ #forex :",
+                        vec![ "~forexman".to_string(), "goldy".to_string() ], false)),
+            ]);
+            
+            gold_stream.send("NAMES".to_string()).await.unwrap();
+            assert_names_lists_all(&exp_names, &mut gold_stream, 3, "goldy").await;
+            
+            gold_stream.send("NAMES #forex,#gold,#coins".to_string()).await.unwrap();
+            assert_names_lists_chanlist(&exp_names, &mut gold_stream, 4, "goldy").await;
         }
         
         quit_test_server(main_state, handle).await;
