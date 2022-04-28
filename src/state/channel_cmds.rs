@@ -1891,4 +1891,60 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_names_invisible_users() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "zool", "Zool",
+                    "Zool Fan").await;
+            line_stream.send("JOIN #amiga,#arcades,#zool2".to_string()).await.unwrap();
+            for _ in 0..3*3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut mati_stream = login_to_test_and_skip(port, "mati", "matix",
+                    "MatiSzpaki").await;
+            mati_stream.send("JOIN #amiga,#arcades".to_string()).await.unwrap();
+            for _ in 0..6 { mati_stream.next().await.unwrap().unwrap(); }
+            
+            let mut bee_stream = login_to_test_and_skip(port, "bee", "bee",
+                    "Beeeeeeee").await;
+            let mut lolipop_stream = login_to_test_and_skip(port, "lolipop", "ylolipop",
+                    "Lolipop Eater").await;
+            let mut chupa_stream = login_to_test_and_skip(port, "chupa", "chupachoops",
+                    "ChupaChoops").await;
+            
+            bee_stream.send("JOIN #arcades".to_string()).await.unwrap();
+            for _ in 0..3 { bee_stream.next().await.unwrap().unwrap(); }
+            lolipop_stream.send("JOIN #amiga".to_string()).await.unwrap();
+            for _ in 0..3 { lolipop_stream.next().await.unwrap().unwrap(); }
+            chupa_stream.send("JOIN #zool2".to_string()).await.unwrap();
+            for _ in 0..3 { chupa_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("lolipop").unwrap().modes.invisible = true;
+                state.users.get_mut("chupa").unwrap().modes.invisible = true;
+            }
+            
+            let exp_names = HashMap::from([
+                ("#amiga", (":irc.irc 353 ", " = #amiga :",
+                        vec![ "~zool".to_string(), "mati".to_string(),
+                            "lolipop".to_string() ], false)),
+                ("#arcades", (":irc.irc 353 ", " = #arcades :",
+                        vec![ "~zool".to_string(), "mati".to_string(),
+                            "bee".to_string() ], false)),
+                ("#zool2", (":irc.irc 353 ", " = #zool2 :",
+                        vec![ "~zool".to_string() ], false)),
+            ]);
+            
+            mati_stream.send("NAMES".to_string()).await.unwrap();
+            mati_stream.next().await.unwrap().unwrap();
+            mati_stream.next().await.unwrap().unwrap();
+            assert_names_lists_all(&exp_names, &mut mati_stream, 4, "mati").await;
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
