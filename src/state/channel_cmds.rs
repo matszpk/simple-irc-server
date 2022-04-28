@@ -1595,4 +1595,47 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_topic_read() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "maniac", "maniac",
+                    "SuperGeek").await;
+            line_stream.send("JOIN #cpus".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("TOPIC #cpus".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 331 maniac #cpus :No topic is set".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("TOPIC #cpus :About processors".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("TOPIC #cpus".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 332 maniac #cpus :About processors".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            let set_time = main_state.state.read().await
+                    .channels.get("#cpus").unwrap().topic.as_ref().unwrap().set_time;
+            
+            assert_eq!(format!(":irc.irc 333 maniac #cpus maniac {}", set_time),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            let mut newbie_stream = login_to_test_and_skip(port, "newbie", "newbie0",
+                    "Computer's Newbie").await;
+            newbie_stream.send("TOPIC #cpus".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 442 newbie #cpus :You're not on that channel".to_string(),
+                    newbie_stream.next().await.unwrap().unwrap());
+            newbie_stream.send("JOIN #cpus".to_string()).await.unwrap();
+            for _ in 0..4 { newbie_stream.next().await.unwrap().unwrap(); }
+            // after join
+            newbie_stream.send("TOPIC #cpus".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 332 newbie #cpus :About processors".to_string(),
+                    newbie_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
