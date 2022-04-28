@@ -145,7 +145,7 @@ impl super::MainState {
                     }
                 }
                 self.send_names_from_channel(conn_state, chanobj,
-                                &state.users, &user).await?;
+                                &state.users, &user, true).await?;
                 
                 for (nick, _) in &chanobj.users {
                     if nick != user_nick.as_str() {
@@ -292,8 +292,8 @@ impl super::MainState {
     }
     
     async fn send_names_from_channel(&self, conn_state: &mut ConnState,
-                channel: &Channel, users: &HashMap<String, User>, conn_user: &User)
-                -> Result<(), Box<dyn Error>> {
+                channel: &Channel, users: &HashMap<String, User>, conn_user: &User,
+                end: bool) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
         let in_channel = channel.users.contains_key(&conn_user.nick);
@@ -321,8 +321,10 @@ impl super::MainState {
                                 channel: &channel.name, replies: &name_chunk }).await?;
             }
         }
-        self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
-                    channel: &channel.name }).await?;
+        if end {
+            self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
+                        channel: &channel.name }).await?;
+        }
         Ok(())
     }
     
@@ -334,12 +336,17 @@ impl super::MainState {
         
         if channels.len() != 0 { 
             for c in channels.iter().filter_map(|c| state.channels.get(c.clone())) {
-                self.send_names_from_channel(conn_state, &c, &state.users, &user).await?;
+                self.send_names_from_channel(conn_state, &c, &state.users,
+                            &user, true).await?;
             }
         } else {
             for c in state.channels.values() {
-                self.send_names_from_channel(conn_state, &c, &state.users, &user).await?;
+                self.send_names_from_channel(conn_state, &c, &state.users,
+                            &user, false).await?;
             }
+            let client = conn_state.user_state.client_name();
+            self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
+                        channel: "*" }).await?;
         }
         Ok(())
     }
@@ -1652,7 +1659,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    async fn assert_names_lists<'a>(exp_names_input:
+    async fn assert_names_lists_chanlist<'a>(exp_names_input:
             &HashMap<&'a str, (&'a str, &'a str, Vec<String>, bool)>,
             line_stream: &mut Framed<TcpStream, IRCLinesCodec>, total_count: usize,
             nick: &'a str) {
@@ -1688,6 +1695,59 @@ mod test {
                 }
                 last_chan = None;
                 chan_replies.clear();
+            }
+        }
+        assert!(exp_names.values().all(|x| x.3)); // if all touched
+    }
+    
+    async fn assert_names_lists_all<'a>(exp_names_input:
+            &HashMap<&'a str, (&'a str, &'a str, Vec<String>, bool)>,
+            line_stream: &mut Framed<TcpStream, IRCLinesCodec>, total_count: usize,
+            nick: &'a str) {
+        let mut last_chan = None;
+        let mut chan_replies = vec![];
+        let mut exp_names = exp_names_input.clone();
+        let reply_start = format!(":irc.irc 353 {} = ", nick);
+        
+        for _ in 0..total_count {
+            let reply = line_stream.next().await.unwrap().unwrap();
+            if reply.starts_with(&reply_start) {
+                let chan = reply[reply_start.len()..]
+                            .split_ascii_whitespace().next().unwrap();
+                if last_chan == Some(chan.to_string()) {
+                    chan_replies.push(reply.clone());
+                } else if let Some(ref prev_chan) = last_chan  {
+                    let exp_name_list = exp_names.get(prev_chan.as_str()).unwrap();
+                    assert!(equal_channel_names(
+                        &format!("{}{}{}", exp_name_list.0, nick, exp_name_list.1),
+                        &exp_name_list.2.iter().map(|x| x.as_str()).collect::<Vec<_>>(),
+                        &chan_replies.iter().map(|x| x.as_str()).collect::<Vec<_>>()));
+                    
+                    exp_names.get_mut(prev_chan.as_str()).unwrap().3 = true;
+                    last_chan = Some(chan.to_string());
+                    chan_replies.clear();
+                    chan_replies.push(reply.clone());
+                } else {
+                    last_chan = Some(chan.to_string());
+                    chan_replies.push(reply.clone());
+                }
+            } else {
+                if let Some(prev_chan) = last_chan {
+                    assert_eq!(format!(":irc.irc 366 {} * :End of /NAMES list",
+                                nick), reply);
+                    let exp_name_list = exp_names.get(prev_chan.as_str()).unwrap();
+                    assert!(equal_channel_names(
+                        &format!("{}{}{}", exp_name_list.0, nick, exp_name_list.1),
+                        &exp_name_list.2.iter().map(|x| x.as_str()).collect::<Vec<_>>(),
+                        &chan_replies.iter().map(|x| x.as_str()).collect::<Vec<_>>()));
+                    
+                    exp_names.get_mut(prev_chan.as_str()).unwrap().3 = true;
+                    last_chan = None;
+                    chan_replies.clear();
+                } else {
+                    panic!("Unexpected none in last_chan");
+                }
+                assert_eq!(format!(":irc.irc 366 {} * :End of /NAMES list", nick), reply);
             }
         }
         assert!(exp_names.values().all(|x| x.3)); // if all touched
@@ -1748,18 +1808,18 @@ mod test {
             time::sleep(Duration::from_millis(100)).await;
             
             line_stream.send("NAMES".to_string()).await.unwrap();
-            assert_names_lists(&exp_names, &mut line_stream, 15, "maniac").await;
+            assert_names_lists_all(&exp_names, &mut line_stream, 11, "maniac").await;
             
             let mut exp_names_2 = HashMap::new();
             exp_names_2.insert("#cpus", exp_names.get("#cpus").unwrap().clone());
             exp_names_2.insert("#psus", exp_names.get("#psus").unwrap().clone());
             
             line_stream.send("NAMES #cpus,#psus".to_string()).await.unwrap();
-            assert_names_lists(&exp_names_2, &mut line_stream, 6, "maniac").await;
+            assert_names_lists_chanlist(&exp_names_2, &mut line_stream, 6, "maniac").await;
             
             line_streams[0].send("NAMES".to_string()).await.unwrap();
             for _ in 0..48 { line_streams[0].next().await.unwrap().unwrap(); }
-            assert_names_lists(&exp_names, &mut line_streams[0], 15, "geek0").await;
+            assert_names_lists_all(&exp_names, &mut line_streams[0], 11, "geek0").await;
         }
         
         quit_test_server(main_state, handle).await;
