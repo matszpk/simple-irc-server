@@ -1591,6 +1591,11 @@ mod test {
                 let state = main_state.state.read().await;
                 assert_eq!(None, state.channels.get("#hifi").unwrap().topic);
             }
+            
+            // no channel
+            line_stream2.send("TOPIC #hifix :bla bla".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 403 djtechno #hifix :No such channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
@@ -1619,7 +1624,6 @@ mod test {
             
             let set_time = main_state.state.read().await
                     .channels.get("#cpus").unwrap().topic.as_ref().unwrap().set_time;
-            
             assert_eq!(format!(":irc.irc 333 maniac #cpus maniac {}", set_time),
                     line_stream.next().await.unwrap().unwrap());
             
@@ -1633,6 +1637,15 @@ mod test {
             // after join
             newbie_stream.send("TOPIC #cpus".to_string()).await.unwrap();
             assert_eq!(":irc.irc 332 newbie #cpus :About processors".to_string(),
+                    newbie_stream.next().await.unwrap().unwrap());
+            
+            let set_time = main_state.state.read().await
+                    .channels.get("#cpus").unwrap().topic.as_ref().unwrap().set_time;
+            assert_eq!(format!(":irc.irc 333 newbie #cpus maniac {}", set_time),
+                    newbie_stream.next().await.unwrap().unwrap());
+            
+            newbie_stream.send("TOPIC #apus".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 403 newbie #apus :No such channel".to_string(),
                     newbie_stream.next().await.unwrap().unwrap());
         }
         
