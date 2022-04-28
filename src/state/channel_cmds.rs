@@ -335,9 +335,15 @@ impl super::MainState {
         let user = state.users.get(user_nick).unwrap();
         
         if channels.len() != 0 { 
-            for c in channels.iter().filter_map(|c| state.channels.get(c.clone())) {
-                self.send_names_from_channel(conn_state, &c, &state.users,
-                            &user, true).await?;
+            for c in channels {
+                if let Some(ref channel) = state.channels.get(c) {
+                    self.send_names_from_channel(conn_state, channel, &state.users,
+                                &user, true).await?;
+                } else {
+                    let client = conn_state.user_state.client_name();
+                    self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
+                        channel: c }).await?;
+                }
             }
         } else {
             for c in state.channels.values() {
@@ -1691,7 +1697,13 @@ mod test {
                     
                     exp_names.get_mut(prev_chan.as_str()).unwrap().3 = true;
                 } else {
-                    panic!("Unexpected none in last_chan");
+                    let reply_start_2 = format!(":irc.irc 366 {} ", nick);
+                    if reply.starts_with(&reply_start_2) {
+                        let chan = reply[reply_start_2.len()..]
+                            .split_ascii_whitespace().next().unwrap();
+                        assert!((!exp_names.contains_key(chan)) ||
+                            exp_names.get(chan).unwrap().2.len() == 0);
+                    }
                 }
                 last_chan = None;
                 chan_replies.clear();
@@ -1816,6 +1828,9 @@ mod test {
             
             line_stream.send("NAMES #cpus,#psus".to_string()).await.unwrap();
             assert_names_lists_chanlist(&exp_names_2, &mut line_stream, 6, "maniac").await;
+            
+            line_stream.send("NAMES #cpus,#xxxx,#psus".to_string()).await.unwrap();
+            assert_names_lists_chanlist(&exp_names_2, &mut line_stream, 7, "maniac").await;
             
             line_streams[0].send("NAMES".to_string()).await.unwrap();
             for _ in 0..48 { line_streams[0].next().await.unwrap().unwrap(); }
