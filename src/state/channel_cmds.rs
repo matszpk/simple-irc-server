@@ -1682,6 +1682,10 @@ mod test {
                 }
                 for _ in 0..6 { line_stream.next().await.unwrap().unwrap(); }
             }
+            
+            for _ in 0..60*2 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("NAMES".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
