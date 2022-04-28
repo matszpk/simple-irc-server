@@ -196,10 +196,7 @@ impl super::MainState {
                 }
                 
                 if do_it {
-                    chanobj.remove_user(&user_nick);
-                    if chanobj.users.len() == 0 {
-                        state.channels.remove(&channel.to_string());
-                    }
+                    state.remove_user_from_channel(channel, &user_nick);
                     removed_from.push(true);
                 }
             } else {
@@ -211,9 +208,9 @@ impl super::MainState {
         
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
-        for channel in &channels {
-            user.channels.remove(&channel.to_string());
-        }
+        //for channel in &channels {
+        //    user.channels.remove(&channel.to_string());
+        //}
         if something_done {
             user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
                         .unwrap().as_secs();
@@ -452,7 +449,7 @@ impl super::MainState {
         
         let mut kicked = vec![];
         
-        if let Some(chanobj) = state.channels.get_mut(channel) {
+        if let Some(chanobj) = state.channels.get(channel) {
             if chanobj.users.contains_key(user_nick) {
                 let user_chum = chanobj.users.get(user_nick).unwrap();
                 if user_chum.is_half_operator() {
@@ -462,7 +459,6 @@ impl super::MainState {
                         if let Some(chum) = chanobj.users.get(&ku) {
                             if !chum.is_protected() && (!chum.is_half_operator() ||
                                 !is_only_half_oper) {
-                                chanobj.remove_user(&ku);
                                 kicked.push(kick_user);
                             } else {
                                 self.feed_msg(&mut conn_state.stream, ErrCannotDoCommand972{
@@ -487,6 +483,9 @@ impl super::MainState {
         }
         
         {
+            for ku in &kicked {
+                state.remove_user_from_channel(channel, &ku);
+            }
             let chanobj = state.channels.get(channel).unwrap();
             for ku in &kicked {
                 let kick_msg = format!("KICK {} {} :{}", channel, ku,
@@ -495,11 +494,6 @@ impl super::MainState {
                     state.users.get(&nick.to_string()).unwrap().send_msg_display(
                             &conn_state.user_state.source, kick_msg.clone())?;
                 }
-                state.users.get_mut(&ku.to_string()).unwrap().channels
-                    .remove(&channel.to_string());
-            }
-            if chanobj.users.len() == 0 {
-                state.channels.remove(&channel.to_string());
             }
         }
         Ok(())
@@ -570,7 +564,7 @@ mod test {
                     line_stream3.next().await.unwrap().unwrap());
             
             let mut exp_channel = Channel{ name: "#fruits".to_string(), topic: None,
-                        creation_time: 0,
+                        creation_time: 0, preconfigured: false,
                         modes: ChannelModes::new_for_channel("charlie".to_string()),
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(),

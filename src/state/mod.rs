@@ -248,6 +248,7 @@ struct Channel {
     ban_info: HashMap<String, BanInfo>,
     users: HashMap<String, ChannelUserModes>,
     creation_time: u64,
+    preconfigured: bool,
 }
 
 impl Channel {
@@ -257,7 +258,8 @@ impl Channel {
         Channel{ name, topic: None, ban_info: HashMap::new(),
             default_modes: ChannelDefaultModes::default(),
             modes: ChannelModes::new_for_channel(user_nick), users,
-            creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() }
+            creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            preconfigured: false }
     }
     
     fn add_user(&mut self, user_nick: &String) {
@@ -568,7 +570,8 @@ impl VolatileState {
                     ban_info: HashMap::new(), default_modes: def_ch_modes,
                     modes: ch_modes, users: HashMap::new(),
                     creation_time: SystemTime::now().duration_since(UNIX_EPOCH)
-                            .unwrap().as_secs() });
+                            .unwrap().as_secs(),
+                    preconfigured: true });
             });
         }
         
@@ -595,6 +598,18 @@ impl VolatileState {
         }
     }
     
+    fn remove_user_from_channel<'a>(&mut self, channel: &'a str, nick: &'a str) {
+        if let Some(chanobj) = self.channels.get_mut(channel) {
+            chanobj.remove_user(nick);
+            if chanobj.users.len() == 0 && !chanobj.preconfigured {
+                self.channels.remove(channel);
+            }
+        }
+        if let Some(user) = self.users.get_mut(nick) {
+            user.channels.remove(channel);
+        }
+    }
+    
     fn remove_user(&mut self, nick: &str) {
         if let Some(user) = self.users.remove(nick) {
             if user.modes.is_local_oper() {
@@ -605,11 +620,7 @@ impl VolatileState {
             }
             self.wallops_users.remove(nick);
             user.channels.iter().for_each(|chname| {
-                let channel = self.channels.get_mut(chname).unwrap();
-                channel.remove_user(nick);
-                if channel.users.len() == 0 {
-                    self.channels.remove(chname);
-                }
+                self.remove_user_from_channel(chname, nick);
             });
         }
     }
@@ -1110,7 +1121,7 @@ mod test {
             default_modes: ChannelDefaultModes::default(),
             ban_info: HashMap::new(), users:
                 [("dizzy".to_string(), ChannelUserModes::new_for_created_channel())].into(),
-            creation_time: channel.creation_time }, channel);
+            creation_time: channel.creation_time, preconfigured: false }, channel);
     }
     
     #[test]
@@ -1190,7 +1201,7 @@ mod test {
             default_modes: ChannelDefaultModes::default(),
             ban_info: HashMap::new(), users:
                 [("diggy".to_string(), ChannelUserModes::new_for_created_channel())].into(),
-            creation_time: channel.creation_time }, channel);
+            creation_time: channel.creation_time, preconfigured: false }, channel);
     }
     
     #[test]
@@ -1207,7 +1218,7 @@ mod test {
                     ("halfguru".to_string(), ChannelUserModes::default()),
                     ("vip".to_string(), ChannelUserModes::default()),
                     ("talker".to_string(), ChannelUserModes::default())].into(),
-            creation_time: channel.creation_time };
+            creation_time: channel.creation_time, preconfigured: false };
         
         channel.users.insert("inventor".to_string(), ChannelUserModes::default());
         channel.users.insert("guru".to_string(), ChannelUserModes::default());
@@ -1334,7 +1345,8 @@ mod test {
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
                         creation_time: state.channels.get("#gooddays")
-                                    .unwrap().creation_time }),
+                                    .unwrap().creation_time,
+                        preconfigured: true }),
                     ("#pets".to_string(),
                     Channel{ name: "#pets".to_string(),
                         topic: Some(ChannelTopic::new("About pets".to_string())),
@@ -1342,14 +1354,16 @@ mod test {
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
                         creation_time: state.channels.get("#pets")
-                                    .unwrap().creation_time }),
+                                    .unwrap().creation_time,
+                        preconfigured: true }),
                     ("&cactuses".to_string(),
                     Channel{ name: "&cactuses".to_string(), topic: None,
                         modes: ChannelModes::default(),
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
                         creation_time: state.channels.get("&cactuses")
-                                    .unwrap().creation_time })]),
+                                    .unwrap().creation_time,
+                        preconfigured: true })]),
                 state.channels);
     }
     
