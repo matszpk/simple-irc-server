@@ -1368,6 +1368,46 @@ mod test {
     }
     
     #[test]
+    fn test_volatile_remove_user_from_channel() {
+        let mut config = MainConfig::default();
+        config.channels = Some(vec![
+            ChannelConfig{ name: "#something".to_string(), topic: None,
+                        modes: ChannelModes::default() } ]);
+        let mut state = VolatileState::new_from_config(&config);
+        let user_state = ConnUserState{
+            hostname: "bobby.com".to_string(),
+            name: Some("matix".to_string()),
+            realname: Some("Matthew Somebody".to_string()),
+            nick: Some("matixi".to_string()),
+            source: "matixi!matix@bobby.com".to_string(),
+            password: None, authenticated: true, registered: true };
+        let (sender, _) = unbounded_channel();
+        let (quit_sender, _) = oneshot::channel();
+        let user = User::new(&config, &user_state, sender, quit_sender);
+        state.add_user(user);
+        
+        // create channels and add channel to user structure
+        [("#matixichan", "matixi"), ("#tulipchan", "matixi")].iter()
+            .for_each(|(chname, nick)| {
+            state.channels.insert(chname.to_string(),
+                    Channel::new(chname.to_string(), nick.to_string()));
+            state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
+                        chname.to_string());
+        });
+        state.channels.get_mut(&"#something".to_string()).unwrap().users
+                .insert("matixi".to_string(), ChannelUserModes::default());
+        state.users.get_mut("matixi").unwrap().channels.insert("#something".to_string());
+        
+        state.remove_user_from_channel("#something", "matixi");
+        assert!(state.channels.contains_key("#something"));
+        assert_eq!(HashMap::new(), state.channels.get("#something").unwrap().users);
+        state.remove_user_from_channel("#matixichan", "matixi");
+        assert!(!state.channels.contains_key("#matixichan"));
+        state.remove_user_from_channel("#tulipan", "matixi");
+        assert!(!state.channels.contains_key("#tulipan"));
+    }
+    
+    #[test]
     fn test_volatile_state_add_remove_user() {
         let config = MainConfig::default();
         let mut state = VolatileState::new_from_config(&config);
