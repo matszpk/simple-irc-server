@@ -368,7 +368,8 @@ impl<'a> Command<'a> {
                     let server = param_it.next().map(|x| *x);
                     Ok(LIST{ channels, server })
                 } else {
-                    Err(NeedMoreParams(LISTId)) }
+                    Ok(LIST{ channels: vec![], server: None })
+                }
             }
             "INVITE" => {
                 if message.params.len() >= 2 {
@@ -929,6 +930,9 @@ mod test {
             Command::from_message(&Message{ source: None, command: "LIST",
                 params: vec![ "#dogs,&juices,#hardware",
                     "funny.checkbox.org" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(LIST{ channels: vec![], server: None }),
+            Command::from_message(&Message{ source: None, command: "LIST",
+                params: vec![] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Wrong parameter 0 in command 'LIST'".to_string()),
             Command::from_message(&Message{ source: None, command: "LIST",
                 params: vec![ "#dogs,&juices,#har:dware",
@@ -937,9 +941,6 @@ mod test {
             Command::from_message(&Message{ source: None, command: "LIST",
                 params: vec![ "#dogs,&juices,#hardware",
                     "fnny" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Command 'LIST' needs more parameters".to_string()),
-            Command::from_message(&Message{ source: None, command: "LIST",
-                params: vec![] }).map_err(|e| e.to_string()));
         
         assert_eq!(Ok(INVITE{ nickname: "greg", channel: "#plants" }),
             Command::from_message(&Message{ source: None, command: "INVITE",

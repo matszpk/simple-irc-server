@@ -367,17 +367,16 @@ impl super::MainState {
         } else {
             let state = self.state.read().await;
             self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
-            let mut count = 0;
-            for ch in channels.iter().filter_map(|ch| {
-                    state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
-                }) {
-                self.feed_msg(&mut conn_state.stream, RplList322{ client,
-                        channel: &ch.name, client_count: ch.users.len(),
-                        topic: ch.topic.as_ref().map(|x| &x.topic)
-                            .unwrap_or(&String::new()) }).await?;
-                count += 1;
-            }
-            if count == 0 {
+            if channels.len() != 0 {
+                for ch in channels.iter().filter_map(|ch| {
+                        state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
+                    }) {
+                    self.feed_msg(&mut conn_state.stream, RplList322{ client,
+                            channel: &ch.name, client_count: ch.users.len(),
+                            topic: ch.topic.as_ref().map(|x| &x.topic)
+                                .unwrap_or(&String::new()) }).await?;
+                }
+            } else {
                 for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
@@ -1962,6 +1961,40 @@ mod test {
             mati_stream.next().await.unwrap().unwrap();
             mati_stream.next().await.unwrap().unwrap();
             assert_names_lists_all(&exp_names, &mut mati_stream, 4, "mati").await;
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_list() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "edmund", "edmund",
+                    "Edmund Serious").await;
+            line_stream.send("JOIN #politics,#economics,#management".to_string())
+                        .await.unwrap();
+            line_stream.send("TOPIC #economics :About economics".to_string()).await.unwrap();
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "nick", "nicolas",
+                    "Nicolas Serious").await;
+            line_stream2.send("JOIN #politics,#economics".to_string())
+                        .await.unwrap();
+            
+            for _ in 0..3*3+3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("LIST".to_string()).await.unwrap();
+//             assert_eq!(":irc.irc 321 edmund Channel :Users  Name".to_string(),
+//                     line_stream.next().await.unwrap().unwrap());
+//             assert_eq!(":irc.irc 322 edmund #politics 2 :".to_string(),
+//                     line_stream.next().await.unwrap().unwrap());
+//             assert_eq!(":irc.irc 322 edmund #economics 2 :About economics".to_string(),
+//                     line_stream.next().await.unwrap().unwrap());
+//             assert_eq!(":irc.irc 322 edmund #management 1 :".to_string(),
+//                     line_stream.next().await.unwrap().unwrap());
+//             assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
+//                     line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
