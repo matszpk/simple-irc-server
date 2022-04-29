@@ -496,10 +496,8 @@ impl super::MainState {
                     state.users.get(&nick.to_string()).unwrap().send_msg_display(
                             &conn_state.user_state.source, kick_msg.clone())?;
                 }
-                for nick in &kicked {
-                    state.users.get(&nick.to_string()).unwrap().send_msg_display(
-                            &conn_state.user_state.source, kick_msg.clone())?;
-                }
+                state.users.get(&ku.to_string()).unwrap().send_msg_display(
+                        &conn_state.user_state.source, kick_msg.clone())?;
             }
         }
         Ok(())
