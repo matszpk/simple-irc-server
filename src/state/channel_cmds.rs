@@ -2093,20 +2093,39 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "seba", "sebastian",
                     "Sebastian Gross").await;
-            line_stream.send("JOIN #funky".to_string()).await.unwrap();
-            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            line_stream.send("JOIN #funky,#punky".to_string()).await.unwrap();
+            for _ in 0..6 { line_stream.next().await.unwrap().unwrap(); }
             
             let mut line_stream2 = login_to_test_and_skip(port, "stan", "stan",
                     "Stan Straightforward").await;
             time::sleep(Duration::from_millis(50)).await;
+            {   // set invite only for punky
+                main_state.state.write().await.channels.get_mut("#punky").unwrap()
+                            .modes.invite_only = true;
+            }
             line_stream.send("INVITE stan #funky".to_string()).await.unwrap();
             time::sleep(Duration::from_millis(50)).await;
             { assert!(main_state.state.read().await.users.get("stan").unwrap()
                             .invited_to.contains("#funky")); }
             line_stream2.send("JOIN #funky".to_string()).await.unwrap();
             time::sleep(Duration::from_millis(50)).await;
-            { assert!(!main_state.state.read().await.users.get("stan").unwrap()
-                            .invited_to.contains("#funky")); }
+            {
+                let state = main_state.state.read().await;
+                assert!(!state.users.get("stan").unwrap().invited_to.contains("#funky"));
+                assert!(state.channels.get("#funky").unwrap().users.contains_key("stan"));
+            }
+            
+            line_stream.send("INVITE stan #punky".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.users.get("stan").unwrap()
+                            .invited_to.contains("#punky")); }
+            line_stream2.send("JOIN #punky".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(!state.users.get("stan").unwrap().invited_to.contains("#punky"));
+                assert!(state.channels.get("#punky").unwrap().users.contains_key("stan"));
+            }
         }
         
         quit_test_server(main_state, handle).await;
