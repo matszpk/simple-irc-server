@@ -91,6 +91,8 @@ impl super::MainState {
                     }
                 };
                 
+                let do_join = do_join && !channel.users.contains_key(&user_nick);
+                
                 if do_join { (true, false)
                 } else { (false, false) }
             } else { // if new channel
@@ -612,6 +614,35 @@ mod test {
                 let state = main_state.state.read().await;
                 exp_channel.remove_user("charlie");
                 assert!(!state.channels.contains_key("#fruits"));
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_join_already_joined() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "charlie", "charlie2",
+                    "Charlie Brown").await;
+            
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(100)).await;
+            
+            {   // set some channel user mode
+                main_state.state.write().await.channels.get_mut("#fruits")
+                        .unwrap().add_voice("charlie");
+            }
+            
+            line_stream.send("JOIN #fruits".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(100)).await;
+            {   // check user mode (voice)
+                assert!(main_state.state.read().await.channels.get("#fruits").unwrap()
+                            .users.get("charlie").unwrap().voice);
             }
         }
         
