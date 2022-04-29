@@ -115,7 +115,8 @@ impl super::MainState {
             let chname = chname_str.to_string();
             
             if *join {
-                user.channels.insert(chname_str.to_string());
+                user.channels.insert(chname.clone());
+                user.invited_to.remove(&chname);
                 if *create {
                     state.channels.insert(chname.clone(), Channel::new(
                                 chname.clone(), user_nick.clone()));
@@ -2080,6 +2081,32 @@ mod test {
                         &line_stream.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_invite() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "seba", "sebastian",
+                    "Sebastian Gross").await;
+            line_stream.send("JOIN #funky".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "stan", "stan",
+                    "Stan Straightforward").await;
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream.send("INVITE stan #funky".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.users.get("stan").unwrap()
+                            .invited_to.contains("#funky")); }
+            line_stream2.send("JOIN #funky".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(!main_state.state.read().await.users.get("stan").unwrap()
+                            .invited_to.contains("#funky")); }
         }
         
         quit_test_server(main_state, handle).await;
