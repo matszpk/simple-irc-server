@@ -1375,6 +1375,30 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_part_preconfigured() {
+        let mut config = MainConfig::default();
+        config.channels = Some(vec![ ChannelConfig{ name: "#carrots".to_string(),
+                topic: None, modes: ChannelModes::default() } ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port,
+                            "brian", "brianx", "BrianX").await;
+            line_stream.send("JOIN #carrots,#apples".to_string()).await.unwrap();
+            
+            line_stream.send("PART #carrots,#apples".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(state.channels.contains_key("#carrots"));
+                assert!(!state.channels.contains_key("#apples"));
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_part_multiple() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
