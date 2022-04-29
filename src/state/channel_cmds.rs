@@ -1891,6 +1891,45 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_names_with_multi_prefix() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = connect_to_test(port).await;
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("NICK forexman".to_string()).await.unwrap();
+            line_stream.send("USER forexman 8 * :Forex Maniac".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            
+            for _ in 0..20 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("JOIN #coins,#forex,#gold".to_string()).await.unwrap();
+            for _ in 0..3*3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut gold_stream = login_to_test_and_skip(port, "goldy", "goldie",
+                    "Gold Maniac").await;
+            gold_stream.send("JOIN #forex".to_string()).await.unwrap();
+            for _ in 0..3 { gold_stream.next().await.unwrap().unwrap(); }
+            
+            let exp_names = HashMap::from([
+                ("#coins", (":irc.irc 353 ", " = #coins :",
+                        vec![ "~@forexman".to_string() ], false)),
+                ("#forex", (":irc.irc 353 ", " = #forex :",
+                        vec![ "~@forexman".to_string(), "goldy".to_string() ], false)),
+                ("#gold", (":irc.irc 353 ", " = #gold :",
+                        vec![ "~@forexman".to_string() ], false)),
+            ]);
+            
+            line_stream.next().await.unwrap().unwrap(); // skip JOIN
+            line_stream.send("NAMES".to_string()).await.unwrap();
+            assert_names_lists_all(&exp_names, &mut line_stream, 4, "forexman").await;
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_names_secret() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
@@ -2180,6 +2219,13 @@ mod test {
             assert_eq!(":irc.irc 401 seba sunday :No such nick/channel".to_string(),
                     line_stream.next().await.unwrap().unwrap());
         }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_kick() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
         quit_test_server(main_state, handle).await;
     }
