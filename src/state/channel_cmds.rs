@@ -2104,28 +2104,81 @@ mod test {
                             .modes.invite_only = true;
             }
             line_stream.send("INVITE stan #funky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 341 seba stan #funky".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
             time::sleep(Duration::from_millis(50)).await;
             { assert!(main_state.state.read().await.users.get("stan").unwrap()
                             .invited_to.contains("#funky")); }
+            assert_eq!(":seba!~sebastian@127.0.0.1 INVITE stan #funky".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
             line_stream2.send("JOIN #funky".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
             time::sleep(Duration::from_millis(50)).await;
             {
                 let state = main_state.state.read().await;
                 assert!(!state.users.get("stan").unwrap().invited_to.contains("#funky"));
                 assert!(state.channels.get("#funky").unwrap().users.contains_key("stan"));
             }
+            line_stream.next().await.unwrap().unwrap(); // skip JOIN
             
             line_stream.send("INVITE stan #punky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 341 seba stan #punky".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
             time::sleep(Duration::from_millis(50)).await;
             { assert!(main_state.state.read().await.users.get("stan").unwrap()
                             .invited_to.contains("#punky")); }
             line_stream2.send("JOIN #punky".to_string()).await.unwrap();
+            assert_eq!(":seba!~sebastian@127.0.0.1 INVITE stan #punky".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
             time::sleep(Duration::from_millis(50)).await;
             {
                 let state = main_state.state.read().await;
                 assert!(!state.users.get("stan").unwrap().invited_to.contains("#punky"));
                 assert!(state.channels.get("#punky").unwrap().users.contains_key("stan"));
             }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_invite_failures() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "seba", "sebastian",
+                    "Sebastian Gross").await;
+            line_stream.send("JOIN #funky,#punky".to_string()).await.unwrap();
+            for _ in 0..6 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "stan", "stan",
+                    "Stan Straightforward").await;
+            line_stream2.send("JOIN #punky".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            
+            line_stream.next().await.unwrap().unwrap(); // skip JOIN stan
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {   // set invite only for punky
+                main_state.state.write().await.channels.get_mut("#punky").unwrap()
+                            .modes.invite_only = true;
+            }
+            
+            login_to_test_and_skip(port, "sonny", "sonny9", "Sonny Sunshine").await;
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream2.send("INVITE sonny #funky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 442 stan #funky :You're not on that channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            line_stream2.send("INVITE sonny #punky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 stan #punky :You're not channel operator".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            line_stream2.send("INVITE sonny #pinky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 403 stan #pinky :No such channel".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream.send("INVITE sunday #punky".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 401 seba sunday :No such nick/channel".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
