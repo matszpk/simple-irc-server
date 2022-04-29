@@ -508,19 +508,19 @@ mod test {
     
     fn equal_channel_names<'a>(exp_msg: &'a str, exp_names: &'a[&'a str],
                 names_replies: &'a[&'a str]) -> bool {
-        let mut match_count = 0;
         let mut exp_names_sorted = Vec::from(exp_names);
         exp_names_sorted.sort();
+        let mut touched = vec![false; exp_names.len()];
         names_replies.iter().all(|reply| {
             if reply.starts_with(exp_msg) {
                 reply[exp_msg.len()..].split_terminator(" ").all(|c| {
-                    if exp_names_sorted.binary_search(&c).is_ok() {
-                        match_count += 1;
+                    if let Ok(p) = exp_names_sorted.binary_search(&c) {
+                        touched[p] = true;
                         true
                     } else { false }
                 })
             } else { false }
-        }) && match_count == exp_names.len()
+        }) && touched.iter().all(|x| *x)
     }
     
     #[tokio::test]
@@ -1996,6 +1996,12 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+//     fn equal_channel_list<'a>(msg_start &'a str, expected :&'a[&'a str],
+//             results :&'a[&'a str]) -> bool {
+//         let mut expset = HashSet::from(expected);
+//         
+//     }
     
     #[tokio::test]
     async fn test_command_list() {
