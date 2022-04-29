@@ -946,6 +946,8 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
             assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            assert!(!main_state.state.read().await.users.contains_key("brian"));
         }
         
         {
@@ -968,6 +970,30 @@ mod test {
             line_stream.send("QUIT :Bye".to_string()).await.unwrap();
             assert_eq!(":irc.irc ERROR: Closing connection".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_quit_from_channels() {
+        let mut config = MainConfig::default();
+        config.channels = Some(vec![ ChannelConfig{ name: "#carrots".to_string(),
+                topic: None, modes: ChannelModes::default() } ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port,
+                            "brian", "brianx", "BrianX").await;
+            line_stream.send("JOIN #carrots,#apples".to_string()).await.unwrap();
+            
+            line_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(state.channels.contains_key("#carrots"));
+                assert!(!state.channels.contains_key("#apples"));
+            }
         }
         
         quit_test_server(main_state, handle).await;
