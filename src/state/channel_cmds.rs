@@ -1997,11 +1997,22 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-//     fn equal_channel_list<'a>(msg_start &'a str, expected :&'a[&'a str],
-//             results :&'a[&'a str]) -> bool {
-//         let mut expset = HashSet::from(expected);
-//         
-//     }
+    fn equal_channel_list<'a>(msg_start: &'a str, expected :&'a[&'a str],
+            results :&'a[&'a str]) -> bool {
+        let mut expected_sorted = Vec::from(expected);
+        expected_sorted.sort();
+        let mut touched =  vec![false; expected.len()];
+        
+        results.iter().all(|res| {
+            if res.starts_with(msg_start) {
+                let rest = &res[msg_start.len()..];
+                if let Ok(p) = expected_sorted.binary_search(&rest) {
+                    touched[p] = true;
+                    true
+                } else { false }
+            } else { false }
+        }) && touched.iter().all(|x| *x)
+    }
     
     #[tokio::test]
     async fn test_command_list() {
@@ -2018,20 +2029,57 @@ mod test {
                     "Nicolas Serious").await;
             line_stream2.send("JOIN #politics,#economics".to_string())
                         .await.unwrap();
+            for _ in 0..3*2+1 { line_stream2.next().await.unwrap().unwrap(); }
             
             for _ in 0..3*3+3 { line_stream.next().await.unwrap().unwrap(); }
             
             line_stream.send("LIST".to_string()).await.unwrap();
-//             assert_eq!(":irc.irc 321 edmund Channel :Users  Name".to_string(),
-//                     line_stream.next().await.unwrap().unwrap());
-//             assert_eq!(":irc.irc 322 edmund #politics 2 :".to_string(),
-//                     line_stream.next().await.unwrap().unwrap());
-//             assert_eq!(":irc.irc 322 edmund #economics 2 :About economics".to_string(),
-//                     line_stream.next().await.unwrap().unwrap());
-//             assert_eq!(":irc.irc 322 edmund #management 1 :".to_string(),
-//                     line_stream.next().await.unwrap().unwrap());
-//             assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
-//                     line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 321 edmund Channel :Users  Name".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_list(":irc.irc 322 edmund ",
+                    &["#politics 2 :", "#economics 2 :About economics", "#management 1 :"],
+                    &[&line_stream.next().await.unwrap().unwrap(),
+                        &line_stream.next().await.unwrap().unwrap(),
+                        &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream2.send("LIST".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 321 nick Channel :Users  Name".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert!(equal_channel_list(":irc.irc 322 nick ",
+                    &["#politics 2 :", "#economics 2 :About economics", "#management 1 :"],
+                    &[&line_stream2.next().await.unwrap().unwrap(),
+                        &line_stream2.next().await.unwrap().unwrap(),
+                        &line_stream2.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 323 nick :End of /LIST".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream.send("LIST #politics,#management,#decisions"
+                        .to_string()).await.unwrap();
+            assert_eq!(":irc.irc 321 edmund Channel :Users  Name".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_list(":irc.irc 322 edmund ",
+                    &["#politics 2 :", "#management 1 :"],
+                    &[&line_stream.next().await.unwrap().unwrap(),
+                        &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            // secret channel
+            main_state.state.write().await.channels.get_mut("#management").unwrap()
+                            .modes.secret = true;
+            
+            line_stream.send("LIST".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 321 edmund Channel :Users  Name".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert!(equal_channel_list(":irc.irc 322 edmund ",
+                    &["#politics 2 :", "#economics 2 :About economics"],
+                    &[&line_stream.next().await.unwrap().unwrap(),
+                        &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 323 edmund :End of /LIST".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
