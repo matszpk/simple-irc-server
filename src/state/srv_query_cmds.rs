@@ -706,4 +706,25 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_time() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "timmy", "tim",
+                    "Timmy Greater").await;
+            line_stream.send("TIME".to_string()).await.unwrap();
+            let time = Local::now();
+            let time2 = time + chrono::Duration::seconds(1);
+            let exp_time_str = format!(":irc.irc 391 timmy irc.irc {}  :{}",
+                    time.timestamp(),  time.to_rfc2822());
+            let exp_time2_str = format!(":irc.irc 391 timmy irc.irc {}  :{}",
+                    time2.timestamp(),  time2.to_rfc2822());
+            let reply_str = line_stream.next().await.unwrap().unwrap();
+            assert!(exp_time_str == reply_str || exp_time2_str == reply_str);
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
