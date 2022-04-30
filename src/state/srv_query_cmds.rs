@@ -727,4 +727,21 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_links() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "timmy", "tim",
+                    "Timmy Greater").await;
+            line_stream.send("LINKS".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 364 timmy irc.irc irc.irc :0 This is IRC server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 365 timmy * :End of LINKS list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
