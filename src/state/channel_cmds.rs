@@ -2255,8 +2255,7 @@ mod test {
             david_stream.send("JOIN #impressions".to_string()).await.unwrap();
             for _ in 0..3 { david_stream.next().await.unwrap().unwrap(); }
             
-            let mut eliach_stream = login_to_test_and_skip(port, "eliach", "eliach",
-                    "Eliach Thunder").await;
+            login_to_test_and_skip(port, "eliach", "eliach", "Eliach Thunder").await;
             
             for _ in 0..4 { line_stream.next().await.unwrap().unwrap(); }
             for _ in 0..3 { ben_stream.next().await.unwrap().unwrap(); }
@@ -2266,7 +2265,7 @@ mod test {
             time::sleep(Duration::from_millis(100)).await;
             {
                 let mut state = main_state.state.write().await;
-                let mut channel = state.channels.get_mut("#impressions").unwrap();
+                let channel = state.channels.get_mut("#impressions").unwrap();
                 channel.add_voice("david");
                 channel.add_half_operator("chris");
                 channel.add_half_operator("charlie");
@@ -2318,8 +2317,91 @@ mod test {
             assert_eq!(":irc.irc 441 chris eliach #impressions \
                     :They aren't on that channel".to_string(),
                     chris_stream.next().await.unwrap().unwrap());
+            
+            david_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { david_stream.next().await.unwrap().unwrap(); }
+            
+            david_stream.send("KICK #impressions chris".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 david #impressions :You're not channel operator"
+                    .to_string(), david_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.channels.get("#impressions")
+                        .unwrap().users.contains_key("chris")); }
         }
         
         quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_kick_self() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "adam", "adam",
+                    "Adam Sandwich").await;
+            line_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut ben_stream = login_to_test_and_skip(port, "ben", "benedict",
+                    "Benedict Tomato").await;
+            ben_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { ben_stream.next().await.unwrap().unwrap(); }
+            
+            let mut chris_stream = login_to_test_and_skip(port, "chris", "christopher",
+                    "Christopher Lambda").await;
+            chris_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { chris_stream.next().await.unwrap().unwrap(); }
+            
+            let mut charlie_stream = login_to_test_and_skip(port, "charlie", "charlie",
+                    "Charlie Pingy").await;
+            charlie_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { charlie_stream.next().await.unwrap().unwrap(); }
+            
+            let mut david_stream = login_to_test_and_skip(port, "david", "david",
+                    "David Storm").await;
+            david_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { david_stream.next().await.unwrap().unwrap(); }
+            
+            for _ in 0..4 { line_stream.next().await.unwrap().unwrap(); }
+            for _ in 0..3 { ben_stream.next().await.unwrap().unwrap(); }
+            for _ in 0..2 { chris_stream.next().await.unwrap().unwrap(); }
+            charlie_stream.next().await.unwrap().unwrap();
+            
+            time::sleep(Duration::from_millis(100)).await;
+            {
+                let mut state = main_state.state.write().await;
+                let channel = state.channels.get_mut("#impressions").unwrap();
+                channel.add_voice("david");
+                channel.add_half_operator("chris");
+                channel.add_operator("charlie");
+                channel.add_protected("ben");
+            }
+            
+            david_stream.send("KICK #impressions david".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 david #impressions :You're not channel operator"
+                    .to_string(), david_stream.next().await.unwrap().unwrap());
+            
+            chris_stream.send("KICK #impressions chris".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 chris :Can not do command".to_string(),
+                    chris_stream.next().await.unwrap().unwrap());
+            
+            charlie_stream.send("KICK #impressions charlie".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut ben_stream, &mut chris_stream,
+                            &mut charlie_stream] {
+                assert_eq!(":charlie!~charlie@127.0.0.1 KICK #impressions charlie :Kicked"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            
+            ben_stream.send("KICK #impressions ben".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 ben :Can not do command".to_string(),
+                    ben_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("KICK #impressions adam".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 adam :Can not do command".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+        
     }
 }
