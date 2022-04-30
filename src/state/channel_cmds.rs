@@ -2402,6 +2402,32 @@ mod test {
         }
         
         quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_kick_reason() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
+        {
+            let mut line_stream = login_to_test_and_skip(port, "adam", "adam",
+                    "Adam Sandwich").await;
+            line_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut ben_stream = login_to_test_and_skip(port, "ben", "benedict",
+                    "Benedict Tomato").await;
+            ben_stream.send("JOIN #impressions".to_string()).await.unwrap();
+            for _ in 0..3 { ben_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("KICK #impressions ben :Bad Boy".to_string()).await.unwrap();
+            assert_eq!(":adam!~adam@127.0.0.1 KICK #impressions ben :Bad Boy".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":adam!~adam@127.0.0.1 KICK #impressions ben :Bad Boy".to_string(),
+                    ben_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
     }
 }
