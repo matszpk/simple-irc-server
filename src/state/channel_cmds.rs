@@ -2283,12 +2283,41 @@ mod test {
             { assert!(!main_state.state.read().await.channels.get("#impressions")
                         .unwrap().users.contains_key("david")); }
             
-             chris_stream.send("KICK #impressions charlie".to_string()).await.unwrap();
-             assert_eq!(":irc.irc 972 chris :Can not do command".to_string(),
-                     chris_stream.next().await.unwrap().unwrap());
-             time::sleep(Duration::from_millis(50)).await;
-             { assert!(main_state.state.read().await.channels.get("#impressions")
-                         .unwrap().users.contains_key("charlie")); }
+            chris_stream.send("KICK #impressions charlie".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 chris :Can not do command".to_string(),
+                    chris_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.channels.get("#impressions")
+                        .unwrap().users.contains_key("charlie")); }
+            
+            chris_stream.send("KICK #impressions ben".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 chris :Can not do command".to_string(),
+                    chris_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.channels.get("#impressions")
+                        .unwrap().users.contains_key("ben")); }
+            
+            chris_stream.send("KICK #impressions adam".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 972 chris :Can not do command".to_string(),
+                    chris_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.channels.get("#impressions")
+                        .unwrap().users.contains_key("adam")); }
+            
+            ben_stream.send("KICK #impressions charlie".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut ben_stream, &mut chris_stream,
+                            &mut charlie_stream] {
+                assert_eq!(":ben!~benedict@127.0.0.1 KICK #impressions charlie :Kicked",
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(!main_state.state.read().await.channels.get("#impressions")
+                        .unwrap().users.contains_key("charlie")); }
+            
+            chris_stream.send("KICK #impressions eliach".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 441 chris eliach #impressions \
+                    :They aren't on that channel".to_string(),
+                    chris_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
