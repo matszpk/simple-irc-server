@@ -667,6 +667,9 @@ mod test {
                     "Zephyr Monumental").await;
             login_to_test_and_skip(port, "leon", "leon", "Leon the Professionalist").await;
             login_to_test_and_skip(port, "amanda", "amanda", "Amanda Fruity").await;
+            let mut emilia_stream = login_to_test_and_skip(port, "emilia", "emilia",
+                        "Emilia Fuzzy").await;
+            emilia_stream.send("QUIT".to_string()).await.unwrap();
             
             time::sleep(Duration::from_millis(50)).await;
             {
@@ -682,8 +685,8 @@ mod test {
                 ":irc.irc 253 tommy 0 :unknown connection(s)",
                 ":irc.irc 254 tommy 2 :channels formed",
                 ":irc.irc 255 tommy :I have 4 clients and 1 servers",
-                ":irc.irc 265 tommy 4 4 :Current local users 4, max 4",
-                ":irc.irc 266 tommy 4 4 :Current global users 4, max 4"] {
+                ":irc.irc 265 tommy 4 5 :Current local users 4, max 5",
+                ":irc.irc 266 tommy 4 5 :Current global users 4, max 5"] {
                 assert_eq!(expected.to_string(), line_stream.next().await.unwrap().unwrap());
             }
             
@@ -694,8 +697,8 @@ mod test {
                 ":irc.irc 253 zephyr 0 :unknown connection(s)",
                 ":irc.irc 254 zephyr 2 :channels formed",
                 ":irc.irc 255 zephyr :I have 4 clients and 1 servers",
-                ":irc.irc 265 zephyr 4 4 :Current local users 4, max 4",
-                ":irc.irc 266 zephyr 4 4 :Current global users 4, max 4"] {
+                ":irc.irc 265 zephyr 4 5 :Current local users 4, max 5",
+                ":irc.irc 266 zephyr 4 5 :Current global users 4, max 5"] {
                 assert_eq!(expected.to_string(),
                         zephyr_stream.next().await.unwrap().unwrap());
             }
