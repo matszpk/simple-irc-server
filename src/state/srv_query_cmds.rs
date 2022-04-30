@@ -551,3 +551,28 @@ impl super::MainState {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::test::*;
+    
+    #[tokio::test]
+    async fn test_command_motd() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "tommy", "thomas",
+                    "Thomas Giggy").await;
+            line_stream.send("MOTD".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 375 tommy :- irc.irc Message of the day - ".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 372 tommy :Hello, world!".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 376 tommy :End of /MOTD command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+}
