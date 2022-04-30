@@ -602,4 +602,48 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_admin() {
+        let mut config = MainConfig::default();
+        config.admin_email = Some("mati@somewhere.pl".to_string());
+        config.admin_info = "Sample installation".to_string();
+        config.admin_info2 = Some("Somewhere in Poland".to_string());
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "tommy", "thomas",
+                    "Thomas Giggy").await;
+            line_stream.send("ADMIN".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 256 tommy irc.irc :Administrative info".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 257 tommy :Sample installation".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 258 tommy :Somewhere in Poland".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 259 tommy :mati@somewhere.pl".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_admin_default() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "tommy", "thomas",
+                    "Thomas Giggy").await;
+            line_stream.send("ADMIN".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 256 tommy irc.irc :Administrative info".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 257 tommy :ircadmin is IRC admin".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
