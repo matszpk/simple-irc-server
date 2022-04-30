@@ -646,4 +646,61 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_lusers() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "tommy".to_string(), password: "zzzzz".to_string(),
+                        mask: None }]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "tommy", "thomas",
+                    "Thomas Giggy").await;
+            line_stream.send("JOIN #hardware,#software".to_string()).await.unwrap();
+            // operator
+            line_stream.send("OPER tommy zzzzz".to_string()).await.unwrap();
+            for _ in 0..7 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut zephyr_stream = login_to_test_and_skip(port, "zephyr", "zephyr",
+                    "Zephyr Monumental").await;
+            login_to_test_and_skip(port, "leon", "leon", "Leon the Professionalist").await;
+            login_to_test_and_skip(port, "amanda", "amanda", "Amanda Fruity").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("leon").unwrap().modes.invisible = true;
+                state.invisible_users_count += 1;
+            }
+            
+            line_stream.send("LUSERS".to_string()).await.unwrap();
+            for expected in [
+                ":irc.irc 251 tommy :There are 3 users and 1 invisible on 1 servers",
+                ":irc.irc 252 tommy 1 :operator(s) online",
+                ":irc.irc 253 tommy 0 :unknown connection(s)",
+                ":irc.irc 254 tommy 2 :channels formed",
+                ":irc.irc 255 tommy :I have 4 clients and 1 servers",
+                ":irc.irc 265 tommy 4 4 :Current local users 4, max 4",
+                ":irc.irc 266 tommy 4 4 :Current global users 4, max 4"] {
+                assert_eq!(expected.to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            
+            zephyr_stream.send("LUSERS".to_string()).await.unwrap();
+            for expected in [
+                ":irc.irc 251 zephyr :There are 3 users and 1 invisible on 1 servers",
+                ":irc.irc 252 zephyr 1 :operator(s) online",
+                ":irc.irc 253 zephyr 0 :unknown connection(s)",
+                ":irc.irc 254 zephyr 2 :channels formed",
+                ":irc.irc 255 zephyr :I have 4 clients and 1 servers",
+                ":irc.irc 265 zephyr 4 4 :Current local users 4, max 4",
+                ":irc.irc 266 zephyr 4 4 :Current global users 4, max 4"] {
+                assert_eq!(expected.to_string(),
+                        zephyr_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
