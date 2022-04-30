@@ -55,11 +55,11 @@ impl super::MainState {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "VERSION", subcommand: None, info: "Server unsupported" }).await?;
         } else {
-            self.send_isupport(conn_state).await?;
             let client = conn_state.user_state.client_name();
             self.feed_msg(&mut conn_state.stream, RplVersion351{ client,
                 version: concat!(env!("CARGO_PKG_NAME"), "-", env!("CARGO_PKG_VERSION")),
                 server: &self.config.name, comments: "simple IRC server" }).await?;
+            self.send_isupport(conn_state).await?;
         }
         Ok(())
     }
@@ -570,6 +570,33 @@ mod test {
             assert_eq!(":irc.irc 372 tommy :Hello, world!".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 376 tommy :End of /MOTD command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_version() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "tommy", "thomas",
+                    "Thomas Giggy").await;
+            line_stream.send("VERSION".to_string()).await.unwrap();
+            
+            assert_eq!(":irc.irc 351 tommy simple-irc-server-0.1.0 irc.irc :simple IRC server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 tommy AWAYLEN=1000 CASEMAPPING=ascii \
+                    CHANMODES=Iabehiklmnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
+                    HOSTLEN=1000 INVEX=I KEYLEN=1000 :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 tommy KICKLEN=1000 LINELEN=2000 MAXLIST=beI:1000 \
+                    MAXNICKLEN=200 MAXPARA=500 MAXTARGETS=500 MODES=500 NETWORK=IRCnetwork \
+                    NICKLEN=200 PREFIX=(qaohv)~&@%+ :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 tommy SAFELIST STATUSMSG=~&@%+ TOPICLEN=1000 USERLEN=200 \
+                    USERMODES=Oiorw :are supported by this server".to_string(),
                     line_stream.next().await.unwrap().unwrap());
         }
         
