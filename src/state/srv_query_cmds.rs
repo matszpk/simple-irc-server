@@ -143,7 +143,7 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         if remote_server.is_some() || server_mask.is_some() {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
-                    command: "TIME", subcommand: None, info: "Server unsupported" }).await?;
+                    command: "LINKS", subcommand: None, info: "Server unsupported" }).await?;
         } else {
             self.feed_msg(&mut conn_state.stream, RplLinks364{ client,
                     server: &self.config.name, mask: &self.config.name, 
