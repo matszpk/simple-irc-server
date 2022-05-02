@@ -425,8 +425,8 @@ impl super::MainState {
                                 _ => {},
                             }
                         } else {
-                            self.feed_msg(&mut conn_state.stream, ErrNotOnChannel442{ client,
-                                    channel: target }).await?;
+                            self.feed_msg(&mut conn_state.stream, ErrUserNotInChannel441{
+                                    client, channel: target, nick: arg }).await?;
                         }
                     },
                     'l' => { 
@@ -1281,6 +1281,27 @@ mod test {
                 assert!(!channel.modes.operators.as_ref().unwrap().contains("cimon"));
                 assert!(!channel.modes.half_operators.as_ref().unwrap().contains("harry"));
                 assert!(!channel.modes.voices.as_ref().unwrap().contains("jonathan"));
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_channel_user_modes_fail_1() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("MODE #mychannel +qaohv ariel danny cimon harry \
+                            jonathan".to_string()).await.unwrap();
+            for nick in ["ariel", "danny", "cimon", "harry", "jonathan"] {
+                assert_eq!(format!(":irc.irc 441 sonny {} #mychannel :They aren't \
+                    on that channel", nick), line_stream.next().await.unwrap().unwrap());
             }
         }
         
