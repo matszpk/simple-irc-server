@@ -757,8 +757,34 @@ mod test {
                     "Timmy Greater").await;
             line_stream.send("INFO".to_string()).await.unwrap();
             assert_eq!(format!(":irc.irc 371 timmy :{} {}", env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION")) , line_stream.next().await.unwrap().unwrap());
+                    env!("CARGO_PKG_VERSION")), line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 374 timmy :End of INFO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_help() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "timmy", "tim",
+                    "Timmy Greater").await;
+            line_stream.send("HELP".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 704 timmy MAIN :This is Simple IRC Server.".to_string(), 
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 705 timmy MAIN :Use 'HELP COMMANDS' to list of commands."
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 706 timmy MAIN :Use 'HELP <command name>' if you want \
+                    to print help about command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("HELP COMMANDS".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 704 timmy COMMANDS :List of commands:".to_string(), 
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 705 timmy COMMANDS :ADMIN".to_string(),
                     line_stream.next().await.unwrap().unwrap());
         }
         

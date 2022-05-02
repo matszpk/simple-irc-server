@@ -17,8 +17,8 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-pub(crate) static HELP_TOPICS: [(&'static str, &'static str); 1] = [
-    ("COMMANDS", r##"List of commands
+pub(crate) static HELP_TOPICS: [(&'static str, &'static str); 2] = [
+    ("COMMANDS", r##"List of commands:
 ADMIN
 AUTHENTICATE - unsupported
 AWAY
@@ -57,6 +57,8 @@ VERSION
 WALLOPS
 WHO
 WHOIS
-WHOWAS
-"##)
+WHOWAS"##),
+    ("MAIN", r##"This is Simple IRC Server.
+Use 'HELP COMMANDS' to list of commands.
+Use 'HELP <command name>' if you want to print help about command."##)
 ];
