@@ -190,9 +190,10 @@ impl super::MainState {
         Ok(())
     }
     
-    async fn process_mode_channel<'a>(&self, conn_state: &mut ConnState,
-            chanobj: &mut Channel, target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)>,
-            chum: &ChannelUserModes) -> Result<(), Box<dyn Error>> {
+    async fn process_mode_channel<'a>(&self,conn_state: &mut ConnState,
+            users: &HashMap<String, User>, chanobj: &mut Channel, target: &'a str,
+            modes: Vec<(&'a str, Vec<&'a str>)>, chum: &ChannelUserModes)
+            -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         let if_op = chum.is_operator();
         let if_half_op = chum.is_operator();
@@ -497,8 +498,12 @@ impl super::MainState {
             if modes_params_string.len() != 0 {
                 mode_string += &modes_params_string;
             }
-            self.feed_msg_source(&mut conn_state.stream, &conn_state.user_state.source,
-                format!("MODE {} {}", target, mode_string)).await?;
+            let mode_string = format!("MODE {} {}", target, mode_string);
+            
+            for unick in chanobj.users.keys() { // to all users of channel
+                users.get(unick).unwrap().send_msg_display(
+                        &conn_state.user_state.source, mode_string.clone())?;
+            }
         }
         } // if modes.len() == 0
         Ok(())
@@ -660,7 +665,7 @@ impl super::MainState {
                     (ChannelUserModes::default(), true)
                 };
                 if !error {
-                    self.process_mode_channel(conn_state, chanobj, target,
+                    self.process_mode_channel(conn_state, &state.users, chanobj, target,
                             modes, &chum).await?;
                 }
             } else {
@@ -1118,6 +1123,51 @@ mod test {
                 assert!(roland.modes.registered);
                 assert!(!state.wallops_users.contains("roland"));
                 assert_eq!(0, state.invisible_users_count);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_channel() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut ariel_stream = login_to_test_and_skip(port, "ariel", "ariel",
+                    "Ariel Fisher").await;
+            let mut danny_stream = login_to_test_and_skip(port, "danny", "danny",
+                    "Danny Fisher").await;
+            ariel_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { ariel_stream.next().await.unwrap().unwrap(); }
+            time::sleep(Duration::from_millis(50)).await;
+            danny_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { danny_stream.next().await.unwrap().unwrap(); }
+            
+            for _ in 0..2 { line_stream.next().await.unwrap().unwrap(); }
+            ariel_stream.next().await.unwrap().unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream.send("MODE #mychannel +mtskl xxxz 10".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut ariel_stream, &mut danny_stream] {
+                assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +mts +k xxxz +l 10"
+                            .to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(channel.modes.moderated);
+                assert!(channel.modes.secret);
+                assert!(channel.modes.protected_topic);
+                assert_eq!(Some(10), channel.modes.client_limit);
+                assert_eq!(Some("xxxz".to_string()), channel.modes.key);
             }
         }
         
