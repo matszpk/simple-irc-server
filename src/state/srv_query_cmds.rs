@@ -495,9 +495,11 @@ impl super::MainState {
                 mode_string.push('-');
                 mode_string += &unset_modes_string;
             }
-            if modes_params_string.len() != 0 {
-                mode_string += &modes_params_string;
-            }
+            let mode_string = if modes_params_string.len() != 0 {
+                if mode_string.len() != 0 {
+                    [&mode_string, &modes_params_string[1..]].join(" ")
+                } else { modes_params_string[1..].to_string() }
+            } else { mode_string };
             let mode_string = format!("MODE {} {}", target, mode_string);
             
             for unick in chanobj.users.keys() { // to all users of channel
@@ -1189,6 +1191,21 @@ mod test {
                 assert!(channel.modes.half_operators.as_ref().unwrap().contains("danny"));
                 assert!(channel.modes.client_limit.is_none());
                 assert!(channel.modes.key.is_none());
+            }
+            
+            line_stream.send("MODE #mychannel -oh ariel danny".to_string())
+                        .await.unwrap();
+            for line_stream in [&mut line_stream, &mut ariel_stream, &mut danny_stream] {
+                assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel -o ariel -h danny" 
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(!channel.modes.operators.as_ref().unwrap().contains("ariel"));
+                assert!(!channel.modes.half_operators.as_ref().unwrap().contains("danny"));
             }
         }
         
