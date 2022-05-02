@@ -512,7 +512,7 @@ impl super::MainState {
                                 user.modes.oper = false;
                                 if !user.modes.oper {
                                     state.operators_count -= 1;
-                                    unset_modes_string.push('o');
+                                    unset_modes_string.push('O');
                                 }
                             }
                         }
@@ -899,6 +899,123 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
             { assert!(main_state.state.read().await.users
                             .get("roland").unwrap().modes.registered); }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_user_operator() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "expert".to_string(),
+                    password: "NoWay".to_string(), mask: None }, ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        {
+            let mut line_stream = login_to_test_and_skip(port, "roland", "roland",
+                    "Roland TechnoMusic").await;
+            line_stream.send("OPER expert NoWay".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 381 roland :You are now an IRC operator".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE roland".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 221 roland +o".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE roland -o".to_string()).await.unwrap();
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland -o".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(!state.users.get("roland").unwrap().modes.wallops);
+                assert_eq!(0, state.operators_count);
+            }
+            
+            line_stream.send("MODE roland +o".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 roland :Permission Denied- You're not an IRC operator"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_user_local_operator() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "expert".to_string(),
+                    password: "NoWay".to_string(), mask: None }, ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        {
+            let mut line_stream = login_to_test_and_skip(port, "roland", "roland",
+                    "Roland TechnoMusic").await;
+            line_stream.send("OPER expert NoWay".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 381 roland :You are now an IRC operator".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE roland".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 221 roland +o".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE roland -O".to_string()).await.unwrap();
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland -O".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(!state.users.get("roland").unwrap().modes.wallops);
+                assert_eq!(0, state.operators_count);
+            }
+            
+            line_stream.send("MODE roland +O".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 roland :Permission Denied- You're not an IRC operator"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_user_multiple() {
+        let mut config = MainConfig::default();
+        config.users = Some(vec![
+            UserConfig{ name: "roland".to_string(), nick: "roland".to_string(),
+                    password: None, mask: None } ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "roland", "roland",
+                    "Roland TechnoMusic").await;
+            line_stream.send("MODE roland +wi-r".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 484 roland :Your connection is restricted!".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland +wi-r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let roland = state.users.get("roland").unwrap();
+                assert!(roland.modes.wallops);
+                assert!(roland.modes.invisible);
+                assert!(!roland.modes.registered);
+                assert!(state.wallops_users.contains("roland"));
+                assert_eq!(1, state.invisible_users_count);
+            }
+            
+            line_stream.send("MODE roland +r-wi".to_string()).await.unwrap();
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland +r-wi".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let roland = state.users.get("roland").unwrap();
+                assert!(!roland.modes.wallops);
+                assert!(!roland.modes.invisible);
+                assert!(roland.modes.registered);
+                assert!(!state.wallops_users.contains("roland"));
+                assert_eq!(0, state.invisible_users_count);
+            }
         }
         
         quit_test_server(main_state, handle).await;
