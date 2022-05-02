@@ -196,7 +196,7 @@ impl super::MainState {
             -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         let if_op = chum.is_operator();
-        let if_half_op = chum.is_operator();
+        let if_half_op = chum.is_half_operator();
         
         if modes.len() == 0 {
             self.feed_msg(&mut conn_state.stream, RplChannelModeIs324{ client,
@@ -214,7 +214,28 @@ impl super::MainState {
             let mut mode_set = false;
             for mchar in mchars.chars() {
                 match mchar {
-                    'i'|'m'|'t'|'n'|'s'|'l'|'k'|'o'|'v'|'h'|'q'|'a' => {
+                    'q' => {
+                        if !chum.founder {
+                            self.feed_msg(&mut conn_state.stream,
+                                ErrChanOpPrivsNeeded482{ client,
+                                        channel: target }).await?;
+                        }
+                    }
+                    'a' => {
+                        if !chum.is_protected() {
+                            self.feed_msg(&mut conn_state.stream,
+                                ErrChanOpPrivsNeeded482{ client,
+                                        channel: target }).await?;
+                        }
+                    }
+                    'o'|'h' => {
+                        if !if_op {
+                            self.feed_msg(&mut conn_state.stream,
+                                ErrChanOpPrivsNeeded482{ client,
+                                        channel: target }).await?;
+                        }
+                    }
+                    'i'|'m'|'t'|'n'|'s'|'l'|'k'|'v' => {
                         if !if_half_op {
                             self.feed_msg(&mut conn_state.stream,
                                 ErrChanOpPrivsNeeded482{ client,
@@ -277,7 +298,7 @@ impl super::MainState {
                     },
                     'e' => {
                         if let Some(emask) = margs_it.next() {
-                            if if_op {
+                            if if_half_op {
                                 let mut exp = chanobj.modes.exception.take()
                                         .unwrap_or_default();
                                 let norm_emask = normalize_sourcemask(emask);
@@ -311,7 +332,7 @@ impl super::MainState {
                     },
                     'I' => {
                         if let Some(imask) = margs_it.next() {
-                            if if_op {
+                            if if_half_op {
                                 let mut exp = chanobj.modes.invite_exception.take()
                                         .unwrap_or_default();
                                 let norm_imask = normalize_sourcemask(imask);
@@ -430,7 +451,7 @@ impl super::MainState {
                         }
                     },
                     'l' => { 
-                        if if_op {
+                        if if_half_op {
                             chanobj.modes.client_limit = if mode_set {
                                 let arg = margs_it.next().unwrap();
                                 modes_params_string += " +l ";
@@ -443,7 +464,7 @@ impl super::MainState {
                         }
                     },
                     'k' => { 
-                        if if_op { chanobj.modes.key =
+                        if if_half_op { chanobj.modes.key =
                             if mode_set {
                                 let arg = margs_it.next().unwrap();
                                 modes_params_string += " +k ";
@@ -454,27 +475,27 @@ impl super::MainState {
                             unset_modes_string.push('k');
                             None }; }
                     },
-                    'i' => if if_op {
+                    'i' => if if_half_op {
                         chanobj.modes.invite_only = mode_set;
                         if mode_set { set_modes_string.push('i'); }
                         else { unset_modes_string.push('i'); }
                     },
-                    'm' => if if_op {
+                    'm' => if if_half_op {
                         chanobj.modes.moderated = mode_set;
                         if mode_set { set_modes_string.push('m'); }
                         else { unset_modes_string.push('m'); }
                     },
-                    't' => if if_op {
+                    't' => if if_half_op {
                         chanobj.modes.protected_topic = mode_set;
                         if mode_set { set_modes_string.push('t'); }
                         else { unset_modes_string.push('t'); }
                     },
-                    'n' => if if_op {
+                    'n' => if if_half_op {
                         chanobj.modes.no_external_messages = mode_set;
                         if mode_set { set_modes_string.push('n'); }
                         else { unset_modes_string.push('n'); }
                     },
-                    's' => if if_op {
+                    's' => if if_half_op {
                         chanobj.modes.secret = mode_set;
                         if mode_set { set_modes_string.push('s'); }
                         else { unset_modes_string.push('s'); }
@@ -1218,6 +1239,44 @@ mod test {
                         .await.unwrap();
             assert_eq!(":irc.irc 442 zinny #mychannel :You're not on that channel"
                         .to_string(), zinny_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_channel_half_op() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut danny_stream = login_to_test_and_skip(port, "danny", "danny",
+                    "Danny Fisher").await;
+            danny_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { danny_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.next().await.unwrap().unwrap(); // skip danny join
+            line_stream.send("MODE #mychannel +h danny".to_string())
+                        .await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +h danny" .to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            danny_stream.next().await.unwrap().unwrap();
+            
+            time::sleep(Duration::from_millis(100)).await;
+            
+            danny_stream.send("MODE #mychannel +l 20".to_string()).await.unwrap();
+            assert_eq!(":danny!~danny@127.0.0.1 MODE #mychannel +l 20" .to_string(),
+                    danny_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(Some(20), state.channels.get("#mychannel").unwrap()
+                            .modes.client_limit);
+            }
         }
         
         quit_test_server(main_state, handle).await;
