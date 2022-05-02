@@ -1260,16 +1260,44 @@ mod test {
                     *digger.com!*@* +e nicki*!*@* +I guru*!*@*".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             time::sleep(Duration::from_millis(50)).await;
-            {
+            let set_time = {
                 let state = main_state.state.read().await;
                 let channel = state.channels.get("#mychannel").unwrap();
                 assert_eq!(Some(HashSet::from([ "nick*!*@*".to_string(),
                         "*digger.com!*@*".to_string() ])), channel.modes.ban);
+                let set_time = channel.ban_info.get("nick*!*@*").unwrap().set_time;
+                assert_eq!(HashMap::from([
+                        ("nick*!*@*".to_string(), BanInfo{ who: "sonny".to_string(),
+                                set_time }),
+                        ("*digger.com!*@*".to_string(), BanInfo{ who: "sonny".to_string(),
+                                set_time }),
+                ]), channel.ban_info);
                 assert_eq!(Some(HashSet::from([ "nicki*!*@*".to_string() ])),
                         channel.modes.exception);
                 assert_eq!(Some(HashSet::from([ "guru*!*@*".to_string() ])),
                         channel.modes.invite_exception);
-            }
+                set_time
+            };
+            
+            line_stream.send("MODE #mychannel +beI".to_string()).await.unwrap();
+            let answer1 = line_stream.next().await.unwrap().unwrap();
+            let answer2 = line_stream.next().await.unwrap().unwrap();
+            let exp_answer1 = format!(":irc.irc 367 sonny #mychannel nick*!*@* sonny {}",
+                        set_time);
+            let exp_answer2 = format!(
+                ":irc.irc 367 sonny #mychannel *digger.com!*@* sonny {}", set_time);
+            assert!((answer1 == exp_answer1 && answer2 == exp_answer2) ||
+                    (answer1 == exp_answer2 && answer2 == exp_answer1));
+            assert_eq!(":irc.irc 368 sonny #mychannel :End of channel ban list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 348 sonny #mychannel nicki*!*@*".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 349 sonny #mychannel :End of channel exception list"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 346 sonny #mychannel guru*!*@*".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 347 sonny #mychannel :End of channel invite list"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
             
             line_stream.send("MODE #mychannel -b nick* -b *dxx -e nicki* -I xxguru*"
                     .to_string()).await.unwrap();
@@ -1282,6 +1310,10 @@ mod test {
                 let channel = state.channels.get("#mychannel").unwrap();
                 assert_eq!(Some(HashSet::from([ "*digger.com!*@*".to_string() ])),
                         channel.modes.ban);
+                assert_eq!(HashMap::from([
+                        ("*digger.com!*@*".to_string(), BanInfo{ who: "sonny".to_string(),
+                                set_time }),
+                ]), channel.ban_info);
                 assert_eq!(Some(HashSet::new()), channel.modes.exception);
                 assert_eq!(Some(HashSet::from([ "guru*!*@*".to_string() ])),
                         channel.modes.invite_exception);
