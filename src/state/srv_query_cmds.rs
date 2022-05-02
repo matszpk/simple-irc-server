@@ -204,6 +204,10 @@ impl super::MainState {
                 channel: target, creation_time: chanobj.creation_time }).await?;
         } else {
         //
+        let mut set_modes_string = String::new();
+        let mut unset_modes_string = String::new();
+        let mut modes_params_string = String::new();
+        
         for (mchars, margs) in modes {
             let mut margs_it = margs.iter();
             let mut mode_set = false;
@@ -229,6 +233,9 @@ impl super::MainState {
                                         .unwrap_or_default();
                                 let norm_bmask = normalize_sourcemask(bmask);
                                 if mode_set {
+                                    modes_params_string += " +b ";
+                                    modes_params_string += &norm_bmask;
+                                    
                                     ban.insert(norm_bmask.clone());
                                     chanobj.ban_info.insert(norm_bmask.clone(), BanInfo{
                                         who: conn_state.user_state.nick
@@ -236,6 +243,9 @@ impl super::MainState {
                                         set_time: SystemTime::now()
                                             .duration_since(UNIX_EPOCH).unwrap().as_secs() });
                                 } else {
+                                    modes_params_string += " -b ";
+                                    modes_params_string += &norm_bmask;
+                                    
                                     ban.remove(&norm_bmask);
                                     chanobj.ban_info.remove(&norm_bmask);
                                 }
@@ -269,10 +279,17 @@ impl super::MainState {
                             if if_op {
                                 let mut exp = chanobj.modes.exception.take()
                                         .unwrap_or_default();
+                                let norm_emask = normalize_sourcemask(emask);
                                 if mode_set {
-                                    exp.insert(normalize_sourcemask(emask));
+                                    modes_params_string += " +e ";
+                                    modes_params_string += &norm_emask;
+                                    
+                                    exp.insert(norm_emask.clone());
                                 } else {
-                                    exp.remove(&normalize_sourcemask(emask));
+                                    modes_params_string += " -e ";
+                                    modes_params_string += &norm_emask;
+                                    
+                                    exp.remove(&norm_emask);
                                 }
                                 chanobj.modes.exception = Some(exp);
                             } else {
@@ -296,10 +313,17 @@ impl super::MainState {
                             if if_op {
                                 let mut exp = chanobj.modes.invite_exception.take()
                                         .unwrap_or_default();
+                                let norm_imask = normalize_sourcemask(imask);
                                 if mode_set {
-                                    exp.insert(normalize_sourcemask(imask));
+                                    modes_params_string += " +I ";
+                                    modes_params_string += &norm_imask;
+                                    
+                                    exp.insert(norm_imask.clone());
                                 } else {
-                                    exp.remove(&normalize_sourcemask(imask));
+                                    modes_params_string += " -I ";
+                                    modes_params_string += &norm_imask;
+                                    
+                                    exp.remove(&norm_imask);
                                 }
                                 chanobj.modes.invite_exception = Some(exp);
                             } else {
@@ -325,8 +349,14 @@ impl super::MainState {
                                 'o' => {
                                     if if_op {
                                         if mode_set {
+                                            modes_params_string += " +o ";
+                                            modes_params_string += &arg;
+                                    
                                             chanobj.add_operator(&arg);
                                         } else {
+                                            modes_params_string += " -o ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.remove_operator(&arg);
                                         }
                                     }
@@ -334,8 +364,14 @@ impl super::MainState {
                                 'v' => {
                                     if if_half_op {
                                         if mode_set {
+                                            modes_params_string += " +v ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.add_voice(&arg);
                                         } else {
+                                            modes_params_string += " -v ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.remove_voice(&arg);
                                         }
                                     }
@@ -343,8 +379,14 @@ impl super::MainState {
                                 'h' => {
                                     if if_op {
                                         if mode_set {
+                                            modes_params_string += " +h ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.add_half_operator(&arg);
                                         } else {
+                                            modes_params_string += " -h ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.remove_half_operator(&arg);
                                         }
                                     }
@@ -352,8 +394,14 @@ impl super::MainState {
                                 'q' => {
                                     if chum.founder {
                                         if mode_set {
+                                            modes_params_string += " +q ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.add_founder(&arg);
                                         } else {
+                                            modes_params_string += " -q ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.remove_founder(&arg);
                                         }
                                     }
@@ -361,8 +409,14 @@ impl super::MainState {
                                 'a' => {
                                     if chum.is_protected() {
                                         if mode_set {
+                                            modes_params_string += " +a ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.add_protected(&arg);
                                         } else {
+                                            modes_params_string += " -a ";
+                                            modes_params_string += &arg;
+                                            
                                             chanobj.remove_protected(&arg);
                                         }
                                     }
@@ -378,24 +432,73 @@ impl super::MainState {
                         let arg = margs_it.next().unwrap();
                         if if_op {
                             chanobj.modes.client_limit = if mode_set {
+                                modes_params_string += " +l ";
+                                modes_params_string += &arg;
+                                            
                                 Some(arg.parse::<usize>().unwrap())
-                            } else { None };
+                            } else {
+                                unset_modes_string.push('l');
+                                None };
                         }
                     },
                     'k' => { 
                         let arg = margs_it.next().unwrap();
                         if if_op { chanobj.modes.key =
-                            if mode_set { Some(arg.to_string()) } else { None }; }
+                            if mode_set {
+                                modes_params_string += " +k ";
+                                modes_params_string += &arg;
+                                
+                                Some(arg.to_string())
+                            } else {
+                            unset_modes_string.push('s');
+                            None }; }
                     },
-                    'i' => if if_op { chanobj.modes.invite_only = mode_set; },
-                    'm' => if if_op { chanobj.modes.moderated = mode_set; },
-                    't' => if if_op { chanobj.modes.protected_topic = mode_set; },
+                    'i' => if if_op {
+                        chanobj.modes.invite_only = mode_set;
+                        if mode_set { set_modes_string.push('i'); }
+                        else { unset_modes_string.push('i'); }
+                    },
+                    'm' => if if_op {
+                        chanobj.modes.moderated = mode_set;
+                        if mode_set { set_modes_string.push('m'); }
+                        else { unset_modes_string.push('m'); }
+                    },
+                    't' => if if_op {
+                        chanobj.modes.protected_topic = mode_set;
+                        if mode_set { set_modes_string.push('t'); }
+                        else { unset_modes_string.push('t'); }
+                    },
                     'n' => if if_op {
-                            chanobj.modes.no_external_messages = mode_set; },
-                    's' => if if_op { chanobj.modes.secret = mode_set; },
+                        chanobj.modes.no_external_messages = mode_set;
+                        if mode_set { set_modes_string.push('n'); }
+                        else { unset_modes_string.push('n'); }
+                    },
+                    's' => if if_op {
+                        chanobj.modes.secret = mode_set;
+                        if mode_set { set_modes_string.push('s'); }
+                        else { unset_modes_string.push('s'); }
+                    },
                     _ => (),
                 }
             }
+        }
+        
+        if set_modes_string.len()!=0 || unset_modes_string.len()!=0 ||
+                modes_params_string.len() != 0 {
+            let mut mode_string = String::new();
+            if set_modes_string.len() != 0 {
+                mode_string.push('+');
+                mode_string += &set_modes_string;
+            }
+            if unset_modes_string.len() != 0 {
+                mode_string.push('-');
+                mode_string += &unset_modes_string;
+            }
+            if modes_params_string.len() != 0 {
+                mode_string += &modes_params_string;
+            }
+            self.feed_msg_source(&mut conn_state.stream, &conn_state.user_state.source,
+                format!("MODE {} {}", target, mode_string)).await?;
         }
         } // if modes.len() == 0
         Ok(())
