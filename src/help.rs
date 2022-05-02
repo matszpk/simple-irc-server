@@ -18,45 +18,45 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 pub(crate) static HELP_TOPICS: [(&'static str, &'static str); 1] = [
-    (r##"COMMANDS", "List of commands
-CAPId = CommandName{ name: "CAP" },
-AUTHENTICATE - unsupported
-PASS
-NICK
-USER
-PING
-PONG
-OPER
-QUIT
-JOIN
-PART
-TOPIC
-NAMES
-LIST
-INVITE
-KICK
-MOTD
-VERSION
+    ("COMMANDS", r##"List of commands
 ADMIN
+AUTHENTICATE - unsupported
+AWAY
+CAP
 CONNECT - unsupported
-LUSERS
-TIME
-STATS - unsupported
-LINKS
 HELP
 INFO
-MODE
-PRIVMSG
-NOTICE
-WHO
-WHOIS
-WHOWAS
+INVITE
+JOIN
+KICK
 KILL
+LINKS
+LIST
+LUSERS
+MODE
+MOTD
+NAMES
+NICK
+NOTICE
+OPER
+PART
+PASS
+PING
+PONG
+PRIVMSG
+QUIT
 REHASH
 RESTART
 SQUIT
-AWAY
+STATS - unsupported
+TIME
+TOPIC
+USER
 USERHOST
+VERSION
 WALLOPS
+WHO
+WHOIS
+WHOWAS
 "##)
 ];
