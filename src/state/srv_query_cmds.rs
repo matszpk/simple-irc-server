@@ -1303,6 +1303,13 @@ mod test {
                 assert_eq!(format!(":irc.irc 441 sonny {} #mychannel :They aren't \
                     on that channel", nick), line_stream.next().await.unwrap().unwrap());
             }
+            
+            line_stream.send("MODE #mychannel -qaohv ariel danny cimon harry \
+                            jonathan".to_string()).await.unwrap();
+            for nick in ["ariel", "danny", "cimon", "harry", "jonathan"] {
+                assert_eq!(format!(":irc.irc 441 sonny {} #mychannel :They aren't \
+                    on that channel", nick), line_stream.next().await.unwrap().unwrap());
+            }
         }
         
         quit_test_server(main_state, handle).await;
