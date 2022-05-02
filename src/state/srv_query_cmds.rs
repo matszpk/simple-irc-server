@@ -430,9 +430,9 @@ impl super::MainState {
                         }
                     },
                     'l' => { 
-                        let arg = margs_it.next().unwrap();
                         if if_op {
                             chanobj.modes.client_limit = if mode_set {
+                                let arg = margs_it.next().unwrap();
                                 modes_params_string += " +l ";
                                 modes_params_string += &arg;
                                             
@@ -443,15 +443,15 @@ impl super::MainState {
                         }
                     },
                     'k' => { 
-                        let arg = margs_it.next().unwrap();
                         if if_op { chanobj.modes.key =
                             if mode_set {
+                                let arg = margs_it.next().unwrap();
                                 modes_params_string += " +k ";
                                 modes_params_string += &arg;
                                 
                                 Some(arg.to_string())
                             } else {
-                            unset_modes_string.push('s');
+                            unset_modes_string.push('k');
                             None }; }
                     },
                     'i' => if if_op {
@@ -1168,6 +1168,27 @@ mod test {
                 assert!(channel.modes.protected_topic);
                 assert_eq!(Some(10), channel.modes.client_limit);
                 assert_eq!(Some("xxxz".to_string()), channel.modes.key);
+            }
+            
+            line_stream.send("MODE #mychannel -mtskl +oh ariel danny".to_string())
+                        .await.unwrap();
+            for line_stream in [&mut line_stream, &mut ariel_stream, &mut danny_stream] {
+                assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel -mtskl \
+                        +o ariel +h danny" .to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(!channel.modes.moderated);
+                assert!(!channel.modes.secret);
+                assert!(!channel.modes.protected_topic);
+                assert!(channel.modes.operators.as_ref().unwrap().contains("ariel"));
+                assert!(channel.modes.half_operators.as_ref().unwrap().contains("danny"));
+                assert!(channel.modes.client_limit.is_none());
+                assert!(channel.modes.key.is_none());
             }
         }
         
