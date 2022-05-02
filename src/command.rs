@@ -138,7 +138,7 @@ pub(crate) enum CommandId {
     TIMEId = CommandName{ name: "TIME" },
     STATSId = CommandName{ name: "STATS" },
     LINKSId = CommandName{ name: "LINKS" },
-    HELPId = CommandName{ name: "HELP" },
+    //HELPId = CommandName{ name: "HELP" },
     //INFOId = CommandName{ name: "INFO" },
     MODEId = CommandName{ name: "MODE" },
     PRIVMSGId = CommandName{ name: "PRIVMSG" },
@@ -229,7 +229,7 @@ pub(crate) enum Command<'a> {
     TIME{ server: Option<&'a str> },
     STATS{ query: char, server: Option<&'a str> },
     LINKS{ remote_server: Option<&'a str>, server_mask: Option<&'a str> },
-    HELP{ subject: &'a str },
+    HELP{ subject: Option<&'a str> },
     INFO{ },
     MODE{ target: &'a str, modes: Vec<(&'a str, Vec<&'a str>)> },
     PRIVMSG{ targets: Vec<&'a str>, text: &'a str },
@@ -442,9 +442,9 @@ impl<'a> Command<'a> {
             }
             "HELP" => {
                 if message.params.len() >= 1 {
-                    Ok(HELP{ subject: message.params[0] })
+                    Ok(HELP{ subject: Some(message.params[0]) })
                 } else {
-                    Err(NeedMoreParams(HELPId)) }
+                    Ok(HELP{ subject: None }) }
             }
             "INFO" => Ok(INFO{}),
             "MODE" => {
@@ -1105,17 +1105,13 @@ mod test {
             Command::from_message(&Message{ source: None, command: "LINKS",
                 params: vec![] }).map_err(|e| e.to_string()));
         
-        assert_eq!(Ok(HELP{ subject: "PING Message" }),
+        assert_eq!(Ok(HELP{ subject: Some("PING Message") }),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![ "PING Message" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Command 'HELP' needs more parameters".to_string()),
-            Command::from_message(&Message{ source: None, command: "HELP",
-                params: vec![] }).map_err(|e| e.to_string()));
-        
-        assert_eq!(Ok(HELP{ subject: "PONG Message" }),
+        assert_eq!(Ok(HELP{ subject: Some("PONG Message") }),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![ "PONG Message" ] }).map_err(|e| e.to_string()));
-        assert_eq!(Err("Command 'HELP' needs more parameters".to_string()),
+        assert_eq!(Ok(HELP{ subject: None }),
             Command::from_message(&Message{ source: None, command: "HELP",
                 params: vec![] }).map_err(|e| e.to_string()));
         

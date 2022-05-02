@@ -154,9 +154,10 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_help<'a>(&self, conn_state: &mut ConnState, subject: &'a str)
-            -> Result<(), Box<dyn Error>> {
+    pub(super) async fn process_help<'a>(&self, conn_state: &mut ConnState,
+            subject_opt: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
+        let subject = subject_opt.unwrap_or("MAIN");
         if let Some((_, content)) = HELP_TOPICS.iter().find(|(t, _)| *t == subject) {
             let lines = content.split_terminator('\n').collect::<Vec<_>>();
             for (i, line) in lines.iter().enumerate() {
