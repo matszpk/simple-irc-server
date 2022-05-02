@@ -1211,4 +1211,79 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_mode_channel_user_modes() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut ariel_stream = login_to_test_and_skip(port, "ariel", "ariel",
+                    "Ariel Fisher").await;
+            let mut danny_stream = login_to_test_and_skip(port, "danny", "danny",
+                    "Danny Fisher").await;
+            let mut cimon_stream = login_to_test_and_skip(port, "cimon", "cimon",
+                    "Cimom Somon").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Garry").await;
+            let mut jonathan_stream = login_to_test_and_skip(port, "jonathan", "jonathan",
+                    "jonathan Adminton").await;
+            for line_stream in [&mut ariel_stream, &mut danny_stream, &mut cimon_stream,
+                            &mut harry_stream, &mut jonathan_stream] {
+                line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+                for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            }
+            
+            for (i,line_stream) in [&mut line_stream, &mut ariel_stream, &mut danny_stream,
+                        &mut cimon_stream, &mut harry_stream].iter_mut().enumerate() {
+                for _ in 0..(5-i) { line_stream.next().await.unwrap().unwrap(); }
+            }
+            
+            line_stream.send("MODE #mychannel +qaohv ariel danny cimon harry \
+                            jonathan".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut ariel_stream, &mut danny_stream,
+                        &mut cimon_stream, &mut harry_stream, &mut jonathan_stream] {
+                assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +q ariel +a danny \
+                        +o cimon +h harry +v jonathan" .to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(channel.modes.founders.as_ref().unwrap().contains("ariel"));
+                assert!(channel.modes.protecteds.as_ref().unwrap().contains("danny"));
+                assert!(channel.modes.operators.as_ref().unwrap().contains("cimon"));
+                assert!(channel.modes.half_operators.as_ref().unwrap().contains("harry"));
+                assert!(channel.modes.voices.as_ref().unwrap().contains("jonathan"));
+            }
+            
+            line_stream.send("MODE #mychannel -qaohv ariel danny cimon harry \
+                            jonathan".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut ariel_stream, &mut danny_stream,
+                        &mut cimon_stream, &mut harry_stream, &mut jonathan_stream] {
+                assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel -q ariel -a danny \
+                        -o cimon -h harry -v jonathan" .to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(!channel.modes.founders.as_ref().unwrap().contains("ariel"));
+                assert!(!channel.modes.protecteds.as_ref().unwrap().contains("danny"));
+                assert!(!channel.modes.operators.as_ref().unwrap().contains("cimon"));
+                assert!(!channel.modes.half_operators.as_ref().unwrap().contains("harry"));
+                assert!(!channel.modes.voices.as_ref().unwrap().contains("jonathan"));
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
