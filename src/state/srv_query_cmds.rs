@@ -411,6 +411,8 @@ impl super::MainState {
             self.feed_msg(&mut conn_state.stream, RplUModeIs221{ client,
                     user_modes: &user.modes.to_string() }).await?;
         } else {
+        let mut set_modes_string = String::new();
+        let mut unset_modes_string = String::new();
         for (mchars, _) in modes {
             let mut mode_set = false;
             for mchar in mchars.chars() {
@@ -422,11 +424,13 @@ impl super::MainState {
                             if !user.modes.invisible {
                                 user.modes.invisible = true;
                                 state.invisible_users_count += 1;
+                                set_modes_string.push('i');
                             }
                         } else {
                             if user.modes.invisible {
                                 user.modes.invisible = false;
                                 state.invisible_users_count -= 1;
+                                unset_modes_string.push('i');
                             }
                         }
                     },
@@ -435,6 +439,7 @@ impl super::MainState {
                             if !user.modes.registered {
                                 if conn_state.user_state.registered {
                                     user.modes.registered = true;
+                                    set_modes_string.push('r');
                                 } else {
                                     self.feed_msg(&mut conn_state.stream,
                                         ErrNoPrivileges481{ client }).await?;
@@ -443,6 +448,7 @@ impl super::MainState {
                         } else {
                             if user.modes.registered {
                                 user.modes.registered = false;
+                                unset_modes_string.push('r');
                                 self.feed_msg(&mut conn_state.stream,
                                     ErrYourConnRestricted484{ client }).await?;
                             }
@@ -453,11 +459,13 @@ impl super::MainState {
                             if !user.modes.wallops {
                                 state.wallops_users.insert(user_nick.to_string());
                                 user.modes.wallops = true;
+                                set_modes_string.push('w');
                             }
                         } else {
                             if user.modes.wallops {
                                 state.wallops_users.remove(&user_nick.to_string());
                                 user.modes.wallops = false;
+                                unset_modes_string.push('w');
                             }
                         }
                     },
@@ -468,6 +476,7 @@ impl super::MainState {
                                     user.modes.oper = true;
                                     if !user.modes.local_oper {
                                         state.operators_count += 1;
+                                        set_modes_string.push('o');
                                     }
                                 } else {
                                     self.feed_msg(&mut conn_state.stream,
@@ -479,6 +488,7 @@ impl super::MainState {
                                 user.modes.oper = false;
                                 if !user.modes.local_oper {
                                     state.operators_count -= 1;
+                                    unset_modes_string.push('o');
                                 }
                             }
                         }
@@ -490,6 +500,7 @@ impl super::MainState {
                                     user.modes.oper = true;
                                     if !user.modes.oper {
                                         state.operators_count += 1;
+                                        set_modes_string.push('O');
                                     }
                                 } else {
                                     self.feed_msg(&mut conn_state.stream,
@@ -501,6 +512,7 @@ impl super::MainState {
                                 user.modes.oper = false;
                                 if !user.modes.oper {
                                     state.operators_count -= 1;
+                                    unset_modes_string.push('o');
                                 }
                             }
                         }
@@ -508,6 +520,20 @@ impl super::MainState {
                     _ => (),
                 }
             }
+        }
+        
+        if set_modes_string.len()!=0 || unset_modes_string.len()!=0 {
+            let mut mode_string = String::new();
+            if set_modes_string.len() != 0 {
+                mode_string.push('+');
+                mode_string += &set_modes_string;
+            }
+            if unset_modes_string.len() != 0 {
+                mode_string.push('-');
+                mode_string += &unset_modes_string;
+            }
+            self.feed_msg_source(&mut conn_state.stream, &conn_state.user_state.source,
+                format!("MODE {} {}", user_nick, mode_string)).await?;
         }
         } // if modes.len() != 0
         Ok(())
@@ -786,6 +812,57 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 705 timmy COMMANDS :ADMIN".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_mode_user() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            login_to_test_and_skip(port, "norton", "norton", "Norton Norton2").await;
+            
+            line_stream.send("MODE sonny".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 221 sonny +".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE sonny +w".to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE sonny +w".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(state.users.get("sonny").unwrap().modes.wallops);
+                assert!(state.wallops_users.contains("sonny"));
+            }
+            
+            line_stream.send("MODE sonny -w".to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE sonny -w".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert!(!state.users.get("sonny").unwrap().modes.wallops);
+                assert!(!state.wallops_users.contains("sonny"));
+            }
+            
+            line_stream.send("MODE norton".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 502 sonny :Cant change mode for other users".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE norton +w".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 502 sonny :Cant change mode for other users".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE nolan".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 401 sonny nolan :No such nick/channel".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE norton +w".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 502 sonny :Cant change mode for other users".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
