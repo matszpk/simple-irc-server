@@ -867,4 +867,40 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_mode_user_registered() {
+        let mut config = MainConfig::default();
+        config.users = Some(vec![
+            UserConfig{ name: "roland".to_string(), nick: "roland".to_string(),
+                    password: None, mask: None } ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "roland", "roland",
+                    "Roland TechnoMusic").await;
+            line_stream.send("MODE roland".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 221 roland +r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            line_stream.send("MODE roland -r".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 484 roland :Your connection is restricted!".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland -r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(!main_state.state.read().await.users
+                            .get("roland").unwrap().modes.registered); }
+            
+            line_stream.send("MODE roland +r".to_string()).await.unwrap();
+            assert_eq!(":roland!~roland@127.0.0.1 MODE roland +r".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            { assert!(main_state.state.read().await.users
+                            .get("roland").unwrap().modes.registered); }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
