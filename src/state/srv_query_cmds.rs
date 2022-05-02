@@ -1272,6 +1272,7 @@ mod test {
             danny_stream.send("MODE #mychannel +l 20".to_string()).await.unwrap();
             assert_eq!(":danny!~danny@127.0.0.1 MODE #mychannel +l 20" .to_string(),
                     danny_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
             {
                 let state = main_state.state.read().await;
                 assert_eq!(Some(20), state.channels.get("#mychannel").unwrap()
