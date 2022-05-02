@@ -1245,6 +1245,53 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_mode_channel_lists() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("MODE #mychannel +b nick* +b *digger.com +e nicki* +I guru*"
+                    .to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +b nick*!*@* +b \
+                    *digger.com!*@* +e nicki*!*@* +I guru*!*@*".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert_eq!(Some(HashSet::from([ "nick*!*@*".to_string(),
+                        "*digger.com!*@*".to_string() ])), channel.modes.ban);
+                assert_eq!(Some(HashSet::from([ "nicki*!*@*".to_string() ])),
+                        channel.modes.exception);
+                assert_eq!(Some(HashSet::from([ "guru*!*@*".to_string() ])),
+                        channel.modes.invite_exception);
+            }
+            
+            line_stream.send("MODE #mychannel -b nick* -b *dxx -e nicki* -I xxguru*"
+                    .to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel -b nick*!*@* \
+                    -b *dxx!*@* -e nicki*!*@* -I xxguru*!*@*".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert_eq!(Some(HashSet::from([ "*digger.com!*@*".to_string() ])),
+                        channel.modes.ban);
+                assert_eq!(Some(HashSet::new()), channel.modes.exception);
+                assert_eq!(Some(HashSet::from([ "guru*!*@*".to_string() ])),
+                        channel.modes.invite_exception);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_mode_channel_half_op() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
