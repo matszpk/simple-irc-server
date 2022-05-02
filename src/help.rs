@@ -1,4 +1,4 @@
-// main.rs - main program
+// srv_query_cmds.rs - main state
 //
 // simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski
@@ -17,27 +17,46 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-mod config;
-mod reply;
-mod command;
-mod utils;
-mod state;
-mod help;
-
-use std::error::Error;
-use clap;
-use clap::Parser;
-use tokio;
-
-use config::*;
-use command::*;
-use state::*;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let cli = Cli::parse();
-    let config = MainConfig::new(cli)?;
-    let (_, handle) = run_server(config).await?;
-    handle.await?;
-    Ok(())
-}
+pub(crate) static HELP_TOPICS: [(&'static str, &'static str); 1] = [
+    (r##"COMMANDS", "List of commands
+CAPId = CommandName{ name: "CAP" },
+AUTHENTICATE - unsupported
+PASS
+NICK
+USER
+PING
+PONG
+OPER
+QUIT
+JOIN
+PART
+TOPIC
+NAMES
+LIST
+INVITE
+KICK
+MOTD
+VERSION
+ADMIN
+CONNECT - unsupported
+LUSERS
+TIME
+STATS - unsupported
+LINKS
+HELP
+INFO
+MODE
+PRIVMSG
+NOTICE
+WHO
+WHOIS
+WHOWAS
+KILL
+REHASH
+RESTART
+SQUIT
+AWAY
+USERHOST
+WALLOPS
+"##)
+];

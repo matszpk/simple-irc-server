@@ -22,13 +22,7 @@ use std::ops::DerefMut;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use super::*;
-
-static HELP_TOPICS: [(&'static str, &'static str); 1] = [
-    ("COMMANDS", "List of commands
-    ADMIN - 
-    HELP -
-    JOIN -")
-];
+use crate::help::*;
 
 impl super::MainState {
     pub(super) async fn process_motd<'a>(&self, conn_state: &mut ConnState,
@@ -87,8 +81,9 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_connect<'a>(&self, _: &mut ConnState, _: &'a str,
+    pub(super) async fn process_connect<'a>(&self, conn_state: &mut ConnState, _: &'a str,
             _: Option<u16>, _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
         self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "CONNECT", subcommand: None,
                     info: "Server unsupported" }).await?;
@@ -135,8 +130,9 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_stats<'a>(&self, _: &mut ConnState, _: char,
+    pub(super) async fn process_stats<'a>(&self, conn_state: &mut ConnState, _: char,
             _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
         self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "STATS", subcommand: None, info: "Server unsupported" }).await?;
         Ok(())
