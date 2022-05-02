@@ -1245,6 +1245,42 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_mode_channel_modes() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
+                    "Sonny Sunset").await;
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("MODE #mychannel +in".to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +in".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(channel.modes.no_external_messages);
+                assert!(channel.modes.invite_only);
+            }
+            
+            line_stream.send("MODE #mychannel -in".to_string()).await.unwrap();
+            assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel -in".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                let channel = state.channels.get("#mychannel").unwrap();
+                assert!(!channel.modes.no_external_messages);
+                assert!(!channel.modes.invite_only);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_mode_channel_lists() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
