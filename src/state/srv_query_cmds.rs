@@ -89,6 +89,9 @@ impl super::MainState {
     
     pub(super) async fn process_connect<'a>(&self, _: &mut ConnState, _: &'a str,
             _: Option<u16>, _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "CONNECT", subcommand: None,
+                    info: "Server unsupported" }).await?;
         Ok(())
     }
     
@@ -134,6 +137,8 @@ impl super::MainState {
     
     pub(super) async fn process_stats<'a>(&self, _: &mut ConnState, _: char,
             _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "STATS", subcommand: None, info: "Server unsupported" }).await?;
         Ok(())
     }
     
