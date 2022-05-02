@@ -585,8 +585,9 @@ mod test {
                     "Thomas Giggy").await;
             line_stream.send("VERSION".to_string()).await.unwrap();
             
-            assert_eq!(":irc.irc 351 tommy simple-irc-server-0.1.0 irc.irc :simple IRC server"
-                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(format!(":irc.irc 351 tommy {}-{} irc.irc :simple IRC server",
+                    env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+                    line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 005 tommy AWAYLEN=1000 CASEMAPPING=ascii \
                     CHANMODES=Iabehiklmnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
                     HOSTLEN=1000 INVEX=I KEYLEN=1000 :are supported by this server"
@@ -739,6 +740,23 @@ mod test {
             assert_eq!(":irc.irc 364 timmy irc.irc irc.irc :0 This is IRC server"
                     .to_string(), line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 365 timmy * :End of LINKS list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_info() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "timmy", "tim",
+                    "Timmy Greater").await;
+            line_stream.send("INFO".to_string()).await.unwrap();
+            assert_eq!(format!(":irc.irc 371 timmy :{} {}", env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION")) , line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 374 timmy :End of INFO list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
         }
         
