@@ -215,7 +215,7 @@ impl super::MainState {
             for mchar in mchars.chars() {
                 match mchar {
                     'i'|'m'|'t'|'n'|'s'|'l'|'k'|'o'|'v'|'h'|'q'|'a' => {
-                        if !if_op {
+                        if !if_half_op {
                             self.feed_msg(&mut conn_state.stream,
                                 ErrChanOpPrivsNeeded482{ client,
                                         channel: target }).await?;
@@ -1145,6 +1145,8 @@ mod test {
                     "Ariel Fisher").await;
             let mut danny_stream = login_to_test_and_skip(port, "danny", "danny",
                     "Danny Fisher").await;
+            let mut zinny_stream = login_to_test_and_skip(port, "zinny", "zinny",
+                    "Zinny Boat").await;
             ariel_stream.send("JOIN #mychannel".to_string()).await.unwrap();
             for _ in 0..3 { ariel_stream.next().await.unwrap().unwrap(); }
             time::sleep(Duration::from_millis(50)).await;
@@ -1160,6 +1162,10 @@ mod test {
                 assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +mts +k xxxz +l 10"
                             .to_string(), line_stream.next().await.unwrap().unwrap());
             }
+            
+            ariel_stream.send("MODE #mychannel +l 20".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 482 ariel #mychannel :You're not channel operator"
+                            .to_string(), ariel_stream.next().await.unwrap().unwrap());
             
             time::sleep(Duration::from_millis(50)).await;
             {
@@ -1207,6 +1213,11 @@ mod test {
                 assert!(!channel.modes.operators.as_ref().unwrap().contains("ariel"));
                 assert!(!channel.modes.half_operators.as_ref().unwrap().contains("danny"));
             }
+            
+            zinny_stream.send("MODE #mychannel -oh ariel danny".to_string())
+                        .await.unwrap();
+            assert_eq!(":irc.irc 442 zinny #mychannel :You're not on that channel"
+                        .to_string(), zinny_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
