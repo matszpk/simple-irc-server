@@ -366,13 +366,21 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_rehash(&self, _: &mut ConnState)
+    pub(super) async fn process_rehash(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "REHASH", subcommand: None,
+                    info: "Server unsupported" }).await?;
         Ok(())
     }
     
-    pub(super) async fn process_restart(&self, _: &mut ConnState)
+    pub(super) async fn process_restart(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+                    command: "RESTART", subcommand: None,
+                    info: "Server unsupported" }).await?;
         Ok(())
     }
     
@@ -450,5 +458,32 @@ impl super::MainState {
             self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::test::*;
+    
+    #[tokio::test]
+    async fn test_command_privmsg_user() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            
+            line_stream.send("PRIVMSG bowie :Hello guy!".to_string()).await.unwrap();
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG bowie :Hello guy!".to_string(),
+                            line_stream2.next().await.unwrap().unwrap());
+            line_stream2.send("PRIVMSG alan :Hello too!".to_string()).await.unwrap();
+            assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG alan :Hello too!".to_string(),
+                            line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
     }
 }
