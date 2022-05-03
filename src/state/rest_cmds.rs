@@ -546,9 +546,97 @@ mod test {
                 assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG #channelx :Hello guy!".to_string(),
                         line_stream.next().await.unwrap().unwrap());
             }
+            line_stream3.send("PRIVMSG #channelx :Hi!".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut line_stream2] {
+                assert_eq!(":cedric!~cedric@127.0.0.1 PRIVMSG #channelx :Hi!".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
             line_stream.send("PRIVMSG #channely :Hello guy!".to_string()).await.unwrap();
             assert_eq!(":irc.irc 403 alan #channely :No such channel".to_string(),
                         line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_channel_external_messages() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            
+            line_stream.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            
+            // send message to channel
+            line_stream2.send("PRIVMSG #channelx :I want to join!".to_string())
+                        .await.unwrap();
+            assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG #channelx :I want to join!"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            { main_state.state.write().await.channels.get_mut("#channelx").unwrap()
+                    .modes.no_external_messages = true; }
+            
+            line_stream2.send("PRIVMSG #channelx :I want to join!".to_string())
+                        .await.unwrap();
+            assert_eq!(":irc.irc 404 bowie #channelx :Cannot send to channel".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_channel_moderated() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            let mut line_stream3 = login_to_test_and_skip(port, "cedric", "cedric",
+                    "Cedric Maximus").await;
+            
+            line_stream.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            line_stream2.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            line_stream.next().await.unwrap().unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            { main_state.state.write().await.channels.get_mut("#channelx").unwrap()
+                    .modes.moderated = true; }
+            
+            // send message to channel
+            line_stream.send("PRIVMSG #channelx :I want you!".to_string())
+                        .await.unwrap();
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG #channelx :I want you!"
+                        .to_string(), line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream2.send("PRIVMSG #channelx :I want you!".to_string())
+                        .await.unwrap();
+            assert_eq!(":irc.irc 404 bowie #channelx :Cannot send to channel".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream3.send("PRIVMSG #channelx :I want you too!".to_string())
+                        .await.unwrap();
+            assert_eq!(":irc.irc 404 cedric #channelx :Cannot send to channel".to_string(),
+                        line_stream3.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            { main_state.state.write().await.channels.get_mut("#channelx").unwrap()
+                    .add_voice("bowie"); }
+            // if have voice
+            line_stream2.send("PRIVMSG #channelx :I want you too!".to_string())
+                        .await.unwrap();
+            assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG #channelx :I want you too!"
+                        .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
