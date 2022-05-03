@@ -86,43 +86,61 @@ impl super::MainState {
                             // to special
                             if !(target_type & ChannelFounder).is_empty() {
                                 if let Some(ref founders) = chanobj.modes.founders {
-                                    founders.iter().try_for_each(|u|
-                                        state.users.get(u).unwrap().send_msg_display(
-                                                &conn_state.user_state.source, &msg_str))?;
+                                    founders.iter().try_for_each(|u| {
+                                        if u != user_nick {
+                                            state.users.get(u).unwrap().send_msg_display(
+                                                &conn_state.user_state.source, &msg_str)
+                                        } else { Ok(()) }
+                                    })?;
                                 }
                             }
                             if !(target_type & ChannelProtected).is_empty() {
                                 if let Some(ref protecteds) = chanobj.modes.protecteds {
-                                    protecteds.iter().try_for_each(|u|
-                                        state.users.get(u).unwrap().send_msg_display(
-                                                &conn_state.user_state.source, &msg_str))?;
+                                    protecteds.iter().try_for_each(|u| {
+                                        if u != user_nick {
+                                            state.users.get(u).unwrap().send_msg_display(
+                                                &conn_state.user_state.source, &msg_str)
+                                        } else { Ok(()) }
+                                    })?;
                                 }
                             }
                             if !(target_type & ChannelOper).is_empty() {
                                 if let Some(ref operators) = chanobj.modes.operators {
-                                    operators.iter().try_for_each(|u|
-                                        state.users.get(u).unwrap().send_msg_display(
-                                                &conn_state.user_state.source, &msg_str))?;
+                                    operators.iter().try_for_each(|u| {
+                                        if u != user_nick {
+                                            state.users.get(u).unwrap().send_msg_display(
+                                                &conn_state.user_state.source, &msg_str)
+                                        } else { Ok(()) }
+                                    })?;
                                 }
                             }
                             if !(target_type & ChannelHalfOper).is_empty() {
                                 if let Some(ref half_ops) = chanobj.modes.half_operators {
-                                    half_ops.iter().try_for_each(|u|
-                                        state.users.get(u).unwrap().send_msg_display(
-                                                &conn_state.user_state.source, &msg_str))?;
+                                    half_ops.iter().try_for_each(|u| {
+                                        if u != user_nick {
+                                            state.users.get(u).unwrap().send_msg_display(
+                                                &conn_state.user_state.source, &msg_str)
+                                        } else { Ok(()) }
+                                    })?;
                                 }
                             }
                             if !(target_type & ChannelVoice).is_empty() {
                                 if let Some(ref voices) = chanobj.modes.voices {
-                                    voices.iter().try_for_each(|u|
-                                        state.users.get(u).unwrap().send_msg_display(
-                                                &conn_state.user_state.source, &msg_str))?;
+                                    voices.iter().try_for_each(|u| {
+                                        if u != user_nick {
+                                            state.users.get(u).unwrap().send_msg_display(
+                                                &conn_state.user_state.source, &msg_str)
+                                        } else { Ok(()) }
+                                    })?;
                                 }
                             }
                         } else {
-                            chanobj.users.keys().try_for_each(|u|
-                                state.users.get(u).unwrap().send_msg_display(
-                                        &conn_state.user_state.source, &msg_str))?;
+                            chanobj.users.keys().try_for_each(|u| {
+                                if u != user_nick {
+                                    state.users.get(u).unwrap().send_msg_display(
+                                        &conn_state.user_state.source, &msg_str)
+                                } else { Ok(()) }
+                            })?;
                         }
                         something_done = true;
                     }
@@ -524,7 +542,7 @@ mod test {
             line_stream2.next().await.unwrap().unwrap();
             
             line_stream.send("PRIVMSG #channelx :Hello guy!".to_string()).await.unwrap();
-            for line_stream in [&mut line_stream, &mut line_stream2, &mut line_stream3] {
+            for line_stream in [&mut line_stream2, &mut line_stream3] {
                 assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG #channelx :Hello guy!".to_string(),
                         line_stream.next().await.unwrap().unwrap());
             }
