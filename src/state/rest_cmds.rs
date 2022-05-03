@@ -641,4 +641,45 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_channel_banned() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            
+            line_stream.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            line_stream2.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            
+            
+            line_stream.send("MODE #channelx +b bowie".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream.next().await.unwrap().unwrap();
+            line_stream2.next().await.unwrap().unwrap();
+            
+            line_stream2.send("PRIVMSG #channelx :I want you!".to_string())
+                        .await.unwrap();
+            assert_eq!(":irc.irc 404 bowie #channelx :Cannot send to channel".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
+            
+            line_stream.send("MODE #channelx +e bowie".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            line_stream2.next().await.unwrap().unwrap();
+            
+            line_stream2.send("PRIVMSG #channelx :I want you!".to_string())
+                        .await.unwrap();
+            assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG #channelx :I want you!".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
