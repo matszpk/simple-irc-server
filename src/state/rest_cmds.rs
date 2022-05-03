@@ -502,4 +502,37 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_channel() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            let mut line_stream3 = login_to_test_and_skip(port, "cedric", "cedric",
+                    "Cedric Maximus").await;
+            
+            for line_stream in [&mut line_stream, &mut line_stream2, &mut line_stream3] {
+                line_stream.send("JOIN #channelx".to_string()).await.unwrap();
+                for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            }
+            
+            for _ in 0..2 { line_stream.next().await.unwrap().unwrap(); }
+            line_stream2.next().await.unwrap().unwrap();
+            
+            line_stream.send("PRIVMSG #channelx :Hello guy!".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut line_stream2, &mut line_stream3] {
+                assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG #channelx :Hello guy!".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            line_stream.send("PRIVMSG #channely :Hello guy!".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 403 alan #channely :No such channel".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
