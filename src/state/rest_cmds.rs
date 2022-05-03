@@ -478,10 +478,26 @@ mod test {
             
             line_stream.send("PRIVMSG bowie :Hello guy!".to_string()).await.unwrap();
             assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG bowie :Hello guy!".to_string(),
-                            line_stream2.next().await.unwrap().unwrap());
+                        line_stream2.next().await.unwrap().unwrap());
             line_stream2.send("PRIVMSG alan :Hello too!".to_string()).await.unwrap();
             assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG alan :Hello too!".to_string(),
-                            line_stream.next().await.unwrap().unwrap());
+                        line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("PRIVMSG boxie :Hello guy!".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 401 alan boxie :No such nick/channel".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            // away
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("bowie").unwrap().away = Some("Bye".to_string());
+            }
+            
+            line_stream.send("PRIVMSG bowie :Hello guy too!".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 301 alan bowie :Bye".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG bowie :Hello guy too!".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
