@@ -799,4 +799,42 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_activity() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let activity = {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("alan").unwrap().last_activity -= 10;
+                state.users.get("alan").unwrap().last_activity
+            };
+            line_stream.send("PRIVMSG guru :Hello boys".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(":irc.irc 401 alan guru :No such nick/channel".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            {
+                let state = main_state.state.read().await;
+                assert_eq!(activity, state.users.get("alan").unwrap().last_activity);
+            }
+            
+            line_stream.send("PRIVMSG bowie :Hello boys".to_string()).await.unwrap();
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG bowie :Hello boys".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let state = main_state.state.read().await;
+                assert_ne!(activity, state.users.get("alan").unwrap().last_activity);
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
