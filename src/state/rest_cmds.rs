@@ -837,4 +837,31 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_notice() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            login_to_test_and_skip(port, "cedric", "cedric", "Cedric Maximus").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("cedric").unwrap().away = Some("Bye".to_string());
+            }
+            
+            line_stream.send("NOTICE #chan1,guru,cedric :Hello boys".to_string())
+                        .await.unwrap();
+            line_stream2.send("PRIVMSG alan :Hello boys".to_string()).await.unwrap();
+            assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG alan :Hello boys".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
