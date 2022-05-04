@@ -682,4 +682,91 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_channel_prefixed() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            
+            let mut founder_stream1 = login_to_test_and_skip(port, "founder1", "founder1",
+                    "Founder1").await;
+            let mut founder_stream2 = login_to_test_and_skip(port, "founder2", "founder2",
+                    "Founder2").await;
+            let mut protected_stream1 = login_to_test_and_skip(port, "protected1",
+                    "protected1", "Protected1").await;
+            let mut protected_stream2 = login_to_test_and_skip(port, "protected2",
+                    "protected2", "Protected2").await;
+            let mut operator_stream1 = login_to_test_and_skip(port, "operator1",
+                    "operator1", "Operator1").await;
+            let mut operator_stream2 = login_to_test_and_skip(port, "operator2",
+                    "operator2", "Operator2").await;
+            let mut halfoper_stream1 = login_to_test_and_skip(port, "halfoper1",
+                    "halfoper1", "HalfOper1").await;
+            let mut halfoper_stream2 = login_to_test_and_skip(port, "halfoper2",
+                    "halfoper2", "HalfOper2").await;
+            let mut voice_stream1 = login_to_test_and_skip(port, "voice1",
+                    "voice1", "Voice1").await;
+            let mut voice_stream2 = login_to_test_and_skip(port, "voice2",
+                    "voice2", "Voice2").await;
+            
+            for line_stream in [&mut line_stream, &mut founder_stream1, &mut founder_stream2,
+                                &mut protected_stream1, &mut protected_stream2,
+                                &mut operator_stream1, &mut operator_stream2,
+                                &mut halfoper_stream1, &mut halfoper_stream2,
+                                &mut voice_stream1, &mut voice_stream2] {
+                line_stream.send("JOIN #channely".to_string()).await.unwrap();
+                for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            }
+            // skip joins
+            for (n,line_stream) in [&mut line_stream,
+                        &mut founder_stream1, &mut founder_stream2,
+                        &mut protected_stream1, &mut protected_stream2,
+                        &mut operator_stream1, &mut operator_stream2,
+                        &mut halfoper_stream1, &mut halfoper_stream2,
+                        &mut voice_stream1, &mut voice_stream2].iter_mut().enumerate() {
+                for _ in 0..(10-n) { line_stream.next().await.unwrap().unwrap(); }
+            }
+            
+            line_stream.send("MODE #channely +q founder1 +q founder2 \
+                        +a protected1 +a protected2 +o operator1 +o operator2 \
+                        +h halfoper1 +h halfoper2 +v voice1 +v voice2".to_string())
+                        .await.unwrap();
+            
+            // skip joins
+            for line_stream in [&mut line_stream,
+                        &mut founder_stream1, &mut founder_stream2,
+                        &mut protected_stream1, &mut protected_stream2,
+                        &mut operator_stream1, &mut operator_stream2,
+                        &mut halfoper_stream1, &mut halfoper_stream2,
+                        &mut voice_stream1, &mut voice_stream2] {
+                line_stream.next().await.unwrap().unwrap();
+            }
+            
+            for (ch, send_stream, send_nick, recv_stream, recv_nick) in [
+                    ('~', &mut founder_stream1, "founder1",
+                            &mut founder_stream2, "founder2"),
+                    ('&', &mut protected_stream1, "protected1",
+                            &mut protected_stream2, "protected2"),
+                    ('@', &mut operator_stream1, "operator1",
+                            &mut operator_stream2, "operator2"),
+                    ('%', &mut halfoper_stream1, "halfoper1",
+                            &mut halfoper_stream2, "halfoper2"),
+                    ('+', &mut voice_stream1, "voice1",
+                            &mut voice_stream2, "voice2")] {
+                send_stream.send(format!("PRIVMSG {}#channely :Hello guys", ch))
+                                .await.unwrap();
+                assert_eq!(format!(":{0}!~{0}@127.0.0.1 PRIVMSG {1}#channely :Hello guys",
+                            send_nick, ch), recv_stream.next().await.unwrap().unwrap());
+                recv_stream.send(format!("PRIVMSG {}#channely :Hello guys", ch))
+                                .await.unwrap();
+                assert_eq!(format!(":{0}!~{0}@127.0.0.1 PRIVMSG {1}#channely :Hello guys",
+                            recv_nick, ch), send_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
