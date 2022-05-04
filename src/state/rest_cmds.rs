@@ -769,4 +769,34 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_privmsg_multiple() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "alan", "alan",
+                    "Alan Bodarski").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
+                    "Bowie Catcher").await;
+            let mut line_stream3 = login_to_test_and_skip(port, "cedric", "cedric",
+                    "Cedric Maximus").await;
+            
+            line_stream.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            line_stream2.send("JOIN #channelx".to_string()).await.unwrap();
+            for _ in 0..3 { line_stream2.next().await.unwrap().unwrap(); }
+            
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("PRIVMSG #channelx,cedric :Hello boys".to_string())
+                        .await.unwrap();
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG #channelx :Hello boys".to_string(),
+                        line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":alan!~alan@127.0.0.1 PRIVMSG cedric :Hello boys".to_string(),
+                        line_stream3.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
