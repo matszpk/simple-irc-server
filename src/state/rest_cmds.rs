@@ -858,8 +858,122 @@ mod test {
             line_stream.send("NOTICE #chan1,guru,cedric :Hello boys".to_string())
                         .await.unwrap();
             line_stream2.send("PRIVMSG alan :Hello boys".to_string()).await.unwrap();
+            // no other error replies (NOTICE - doesn't send error messages)
+            // directly this message
             assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG alan :Hello boys".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_who() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: "Funny".to_string(), mask: None },
+        ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
+            line_stream.send("WHO jerry".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 352 fanny * ~jerry 127.0.0.1 irc.irc jerry H :0 \
+                    Jerry Lazy".to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 315 fanny jerry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            {
+                let mut state = main_state.state.write().await;
+                state.users.get_mut("jerry").unwrap().away = Some("Bye".to_string());
+            }
+            
+            line_stream.send("WHO jerry".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 352 fanny * ~jerry 127.0.0.1 irc.irc jerry G :0 \
+                    Jerry Lazy".to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 315 fanny jerry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream2.send("WHO fanny".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 352 jerry * ~fanny 127.0.0.1 irc.irc fanny H* :0 \
+                    Fanny BumBumBum".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 315 jerry fanny :End of WHO list".to_string(),
+                    line_stream2.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_who_channel() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            let mut line_stream2 = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
+            
+            for line_stream in [&mut line_stream, &mut line_stream2] {
+                line_stream.send("JOIN #channelz".to_string()).await.unwrap();
+                for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            }
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("WHO #channelz".to_string()).await.unwrap();
+            for answer in [
+                ":irc.irc 352 fanny #channelz ~fanny 127.0.0.1 irc.irc \
+                        fanny H~ :0 Fanny BumBumBum",
+                ":irc.irc 352 fanny #channelz ~jerry 127.0.0.1 irc.irc jerry \
+                        H :0 Jerry Lazy",
+                ":irc.irc 315 fanny #channelz :End of WHO list" ] {
+                assert_eq!(answer.to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_who_channel_multi_prefix() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = connect_to_test(port).await;
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("NICK fanny".to_string()).await.unwrap();
+            line_stream.send("USER fanny 8 * :Fanny BumBumBum".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            for _ in 0..20 { line_stream.next().await.unwrap().unwrap(); }
+            
+            let mut line_stream2 = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
+            
+            for line_stream in [&mut line_stream, &mut line_stream2] {
+                line_stream.send("JOIN #channelz".to_string()).await.unwrap();
+                for _ in 0..3 { line_stream.next().await.unwrap().unwrap(); }
+            }
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("WHO #channelz".to_string()).await.unwrap();
+            for answer in [
+                ":irc.irc 352 fanny #channelz ~fanny 127.0.0.1 irc.irc \
+                        fanny H~@ :0 Fanny BumBumBum",
+                ":irc.irc 352 fanny #channelz ~jerry 127.0.0.1 irc.irc jerry \
+                        H :0 Jerry Lazy",
+                ":irc.irc 315 fanny #channelz :End of WHO list" ] {
+                assert_eq!(answer.to_string(), line_stream.next().await.unwrap().unwrap());
+            }
         }
         
         quit_test_server(main_state, handle).await;
