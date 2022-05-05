@@ -1252,5 +1252,64 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
-
+    
+    fn equal_channel_names<'a>(exp_msg: &'a str, exp_names: &'a[&'a str],
+                names_replies: &'a[&'a str]) -> bool {
+        let mut exp_names_sorted = Vec::from(exp_names);
+        exp_names_sorted.sort();
+        let mut touched = vec![false; exp_names.len()];
+        names_replies.iter().all(|reply| {
+            if reply.starts_with(exp_msg) {
+                reply[exp_msg.len()..].split_terminator(" ").all(|c| {
+                    if let Ok(p) = exp_names_sorted.binary_search(&c) {
+                        touched[p] = true;
+                        true
+                    } else { false }
+                })
+            } else { false }
+        }) && touched.iter().all(|x| *x)
+    }
+    
+    #[tokio::test]
+    async fn test_command_whois_channels() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Lazy").await;
+            for i in 0..45 {
+                harry_stream.send(format!("JOIN #channel{}", i)).await.unwrap();
+                for _ in 0..3 { harry_stream.next().await.unwrap().unwrap(); }
+            }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let signon = { main_state.state.read().await.users
+                            .get("harry").unwrap().signon };
+            
+            line_stream.send("WHOIS harry".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 312 fanny harry irc.irc :This is IRC server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            let channel_list = (0..45).map(|x| format!("~#channel{}", x))
+                            .collect::<Vec<_>>();
+            let channel_str_list = channel_list.iter().map(|x| x.as_str())
+                            .collect::<Vec<_>>();
+            assert!(equal_channel_names(":irc.irc 319 fanny harry :",
+                    channel_str_list.as_slice(),
+                    &[&line_stream.next().await.unwrap().unwrap(),
+                      &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(format!(
+                ":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
+                SystemTime::now().duration_since(UNIX_EPOCH)
+                                .unwrap().as_secs() - signon, signon),
+                                line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 318 fanny harry :End of /WHOIS list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
