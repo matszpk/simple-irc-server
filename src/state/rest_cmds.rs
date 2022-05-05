@@ -1160,12 +1160,9 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
-            let mut jarry_stream = login_to_test_and_skip(port, "henry", "henry",
-                        "Henry Solo").await;
-            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
-                        "Harry Lazy").await;
-            let mut jarry_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
-                        "Dizzy Multi").await;
+            login_to_test_and_skip(port, "henry", "henry", "Henry Solo").await;
+            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            login_to_test_and_skip(port, "dizzy", "dizzy", "Dizzy Multi").await;
             
             time::sleep(Duration::from_millis(50)).await;
             let (signon, signon2) = {
@@ -1189,7 +1186,7 @@ mod test {
                         .map(|x| x.to_string()).collect::<Vec<_>>();
             expecteds.sort();
             let mut results = vec![];
-            for x in 0..6 { results.push(line_stream.next().await.unwrap().unwrap()); }
+            for _ in 0..6 { results.push(line_stream.next().await.unwrap().unwrap()); }
             results.sort();
             assert_eq!(expecteds, results);
             assert_eq!(":irc.irc 318 fanny *ry :End of /WHOIS list".to_string(),
