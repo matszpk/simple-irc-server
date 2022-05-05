@@ -1080,7 +1080,7 @@ mod test {
             line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
             
             time::sleep(Duration::from_millis(50)).await;
-            harry_stream.send("JOIN #superchannel".to_string()).await.unwrap();
+            jarry_stream.send("JOIN #superchannel".to_string()).await.unwrap();
             jarry_stream.send("MODE jarry +i".to_string()).await.unwrap();
             harry_stream.send("JOIN #mychannel".to_string()).await.unwrap();
             harry_stream.send("MODE harry +i".to_string()).await.unwrap();
@@ -1182,8 +1182,7 @@ mod test {
                 &format!(":irc.irc 317 fanny henry {} {} :seconds idle, signon time",
                             SystemTime::now().duration_since(UNIX_EPOCH)
                                 .unwrap().as_secs() - signon2, signon2),
-                 ].iter()
-                        .map(|x| x.to_string()).collect::<Vec<_>>();
+                 ].iter().map(|x| x.to_string()).collect::<Vec<_>>();
             expecteds.sort();
             let mut results = vec![];
             for _ in 0..6 { results.push(line_stream.next().await.unwrap().unwrap()); }
@@ -1195,4 +1194,63 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_whois_invisible_channel() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            
+            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
+                        "Jarry Lazy").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                        "Harry Lazy").await;
+            
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            jarry_stream.send("JOIN #superchannel".to_string()).await.unwrap();
+            jarry_stream.send("MODE jarry +i".to_string()).await.unwrap();
+            harry_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            harry_stream.send("MODE harry +i".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            
+            for _ in 0..(3+1) { line_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let (signon, signon2) = {
+                let state = main_state.state.read().await;
+                (state.users.get("harry").unwrap().signon,
+                        state.users.get("jerry").unwrap().signon)
+            };
+            
+            line_stream.send("WHOIS *rry".to_string()).await.unwrap();
+            let mut expecteds = [ 
+                ":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy",
+                ":irc.irc 312 fanny harry irc.irc :This is IRC server",
+                ":irc.irc 319 fanny harry :#mychannel",
+                &format!(":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
+                            SystemTime::now().duration_since(UNIX_EPOCH)
+                                .unwrap().as_secs() - signon, signon),
+                ":irc.irc 311 fanny jerry ~jerry 127.0.0.1 * :Jerry Lazy",
+                ":irc.irc 312 fanny jerry irc.irc :This is IRC server",
+                &format!(":irc.irc 317 fanny jerry {} {} :seconds idle, signon time",
+                            SystemTime::now().duration_since(UNIX_EPOCH)
+                                .unwrap().as_secs() - signon2, signon2)
+                ].iter().map(|x| x.to_string()).collect::<Vec<_>>();
+            expecteds.sort();
+            let mut results = vec![];
+            for _ in 0..7 { results.push(line_stream.next().await.unwrap().unwrap()); }
+            results.sort();
+            assert_eq!(expecteds, results);
+            assert_eq!(":irc.irc 318 fanny *rry :End of /WHOIS list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+
 }
