@@ -285,8 +285,8 @@ impl super::MainState {
                             nick: &nick }).await?;
                 }
                 self.feed_msg(&mut conn_state.stream, RplWhoIsUser311{ client,
-                        nick: &nick, username: &user.name, host: &user.hostname,
-                        realname: &user.realname }).await?;
+                        nick: &nick, username: &arg_user.name, host: &arg_user.hostname,
+                        realname: &arg_user.realname }).await?;
                 self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
                         nick: &nick, server: &self.config.name,
                         server_info: &self.config.info }).await?;
@@ -312,13 +312,13 @@ impl super::MainState {
                 
                 self.feed_msg(&mut conn_state.stream, RplwhoIsIdle317{ client,
                         nick: &nick, secs: SystemTime::now().duration_since(UNIX_EPOCH)
-                            .unwrap().as_secs() - user.last_activity,
-                        signon: user.signon }).await?;
-                if user.modes.is_local_oper() {
+                            .unwrap().as_secs() - arg_user.last_activity,
+                        signon: arg_user.signon }).await?;
+                if arg_user.modes.is_local_oper() {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsHost378{ client,
-                            nick: &nick, host_info: &user.hostname }).await?;
+                            nick: &nick, host_info: &arg_user.hostname }).await?;
                     self.feed_msg(&mut conn_state.stream, RplWhoIsModes379{ client,
-                            nick: &nick, modes: &user.modes.to_string() }).await?;
+                            nick: &nick, modes: &arg_user.modes.to_string() }).await?;
                 }
             }
             self.feed_msg(&mut conn_state.stream, RplEndOfWhoIs318{ client,
@@ -1030,4 +1030,97 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_who_invisible() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            
+            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
+                        "Jarry Lazy").await;
+            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            jarry_stream.send("MODE jarry +i".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            
+            line_stream.send("WHO *rry".to_string()).await.unwrap();
+            assert!(equal_list(":irc.irc 352 fanny * ",
+                            &["~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy",
+                            "~harry 127.0.0.1 irc.irc harry H :0 Harry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_who_invisible_channel() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            
+            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
+                        "Jarry Lazy").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                        "Harry Lazy").await;
+            
+            line_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            
+            time::sleep(Duration::from_millis(50)).await;
+            harry_stream.send("JOIN #superchannel".to_string()).await.unwrap();
+            jarry_stream.send("MODE jarry +i".to_string()).await.unwrap();
+            harry_stream.send("JOIN #mychannel".to_string()).await.unwrap();
+            harry_stream.send("MODE harry +i".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            
+            for _ in 0..(3+1) { line_stream.next().await.unwrap().unwrap(); }
+            
+            line_stream.send("WHO *rry".to_string()).await.unwrap();
+            assert!(equal_list(":irc.irc 352 fanny * ",
+                            &["~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy",
+                            "~harry 127.0.0.1 irc.irc harry H :0 Harry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+//     #[tokio::test]
+//     async fn test_command_whois() {
+//         let mut config = MainConfig::default();
+//         config.operators = Some(vec![
+//             OperatorConfig{ name: "fanny".to_string(),
+//                     password: "Funny".to_string(), mask: None },
+//         ]);
+//         let (main_state, handle, port) = run_test_server(config).await;
+//         
+//         {
+//             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+//                     "Fanny BumBumBum").await;
+//             line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+//             line_stream.next().await.unwrap().unwrap();
+//             login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+//             
+//             line_stream.send("WHOIS harry".to_string()).await.unwrap();
+//             for i in 0..10 {
+//                 println!("Answer {}: {}", i, line_stream.next().await.unwrap().unwrap());
+//             }
+//         }
+//         
+//         quit_test_server(main_state, handle).await;
+//     }
 }
