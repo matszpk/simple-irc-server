@@ -978,4 +978,56 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    fn equal_list<'a>(msg_start: &'a str, expected :&'a[&'a str],
+            results :&'a[&'a str]) -> bool {
+        let mut expected_sorted = Vec::from(expected);
+        expected_sorted.sort();
+        let mut touched =  vec![false; expected.len()];
+        
+        results.iter().all(|res| {
+            if res.starts_with(msg_start) {
+                let rest = &res[msg_start.len()..];
+                if let Ok(p) = expected_sorted.binary_search(&rest) {
+                    touched[p] = true;
+                    true
+                } else { false }
+            } else { false }
+        }) && touched.iter().all(|x| *x)
+    }
+    
+    #[tokio::test]
+    async fn test_command_who_wildcards() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            login_to_test_and_skip(port, "jarry", "jarry", "Jarry Lazy").await;
+            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            
+            line_stream.send("WHO j*rry".to_string()).await.unwrap();
+            assert!(equal_list(":irc.irc 352 fanny * ",
+                            &["~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy",
+                            "~jarry 127.0.0.1 irc.irc jarry H :0 Jarry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny j*rry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("WHO *rry".to_string()).await.unwrap();
+            assert!(equal_list(":irc.irc 352 fanny * ",
+                            &["~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy",
+                            "~jarry 127.0.0.1 irc.irc jarry H :0 Jarry Lazy",
+                            "~harry 127.0.0.1 irc.irc harry H :0 Harry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
