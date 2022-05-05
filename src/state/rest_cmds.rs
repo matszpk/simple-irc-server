@@ -269,11 +269,13 @@ impl super::MainState {
                 }
             });
             
-            state.users.keys().for_each(|nick| {
-                if real_nickmasks.iter().any(|mask| match_wildcard(mask, nick)) {
-                    nicks.insert(nick.to_string());
-                }
-            });
+            if real_nickmasks.len() != 0 {
+                state.users.keys().for_each(|nick| {
+                    if real_nickmasks.iter().any(|mask| match_wildcard(mask, nick)) {
+                        nicks.insert(nick.to_string());
+                    }
+                });
+            }
             
             for nick in nicks {
                 let arg_user = state.users.get(&nick).unwrap();
