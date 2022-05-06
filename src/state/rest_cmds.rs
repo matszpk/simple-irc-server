@@ -915,6 +915,23 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
+    fn equal_list<'a>(msg_start: &'a str, expected :&'a[&'a str],
+            results :&'a[&'a str]) -> bool {
+        let mut expected_sorted = Vec::from(expected);
+        expected_sorted.sort();
+        let mut touched =  vec![false; expected.len()];
+        
+        results.iter().all(|res| {
+            if res.starts_with(msg_start) {
+                let rest = &res[msg_start.len()..];
+                if let Ok(p) = expected_sorted.binary_search(&rest) {
+                    touched[p] = true;
+                    true
+                } else { false }
+            } else { false }
+        }) && touched.iter().all(|x| *x)
+    }
+    
     #[tokio::test]
     async fn test_command_who_channel() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
@@ -932,14 +949,13 @@ mod test {
             line_stream.next().await.unwrap().unwrap();
             
             line_stream.send("WHO #channelz".to_string()).await.unwrap();
-            for answer in [
-                ":irc.irc 352 fanny #channelz ~fanny 127.0.0.1 irc.irc \
-                        fanny H~ :0 Fanny BumBumBum",
-                ":irc.irc 352 fanny #channelz ~jerry 127.0.0.1 irc.irc jerry \
-                        H :0 Jerry Lazy",
-                ":irc.irc 315 fanny #channelz :End of WHO list" ] {
-                assert_eq!(answer.to_string(), line_stream.next().await.unwrap().unwrap());
-            }
+            assert!(equal_list(":irc.irc 352 fanny #channelz ",
+                            &["~fanny 127.0.0.1 irc.irc fanny H~ :0 Fanny BumBumBum",
+                            "~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny #channelz :End of WHO list".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
@@ -968,34 +984,16 @@ mod test {
             line_stream.next().await.unwrap().unwrap();
             
             line_stream.send("WHO #channelz".to_string()).await.unwrap();
-            for answer in [
-                ":irc.irc 352 fanny #channelz ~fanny 127.0.0.1 irc.irc \
-                        fanny H~@ :0 Fanny BumBumBum",
-                ":irc.irc 352 fanny #channelz ~jerry 127.0.0.1 irc.irc jerry \
-                        H :0 Jerry Lazy",
-                ":irc.irc 315 fanny #channelz :End of WHO list" ] {
-                assert_eq!(answer.to_string(), line_stream.next().await.unwrap().unwrap());
-            }
+            assert!(equal_list(":irc.irc 352 fanny #channelz ",
+                            &["~fanny 127.0.0.1 irc.irc fanny H~@ :0 Fanny BumBumBum",
+                            "~jerry 127.0.0.1 irc.irc jerry H :0 Jerry Lazy"],
+                            &[&line_stream.next().await.unwrap().unwrap(),
+                                &line_stream.next().await.unwrap().unwrap()]));
+            assert_eq!(":irc.irc 315 fanny #channelz :End of WHO list".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
-    }
-    
-    fn equal_list<'a>(msg_start: &'a str, expected :&'a[&'a str],
-            results :&'a[&'a str]) -> bool {
-        let mut expected_sorted = Vec::from(expected);
-        expected_sorted.sort();
-        let mut touched =  vec![false; expected.len()];
-        
-        results.iter().all(|res| {
-            if res.starts_with(msg_start) {
-                let rest = &res[msg_start.len()..];
-                if let Ok(p) = expected_sorted.binary_search(&rest) {
-                    touched[p] = true;
-                    true
-                } else { false }
-            } else { false }
-        }) && touched.iter().all(|x| *x)
     }
     
     #[tokio::test]
@@ -1397,6 +1395,33 @@ mod test {
             assert_eq!(expecteds, results);
             assert_eq!(":irc.irc 318 fanny *ry,dizzy :End of /WHOIS list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_whowas() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            login_to_test_and_skip(port, "henry", "henry", "Henry Solo").await;
+            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
+                        "Dizzy Multi").await;
+            dizzy_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
+                        "Dizzy MultiX").await;
+            dizzy_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            
+            line_stream.send("WHOWAS dizzy".to_string()).await.unwrap();
+            for i in 0..3 {
+                println!("Answer {}: {}", i, line_stream.next().await.unwrap().unwrap());
+            }
         }
         
         quit_test_server(main_state, handle).await;

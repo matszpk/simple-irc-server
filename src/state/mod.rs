@@ -622,6 +622,7 @@ impl VolatileState {
             user.channels.iter().for_each(|chname| {
                 self.remove_user_from_channel(chname, nick);
             });
+            self.insert_to_nick_history(&nick.to_string(), user.history_entry.clone());
         }
     }
     
