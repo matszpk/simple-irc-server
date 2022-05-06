@@ -1407,8 +1407,6 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
-            login_to_test_and_skip(port, "henry", "henry", "Henry Solo").await;
-            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
             let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
                         "Dizzy Multi").await;
             dizzy_stream.send("QUIT :Bye".to_string()).await.unwrap();
@@ -1486,6 +1484,57 @@ mod test {
                         line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 369 fanny zizzy :End of WHOWAS".to_string(),
                         line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_kill() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: "Funny".to_string(), mask: None },
+        ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
+                        "Dizzy Multi").await;
+            
+            line_stream.send("KILL dizzy :Not polite".to_string()).await.unwrap();
+            assert_eq!(":irc.irc ERROR :User killed by fanny: Not polite".to_string(),
+                        dizzy_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            assert!(!main_state.state.read().await.users.contains_key("dizzy"));
+            line_stream.send("KILL dizzy :Not polite".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 401 fanny dizzy :No such nick/channel".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_kill_no_privileges() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            login_to_test_and_skip(port, "dizzy", "dizzy", "Dizzy Multi").await;
+            
+            line_stream.send("KILL dizzy :Not polite".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 fanny :Permission Denied- You're not an IRC \
+                        operator".to_string(), line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            assert!(main_state.state.read().await.users.contains_key("dizzy"));
         }
         
         quit_test_server(main_state, handle).await;
