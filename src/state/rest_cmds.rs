@@ -1449,6 +1449,43 @@ mod test {
             }
             assert_eq!(":irc.irc 369 fanny dizzy :End of WHOWAS".to_string(),
                         line_stream.next().await.unwrap().unwrap());
+            
+            let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
+                        "Dizzy MultiZ").await;
+            dizzy_stream.send("NICK gizzy".to_string()).await.unwrap();
+            dizzy_stream.next().await.unwrap().unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            time::sleep(Duration::from_millis(50)).await;
+            let signon0 = {
+                let state = main_state.state.read().await;
+                let history = state.nick_histories.get("dizzy").unwrap();
+                history[2].signon
+            };
+            
+            line_stream.send("WHOWAS dizzy".to_string()).await.unwrap();
+            for expected in [
+                ":irc.irc 314 fanny dizzy ~dizzy 127.0.0.1 * :Dizzy MultiZ",
+                &format!(":irc.irc 312 fanny dizzy irc.irc :Logged in at {}",
+                        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(
+                                        signon0 as i64, 0), Utc)),
+                ":irc.irc 314 fanny dizzy ~dizzy 127.0.0.1 * :Dizzy MultiX",
+                &format!(":irc.irc 312 fanny dizzy irc.irc :Logged in at {}",
+                        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(
+                                        signon1 as i64, 0), Utc)),
+                ":irc.irc 314 fanny dizzy ~dizzy 127.0.0.1 * :Dizzy Multi",
+                &format!(":irc.irc 312 fanny dizzy irc.irc :Logged in at {}",
+                        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(
+                                        signon2 as i64, 0), Utc)) ] {
+                assert_eq!(expected.to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            assert_eq!(":irc.irc 369 fanny dizzy :End of WHOWAS".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("WHOWAS zizzy".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 406 fanny zizzy :There was no such nickname".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 369 fanny zizzy :End of WHOWAS".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
