@@ -1539,4 +1539,37 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_squit() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: "Funny".to_string(), mask: None },
+        ]);
+        let (_, _, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.send("SQUIT irc.irc :Blabla".to_string()).await.unwrap();
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_command_squit_no_privileges() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("SQUIT irc.irc :Blabla".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 483 fanny :You cant kill a server!".to_string(), 
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
