@@ -1572,4 +1572,30 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_away() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("AWAY :See later".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 306 fanny :You have been marked as being away".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            time::sleep(Duration::from_millis(50)).await;
+            assert_eq!(Some("See later".to_string()),
+                    main_state.state.read().await.users.get("fanny").unwrap().away);
+            
+            line_stream.send("AWAY".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 305 fanny :You are no longer marked as being away"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            
+            time::sleep(Duration::from_millis(50)).await;
+            assert!(main_state.state.read().await.users.get("fanny")
+                        .unwrap().away.is_none());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
