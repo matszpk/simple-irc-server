@@ -1312,4 +1312,45 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_whois_channel_multi_prefix() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = connect_to_test(port).await;
+            line_stream.send("CAP LS 302".to_string()).await.unwrap();
+            line_stream.send("NICK fanny".to_string()).await.unwrap();
+            line_stream.send("USER fanny 8 * :Fanny BumBumBum".to_string()).await.unwrap();
+            line_stream.send("CAP REQ :multi-prefix".to_string()).await.unwrap();
+            line_stream.send("CAP END".to_string()).await.unwrap();
+            for _ in 0..20 { line_stream.next().await.unwrap().unwrap(); }
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Lazy").await;
+            
+            harry_stream.send("JOIN #channel2".to_string()).await.unwrap();
+            for _ in 0..3 { harry_stream.next().await.unwrap().unwrap(); }
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let signon = { main_state.state.read().await.users
+                            .get("harry").unwrap().signon };
+            
+            line_stream.send("WHOIS harry".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 312 fanny harry irc.irc :This is IRC server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 319 fanny harry :~@#channel2"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(format!(
+                ":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
+                SystemTime::now().duration_since(UNIX_EPOCH)
+                                .unwrap().as_secs() - signon, signon),
+                                line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 318 fanny harry :End of /WHOIS list".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
