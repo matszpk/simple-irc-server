@@ -1640,4 +1640,48 @@ mod test {
         
         quit_test_server(main_state, handle).await;
     }
+    
+    #[tokio::test]
+    async fn test_command_wallops() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: "Funny".to_string(), mask: None },
+        ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            let mut hanna_stream = login_to_test_and_skip(port, "hanna", "hanna",
+                    "Hanna-Barbera").await;
+            let mut gena_stream = login_to_test_and_skip(port, "gena", "gena",
+                    "Gena Sphinxs").await;
+            let mut keith_stream = login_to_test_and_skip(port, "keith", "keith",
+                    "Keith North").await;
+            
+            line_stream.send("MODE funny +w".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            hanna_stream.send("MODE hanna +w".to_string()).await.unwrap();
+            hanna_stream.next().await.unwrap().unwrap();
+            gena_stream.send("MODE gena +w".to_string()).await.unwrap();
+            gena_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("WALLOPS :Hello people".to_string()).await.unwrap();
+            for line_stream in [&mut line_stream, &mut hanna_stream, &mut gena_stream] {
+                assert_eq!(":funny!~funny@127.0.0.1 WALLOPS :Hello people".to_string(),
+                        line_stream.next().await.unwrap().unwrap());
+            }
+            hanna_stream.send("WALLOPS :Hello people".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 hanna :Permission Denied- You're not an IRC \
+                    operator".to_string(), hanna_stream.next().await.unwrap().unwrap());
+            keith_stream.send("WALLOPS :Hello people".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 keith :Permission Denied- You're not an IRC \
+                    operator".to_string(), keith_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
 }
