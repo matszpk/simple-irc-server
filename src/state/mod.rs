@@ -66,7 +66,7 @@ impl User {
     fn new(config: &MainConfig, user_state: &ConnUserState, sender: UnboundedSender<String>,
             quit_sender: oneshot::Sender<(String, String)>) -> User {
         let mut user_modes = config.default_user_modes;
-        user_modes.registered =  user_modes.registered || user_state.registered;
+        user_modes.registered = user_modes.registered || user_state.registered;
         let now_ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         User{ hostname: user_state.hostname.clone(), sender,
                 quit_sender: Some(quit_sender),
