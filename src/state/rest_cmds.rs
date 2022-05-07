@@ -455,15 +455,16 @@ impl super::MainState {
         
         for nicks in nicknames.chunks(20) {
             let replies = nicks.iter().map(|nick| {
-                let user = state.users.get(&nick.to_string()).unwrap();
-                format!("{}=+~{}@{}", nick, user.name, user.hostname)
+                if let Some(user) = state.users.get(&nick.to_string()) {
+                    format!("{}=+~{}@{}", nick, user.name, user.hostname)
+                } else { String::default() }
             }).collect::<Vec<_>>();
             self.feed_msg(&mut conn_state.stream, RplUserHost302{ client,
                     replies: &replies }).await?;
         }
         Ok(())
     }
-    
+
     pub(super) async fn process_wallops<'a>(&self, conn_state: &mut ConnState,
             msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
@@ -1594,6 +1595,47 @@ mod test {
             time::sleep(Duration::from_millis(50)).await;
             assert!(main_state.state.read().await.users.get("fanny")
                         .unwrap().away.is_none());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_userhost() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            for i in 0..50 {
+                login_to_test_and_skip(port, &format!("binny{}", i),
+                        &format!("binny{}", i), &format!("Binny{} BigBang", i)).await;
+            }
+            
+            line_stream.send(format!("USERHOST {}", (0..50).map(|x| format!("binny{}", x))
+                            .collect::<Vec<_>>().join(" "))).await.unwrap();
+            for range in [(0..20), (20..40), (40..50)] {
+                assert_eq!(":irc.irc 302 funny :".to_string() + &(range.map(
+                    |x| format!("binny{0}=+~binny{0}@127.0.0.1", x))
+                            .collect::<Vec<_>>().join(" ")),
+                    line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_userhost_notfound() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            
+            line_stream.send("USERHOST ziggy".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 302 funny :".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
