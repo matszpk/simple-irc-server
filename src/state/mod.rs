@@ -885,8 +885,8 @@ impl MainState {
                         self.process_away(conn_state, text).await,
                     USERHOST{ nicknames } =>
                         self.process_userhost(conn_state, nicknames).await, 
-                    WALLOPS{ text } =>
-                        self.process_wallops(conn_state, text, &msg).await,
+                    WALLOPS{ .. } =>
+                        self.process_wallops(conn_state, &msg).await,
                 }
             },
         }

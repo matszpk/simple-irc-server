@@ -464,7 +464,7 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_wallops<'a>(&self, conn_state: &mut ConnState, _: &'a str,
+    pub(super) async fn process_wallops<'a>(&self, conn_state: &mut ConnState,
             msg: &'a Message<'a>) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
