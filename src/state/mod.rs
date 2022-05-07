@@ -150,10 +150,10 @@ impl ChannelUserModes {
     fn to_string(&self, caps: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
-        if (caps.multi_prefix || out.len() == 0) && self.protected { out.push('&'); }
-        if (caps.multi_prefix || out.len() == 0) && self.operator { out.push('@'); }
-        if (caps.multi_prefix || out.len() == 0) && self.half_oper { out.push('%'); }
-        if (caps.multi_prefix || out.len() == 0) && self.voice { out.push('+'); }
+        if (caps.multi_prefix || out.is_empty()) && self.protected { out.push('&'); }
+        if (caps.multi_prefix || out.is_empty()) && self.operator { out.push('@'); }
+        if (caps.multi_prefix || out.is_empty()) && self.half_oper { out.push('%'); }
+        if (caps.multi_prefix || out.is_empty()) && self.voice { out.push('+'); }
         out
     }
 }
@@ -601,7 +601,7 @@ impl VolatileState {
     fn remove_user_from_channel<'a>(&mut self, channel: &'a str, nick: &'a str) {
         if let Some(chanobj) = self.channels.get_mut(channel) {
             chanobj.remove_user(nick);
-            if chanobj.users.len() == 0 && !chanobj.preconfigured {
+            if chanobj.users.is_empty() && !chanobj.preconfigured {
                 self.channels.remove(channel);
             }
         }

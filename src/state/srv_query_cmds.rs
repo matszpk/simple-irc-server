@@ -198,7 +198,7 @@ impl super::MainState {
         let if_op = chum.is_operator();
         let if_half_op = chum.is_half_operator();
         
-        if modes.len() == 0 {
+        if modes.is_empty() {
             self.feed_msg(&mut conn_state.stream, RplChannelModeIs324{ client,
                     channel: target, modestring: &chanobj.modes.to_string() }).await?;
             self.feed_msg(&mut conn_state.stream, RplCreationTime329{ client,
@@ -505,19 +505,19 @@ impl super::MainState {
             }
         }
         
-        if set_modes_string.len()!=0 || unset_modes_string.len()!=0 ||
-                modes_params_string.len() != 0 {
+        if !set_modes_string.is_empty() || !unset_modes_string.is_empty() ||
+                !modes_params_string.is_empty() {
             let mut mode_string = String::new();
-            if set_modes_string.len() != 0 {
+            if !set_modes_string.is_empty() {
                 mode_string.push('+');
                 mode_string += &set_modes_string;
             }
-            if unset_modes_string.len() != 0 {
+            if !unset_modes_string.is_empty() {
                 mode_string.push('-');
                 mode_string += &unset_modes_string;
             }
-            let mode_string = if modes_params_string.len() != 0 {
-                if mode_string.len() != 0 {
+            let mode_string = if !modes_params_string.is_empty() {
+                if !mode_string.is_empty() {
                     [&mode_string, &modes_params_string[1..]].join(" ")
                 } else { modes_params_string[1..].to_string() }
             } else { mode_string };
@@ -538,7 +538,7 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         let mut user = state.users.get_mut(target).unwrap();
         let user_nick = target;
-        if modes.len() == 0 {
+        if modes.is_empty() {
             self.feed_msg(&mut conn_state.stream, RplUModeIs221{ client,
                     user_modes: &user.modes.to_string() }).await?;
         } else {
@@ -653,13 +653,13 @@ impl super::MainState {
             }
         }
         
-        if set_modes_string.len()!=0 || unset_modes_string.len()!=0 {
+        if !set_modes_string.is_empty() || !unset_modes_string.is_empty() {
             let mut mode_string = String::new();
-            if set_modes_string.len() != 0 {
+            if !set_modes_string.is_empty() {
                 mode_string.push('+');
                 mode_string += &set_modes_string;
             }
-            if unset_modes_string.len() != 0 {
+            if !unset_modes_string.is_empty() {
                 mode_string.push('-');
                 mode_string += &unset_modes_string;
             }

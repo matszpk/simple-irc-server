@@ -54,7 +54,7 @@ impl<'a> Message<'a> {
     pub(crate) fn from_shared_str(input: &'a str) -> Result<Self, MessageError> {
         let trimmed = input.trim_start();
         
-        if trimmed.len() != 0 {
+        if !trimmed.is_empty() {
             // start_pos after ':' if exists - to skip ':' before source
             let start_pos = if trimmed.bytes().next() == Some(b':') { 1 } else { 0 };
             let (rest, last_param) =
@@ -93,14 +93,14 @@ impl<'a> Message<'a> {
         out += source;
         out.push(' ');
         out += self.command;
-        if self.params.len() >= 1 {
+        if !self.params.is_empty() {
             self.params[..self.params.len()-1].iter().for_each(|s| {
                 out.push(' ');
                 out += s;
             });
             let last = self.params[self.params.len()-1];
             if last.find(|c|  c==':' || c == ' ' || c == '\t').is_some() ||
-                            last.len() == 0 {
+                            last.is_empty() {
                 out += " :";
             } else {
                 out.push(' ');
@@ -252,7 +252,7 @@ impl<'a> Command<'a> {
     fn parse_from_message(message: &Message<'a>) -> Result<Self, CommandError> {
         match message.command.to_ascii_uppercase().as_str() {
             "CAP" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let subcommand = match param_it.next().unwrap()
                             .to_ascii_uppercase().as_str() {
@@ -282,13 +282,13 @@ impl<'a> Command<'a> {
             },
             "AUTHENTICATE" => Ok(AUTHENTICATE{}),
             "PASS" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(PASS{ password: message.params[0] })
                 } else {
                     Err(NeedMoreParams(PASSId)) }
             }
             "NICK" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(NICK{ nickname: message.params[0] })
                 } else {
                     Err(NeedMoreParams(NICKId)) }
@@ -303,13 +303,13 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(USERId)) }
             }
             "PING" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(PING{ token: message.params[0] })
                 } else {
                     Err(NeedMoreParams(PINGId)) }
             }
             "PONG" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(PONG{ token: message.params[0] })
                 } else {
                     Err(NeedMoreParams(PONGId)) }
@@ -323,7 +323,7 @@ impl<'a> Command<'a> {
             }
             "QUIT" => Ok(QUIT{}),
             "JOIN" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let keys_opt = param_it.next().map(|x|
@@ -338,7 +338,7 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(JOINId)) }
             }
             "PART" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let reason = param_it.next().map(|x| *x);
@@ -347,7 +347,7 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(PARTId)) }
             }
             "TOPIC" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let channel = param_it.next().unwrap();
                     let topic = param_it.next().map(|x| *x);
@@ -356,13 +356,13 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(TOPICId)) }
             }
             "NAMES" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(NAMES{ channels: message.params[0].split(',').collect::<Vec<_>>() })
                 } else {
                     Ok(NAMES{ channels: vec![] }) }
             }
             "LIST" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let server = param_it.next().map(|x| *x);
@@ -398,7 +398,7 @@ impl<'a> Command<'a> {
                 Ok(ADMIN{ target: message.params.iter().next().map(|x| *x) })
             }
             "CONNECT" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let target_server = param_it.next().unwrap();
                     let port = param_it.next().map(|x| x.parse()).transpose();
@@ -417,7 +417,7 @@ impl<'a> Command<'a> {
                 Ok(TIME{ server: message.params.iter().next().map(|x| *x) })
             }
             "STATS" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let query_str = param_it.next().unwrap();
                     let server = param_it.next().map(|x| *x);
@@ -441,14 +441,14 @@ impl<'a> Command<'a> {
                     Ok(LINKS{ remote_server: None, server_mask: None }) }
             }
             "HELP" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(HELP{ subject: Some(message.params[0]) })
                 } else {
                     Ok(HELP{ subject: None }) }
             }
             "INFO" => Ok(INFO{}),
             "MODE" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut modes = vec![];
                     let mut param_it = message.params.iter();
                     let target = param_it.next().unwrap();
@@ -491,13 +491,13 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(NOTICEId)) }
             }
             "WHO" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(WHO{ mask: message.params[0] })
                 } else {
                     Err(NeedMoreParams(WHOId)) }
             }
             "WHOIS" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     if message.params.len() >= 2 {
                        Ok(WHOIS{ target: Some(message.params[0]),
                             nickmasks: message.params[1].split(',').collect::<Vec<_>>() })
@@ -509,7 +509,7 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(WHOISId)) }
             }
             "WHOWAS" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let nickname = param_it.next().unwrap();
                     let count = param_it.next().map(|x| x.parse()).transpose();
@@ -543,13 +543,13 @@ impl<'a> Command<'a> {
                 Ok(AWAY{ text: message.params.iter().next().map(|x| *x) })
             }
             "USERHOST" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(USERHOST{ nicknames: message.params.clone() })
                 } else {
                     Err(NeedMoreParams(USERHOSTId)) }
             }
             "WALLOPS" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(WALLOPS{ text: message.params[0] })
                 } else {
                     Err(NeedMoreParams(WALLOPSId)) }

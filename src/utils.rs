@@ -74,7 +74,7 @@ pub(crate) fn validate_source(s: &str) -> bool {
 }
 
 pub(crate) fn validate_username(username: &str) -> Result<(), ValidationError> {
-    if username.len() != 0 && (username.as_bytes()[0] == b'#' ||
+    if !username.is_empty() && (username.as_bytes()[0] == b'#' ||
             username.as_bytes()[0] == b'&') {
         Err(ValidationError::new("Username must not have channel prefix."))
     } else if !username.contains('.') && !username.contains(':') && !username.contains(',') {
@@ -85,7 +85,7 @@ pub(crate) fn validate_username(username: &str) -> Result<(), ValidationError> {
 }
 
 pub(crate) fn validate_channel(channel: &str) -> Result<(), ValidationError> {
-    if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') &&
+    if !channel.is_empty() && !channel.contains(':') && !channel.contains(',') &&
         (channel.as_bytes()[0] == b'#' || channel.as_bytes()[0] == b'&') {
         Ok(())
     } else {
@@ -105,7 +105,7 @@ pub(crate) fn validate_server_mask<E: Error>(s: &str, e: E) -> Result<(), E>  {
 }
 
 pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result<(), E> {
-    if channel.len() != 0 && !channel.contains(':') && !channel.contains(',') {
+    if !channel.is_empty() && !channel.contains(':') && !channel.contains(',') {
         let mut is_channel = false;
         let mut last_amp = false;
         for (i,c) in channel.bytes().enumerate() {
@@ -130,12 +130,12 @@ pub(crate) fn validate_usermodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
                 -> Result<(), CommandError> {
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
-        if ms.len() != 0 {
+        if !ms.is_empty() {
             if ms.find(|c|
                 c!='+' && c!='-' && c!='i' && c!='o' &&
                     c!='O' && c!='r' && c!='w').is_some() {
                 Err(UnknownUModeFlag(param_idx))
-            } else if margs.len() != 0 {
+            } else if !margs.is_empty() {
                 Err(WrongParameter(MODEId, param_idx))
             } else {
                 param_idx += 1;
@@ -151,7 +151,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                 -> Result<(), CommandError> {
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
-        if ms.len() != 0 {
+        if !ms.is_empty() {
             let mut mode_set = false;
             let mut arg_param_idx = param_idx+1;
             
@@ -240,14 +240,14 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
     let mut pat = pattern;
     let mut t = text;
     let mut asterisk = false;
-    while pat.len()!=0 {
+    while !pat.is_empty() {
         let (newpat, m, cur_ast) = if let Some(i) = pat.find('*') {
             (&pat[i+1..], &pat[..i], true)
         } else {
             (&pat[pat.len()..pat.len()], pat, false)
         };
         
-        if m.len() != 0 {
+        if !m.is_empty() {
             if !asterisk {
                 // if first match
                 if !starts_single_wilcards(m, t) { return false; }
@@ -274,7 +274,7 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
         pat = newpat;
     }
     // if last character in pattern is '*' or text has been fully consumed
-    (pattern.len()!=0 && pattern.as_bytes()[pattern.len()-1] == b'*') || t.len() == 0
+    (!pattern.is_empty() && pattern.as_bytes()[pattern.len()-1] == b'*') || t.is_empty()
 }
 
 pub(crate) fn normalize_sourcemask(mask: &str) -> String {

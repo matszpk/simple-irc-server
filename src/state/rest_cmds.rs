@@ -269,7 +269,7 @@ impl super::MainState {
                 }
             });
             
-            if real_nickmasks.len() != 0 {
+            if !real_nickmasks.is_empty() {
                 state.users.keys().for_each(|nick| {
                     if real_nickmasks.iter().any(|mask| match_wildcard(mask, nick)) {
                         nicks.insert(nick.to_string());

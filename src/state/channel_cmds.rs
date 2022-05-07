@@ -252,7 +252,7 @@ impl super::MainState {
             
             if do_change_topic {
                 let chanobj = state.channels.get_mut(channel).unwrap();
-                if topic.len() != 0 {
+                if !topic.is_empty() {
                     chanobj.topic = Some(ChannelTopic::new_with_nick(
                         topic.to_string(), user_nick.clone()));
                 } else {
@@ -319,7 +319,7 @@ impl super::MainState {
                     name_chunk.clear();
                 }
             }
-            if name_chunk.len() != 0 {   // last chunk
+            if !name_chunk.is_empty() {   // last chunk
                 self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
                                 channel: &channel.name, replies: &name_chunk }).await?;
             }
@@ -337,7 +337,7 @@ impl super::MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let user = state.users.get(user_nick).unwrap();
         
-        if channels.len() != 0 { 
+        if !channels.is_empty() {
             for c in channels {
                 if let Some(ref channel) = state.channels.get(c) {
                     self.send_names_from_channel(conn_state, channel, &state.users,
@@ -370,7 +370,7 @@ impl super::MainState {
         } else {
             let state = self.state.read().await;
             self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
-            if channels.len() != 0 {
+            if !channels.is_empty() {
                 for ch in channels.iter().filter_map(|ch| {
                         state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
                     }) {
@@ -1754,7 +1754,7 @@ mod test {
                         let chan = reply[reply_start_2.len()..]
                             .split_ascii_whitespace().next().unwrap();
                         assert!((!exp_names.contains_key(chan)) ||
-                            exp_names.get(chan).unwrap().2.len() == 0);
+                            exp_names.get(chan).unwrap().2.is_empty());
                     }
                 }
                 last_chan = None;
