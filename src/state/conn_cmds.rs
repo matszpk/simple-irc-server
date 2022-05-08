@@ -94,6 +94,7 @@ impl super::MainState {
                 conn_state.caps_negotation = true;
                 if let Some(cs) = caps {
                     let mut new_caps = conn_state.caps;
+                    // accept if all capabilities matches
                     if cs.iter().all(|c| new_caps.apply_cap(c)) {
                         conn_state.caps = new_caps;
                         self.feed_msg(&mut conn_state.stream,
@@ -114,6 +115,7 @@ impl super::MainState {
         Ok(())
     }
     
+    // send ISupport messages
     pub(super) async fn send_isupport(&self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
@@ -138,12 +140,17 @@ impl super::MainState {
     
     async fn authenticate(&self, conn_state: &mut ConnState)
         -> Result<(), Box<dyn Error>> {
+        // registered - user that defined in configuration
         let (auth_opt, registered) = {
+            // finish of authentication requires finish caps negotiation.
             if !conn_state.caps_negotation {
                 let user_state = &mut conn_state.user_state;
+                // nick must be defined
                 if user_state.nick.is_some() {
+                    // username must be defined
                     if let Some(ref name) = user_state.name {
                         let mut registered = false;
+                        // get password option
                         let password_opt = if let Some(uidx) =
                                     self.user_config_idxs.get(name) {
                             // match user mask
@@ -163,9 +170,11 @@ impl super::MainState {
                                 }
                             } else { None }
                         } else { None }
+                            // otherwise get default password from configuration
                             .or(self.config.password.as_ref());
                         
                         if let Some(password) = password_opt {
+                            // check password
                             let good = if let Some(ref entered_pwd) = user_state.password {
                                 *entered_pwd == *password
                             } else { false };
@@ -194,7 +203,7 @@ impl super::MainState {
                     if !state.users.contains_key(&user.nick) {
                         state.add_user(user);
                         umode_str
-                    } else {
+                    } else { // if nick already used
                         let client = conn_state.user_state.client_name();
                         self.feed_msg(&mut conn_state.stream,
                                 ErrNicknameInUse433{ client, nick: &user.nick }).await?;
@@ -202,7 +211,7 @@ impl super::MainState {
                     }
                 };
                 
-                {
+                {   // send message to user: welcome,....
                     let user_state = &conn_state.user_state;
                     let client = user_state.client_name();
                     // welcome
@@ -228,10 +237,11 @@ impl super::MainState {
                     self.send_isupport(conn_state).await?;
                 }
                 
+                // send messages from LUSERS and MOTD
                 self.process_lusers(conn_state).await?;
                 self.process_motd(conn_state, None).await?;
                 
-                // mode
+                // send mode reply
                 let client = conn_state.user_state.client_name();
                 self.feed_msg(&mut conn_state.stream,
                         RplUModeIs221{ client, user_modes: &user_modes }).await?;
@@ -239,6 +249,7 @@ impl super::MainState {
                 // run ping waker for this connection
                 conn_state.run_ping_waker(&self.config);
             } else {
+                // if authentication failed
                 let client = conn_state.user_state.client_name();
                 conn_state.quit.store(1, Ordering::SeqCst);
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
@@ -260,6 +271,7 @@ impl super::MainState {
             -> Result<(), Box<dyn Error>> {
         if !conn_state.user_state.authenticated {
             conn_state.user_state.password = Some(pass.to_string());
+            // try authentication
             self.authenticate(conn_state).await?;
         } else {
             let client = conn_state.user_state.client_name();
@@ -273,6 +285,7 @@ impl super::MainState {
         if !conn_state.user_state.authenticated {
             if !self.state.read().await.users.contains_key(nick) {
                 conn_state.user_state.set_nick(nick.to_string());
+                // try authentication
                 self.authenticate(conn_state).await?;
             } else {
                 let client = conn_state.user_state.client_name();
@@ -285,6 +298,7 @@ impl super::MainState {
             let old_nick = conn_state.user_state.nick.as_ref().unwrap().to_string();
             if nick != old_nick {
                 let nick_str = nick.to_string();
+                // if new nick is not used by other
                 if !state.users.contains_key(&nick_str) {
                     let old_source = conn_state.user_state.source.clone();
                     let mut user = state.users.remove(&old_nick).unwrap();
@@ -325,6 +339,7 @@ impl super::MainState {
         if !conn_state.user_state.authenticated {
             conn_state.user_state.set_name(username.to_string());
             conn_state.user_state.realname = Some(realname.to_string());
+            // try authentication
             self.authenticate(conn_state).await?;
         } else {
             let client = conn_state.user_state.client_name();
@@ -354,17 +369,18 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         
         if let Some(oper_idx) = self.oper_config_idxs.get(nick) {
+            // if operator defined in configuration
             let mut state = self.state.write().await;
             let mut user = state.users.get_mut(user_nick).unwrap();
             let op_cfg_opt = self.config.operators.as_ref().unwrap().get(*oper_idx);
             let op_config = op_cfg_opt.as_ref().unwrap();
             
+            // check password
             let do_it = if op_config.password != password {
                 self.feed_msg(&mut conn_state.stream,
                         ErrPasswdMismatch464{ client }).await?;
                 false
-            }
-            else if let Some(ref op_mask) = op_config.mask {
+            } else if let Some(ref op_mask) = op_config.mask {
                 if !match_wildcard(&op_mask, &conn_state.user_state.source) {
                     self.feed_msg(&mut conn_state.stream,
                             ErrNoOperHost491{ client }).await?;
@@ -373,6 +389,7 @@ impl super::MainState {
             } else { true };
             
             if do_it {
+                // do it if all is ok.
                 user.modes.oper = true;
                 state.operators_count += 1;
                 self.feed_msg(&mut conn_state.stream, RplYoureOper381{ client }).await?;
