@@ -44,18 +44,20 @@ impl super::MainState {
                 // if already created
                 let do_join = if let Some(key) = &channel.modes.key {
                     if let Some(ref keys) = keys_opt {
+                        // check key
                         if key != keys[i] {
                             self.feed_msg(&mut conn_state.stream, ErrBadChannelKey475{
                             client, channel: chname_str }).await?;
                             false
                         } else { true }
-                    } else {
+                    } else { // no key then bad key
                         self.feed_msg(&mut conn_state.stream, ErrBadChannelKey475{
                             client, channel: chname_str }).await?;
                         false
                     }
                 } else { true };
                 
+                // check whether user is banned
                 let do_join = do_join && {
                     if !channel.modes.banned(&conn_state.user_state.source) {
                         true
@@ -66,6 +68,7 @@ impl super::MainState {
                     }
                 };
                 
+                // check whether must have invitation
                 let do_join = do_join && {
                      if !channel.modes.invite_only ||
                         user.invited_to.contains(&channel.name) ||
@@ -80,6 +83,7 @@ impl super::MainState {
                     }
                 };
                 
+                // check whether channel is not full
                 let do_join = do_join && {
                     let not_full = if let Some(client_limit) = channel.modes.client_limit {
                         channel.users.len() < client_limit
@@ -90,7 +94,7 @@ impl super::MainState {
                         false
                     }
                 };
-                
+                // check whether user is not alrady joined
                 let do_join = do_join && !channel.users.contains_key(&user_nick);
                 
                 if do_join { (true, false)
@@ -99,6 +103,7 @@ impl super::MainState {
                 (true, true)
             };
             
+            // check whether user is not in max channels
             let do_join = if let Some(max_joins) = self.config.max_joins {
                 if join_count >= max_joins {
                     self.feed_msg(&mut conn_state.stream, ErrTooManyChannels405{
@@ -111,6 +116,7 @@ impl super::MainState {
             if do_join { join_count += 1; }
         }
         
+        // insert create channel or add user to channel
         for ((join, create), chname_str) in joined_created.iter().zip(channels.iter()) {
             let chname = chname_str.to_string();
             
@@ -125,6 +131,7 @@ impl super::MainState {
                 }
             }
         }
+        // if something done - then change last activity
         if join_count != user_joined {
             user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
                         .unwrap().as_secs();
@@ -150,6 +157,7 @@ impl super::MainState {
                 self.send_names_from_channel(conn_state, chanobj,
                                 &state.users, &user, true).await?;
                 
+                // send message to other users in channel
                 for (nick, _) in &chanobj.users {
                     if nick != user_nick.as_str() {
                         state.users.get(&nick.clone()).unwrap().send_msg_display(
@@ -175,6 +183,7 @@ impl super::MainState {
         
         for channel in &channels {
             if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
+                // if user in channel
                 let do_it = if chanobj.users.contains_key(&user_nick) {
                     something_done = true;
                     true
@@ -198,6 +207,7 @@ impl super::MainState {
                     }
                 }
                 
+                // remove user from channel
                 if do_it {
                     state.remove_user_from_channel(channel, &user_nick);
                     removed_from.push(true);
@@ -211,9 +221,8 @@ impl super::MainState {
         
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
         let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
-        //for channel in &channels {
-        //    user.channels.remove(&channel.to_string());
-        //}
+        
+        // if something done then change last activity time
         if something_done {
             user.last_activity = SystemTime::now().duration_since(UNIX_EPOCH)
                         .unwrap().as_secs();
@@ -226,11 +235,16 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         
         if let Some(topic) = topic_opt {
+            // if change topic
             let mut state = self.state.write().await;
             let user_nick = conn_state.user_state.nick.as_ref().unwrap();
             
+            // if channel exists
             let do_change_topic = if let Some(chanobj) = state.channels.get(channel) {
+                // if user on channel
                 if chanobj.users.contains_key(user_nick) {
+                    // if channel topic is not protected otherwise use should be at least
+                    // a half-operator.
                     if !chanobj.modes.protected_topic || chanobj.users.get(user_nick)
                                 .unwrap().is_half_operator() {
                         true
@@ -251,6 +265,7 @@ impl super::MainState {
             };
             
             if do_change_topic {
+                // change topic
                 let chanobj = state.channels.get_mut(channel).unwrap();
                 if !topic.is_empty() {
                     chanobj.topic = Some(ChannelTopic::new_with_nick(
@@ -260,6 +275,7 @@ impl super::MainState {
                 }
             }
             if do_change_topic {
+                // send message about to all users in channel.
                 let chanobj = state.channels.get(channel).unwrap();
                 for (cu, _) in &chanobj.users {
                     state.users.get(cu).unwrap().send_message(msg,
@@ -267,12 +283,13 @@ impl super::MainState {
                 }
             }
         } else {
-            // read
+            // read topic
             let state = self.state.read().await;
             if let Some(chanobj) = state.channels.get(channel) {
                 let user_nick = conn_state.user_state.nick.as_ref().unwrap();
                 
                 if chanobj.users.contains_key(user_nick) {
+                    // if user on channel
                     if let Some(ref topic) = chanobj.topic {
                         self.feed_msg(&mut conn_state.stream, RplTopic332{ client,
                             channel, topic: &topic.topic }).await?;
@@ -294,12 +311,14 @@ impl super::MainState {
         Ok(())
     }
     
+    // routine used for sending names of channel. end argument - if true then send EndOfNames.
     async fn send_names_from_channel(&self, conn_state: &mut ConnState,
                 channel: &Channel, users: &HashMap<String, User>, conn_user: &User,
                 end: bool) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
         
         let in_channel = channel.users.contains_key(&conn_user.nick);
+        // if channel is not secret or user on channel.
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
             let symbol = if channel.modes.secret { "@" } else { "=" };
@@ -309,6 +328,7 @@ impl super::MainState {
             
             for n in &channel.users {
                 let user = users.get(n.0.as_str()).unwrap();
+                // do not send names of invisible users or user on channel
                 if !user.modes.invisible || in_channel {
                     name_chunk.push(NameReplyStruct{
                         prefix: n.1.to_string(&conn_state.caps), nick: &user.nick });
@@ -338,6 +358,7 @@ impl super::MainState {
         let user = state.users.get(user_nick).unwrap();
         
         if !channels.is_empty() {
+            // send names with EndOfNames
             for c in channels {
                 if let Some(ref channel) = state.channels.get(c) {
                     self.send_names_from_channel(conn_state, channel, &state.users,
@@ -349,11 +370,13 @@ impl super::MainState {
                 }
             }
         } else {
+            // send names.
             for c in state.channels.values() {
                 self.send_names_from_channel(conn_state, &c, &state.users,
                             &user, false).await?;
             }
             let client = conn_state.user_state.client_name();
+            // send single EndOfNames with wildcard.
             self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
                         channel: "*" }).await?;
         }
@@ -371,6 +394,7 @@ impl super::MainState {
             let state = self.state.read().await;
             self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
             if !channels.is_empty() {
+                // send channels that are public (not secret).
                 for ch in channels.iter().filter_map(|ch| {
                         state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
                     }) {
@@ -380,6 +404,7 @@ impl super::MainState {
                                 .unwrap_or(&String::new()) }).await?;
                 }
             } else {
+                // send channels that are public (not secret).
                 for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
                         channel: &ch.name, client_count: ch.users.len(),
@@ -402,6 +427,7 @@ impl super::MainState {
         let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
             if chanobj.users.contains_key(user_nick) {
                 let do_invite2 = if chanobj.modes.invite_only {
+                    // only operator can invite into channel if channel is invite_only.
                     if !chanobj.users.get(user_nick).unwrap().operator {
                         self.feed_msg(&mut conn_state.stream,
                                     ErrChanOpPrivsNeeded482{ client, channel }).await?;
@@ -452,8 +478,10 @@ impl super::MainState {
         let mut kicked = vec![];
         
         if let Some(chanobj) = state.channels.get(channel) {
+            // if user on channel
             if chanobj.users.contains_key(user_nick) {
                 let user_chum = chanobj.users.get(user_nick).unwrap();
+                // if user is half operator at least.
                 if user_chum.is_half_operator() {
                     let is_only_half_oper = user_chum.is_only_half_operator();
                     for kick_user in &kick_users {
@@ -484,7 +512,7 @@ impl super::MainState {
                         ErrNoSuchChannel403{ client, channel }).await?;
         }
         
-        {
+        {   // kick users
             for ku in &kicked {
                 state.remove_user_from_channel(channel, &ku);
             }
@@ -496,6 +524,7 @@ impl super::MainState {
                     state.users.get(&nick.to_string()).unwrap().send_msg_display(
                             &conn_state.user_state.source, kick_msg.clone())?;
                 }
+                // and send to kicked user
                 state.users.get(&ku.to_string()).unwrap().send_msg_display(
                         &conn_state.user_state.source, kick_msg.clone())?;
             }
