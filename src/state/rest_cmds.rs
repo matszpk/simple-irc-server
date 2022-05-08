@@ -43,6 +43,7 @@ impl super::MainState {
             if target_type.contains(PrivMsgTargetType::Channel) { // to channel
                 if let Some(chanobj) = state.channels.get(chan_str) {
                     let chanuser_mode = chanobj.users.get(user_nick);
+                    // check whether can send from outside channel
                     let can_send = {
                         if (!chanobj.modes.no_external_messages &&
                                     !chanobj.modes.secret) ||
@@ -56,6 +57,7 @@ impl super::MainState {
                             false
                         }
                     };
+                    // check whether user in channel is banned
                     let can_send = can_send && {
                         if !chanobj.modes.banned(&conn_state.user_state.source) {
                             true
@@ -67,6 +69,7 @@ impl super::MainState {
                             false
                         }
                     };
+                    // check whether is channel moderated and user have voice permissions
                     let can_send = can_send && {
                         if !chanobj.modes.moderated ||
                             chanuser_mode.map_or(false, |chum| chum.is_voice()) {
@@ -83,7 +86,7 @@ impl super::MainState {
                     if can_send {
                         use PrivMsgTargetType::*;
                         if !(target_type & ChannelAllSpecial).is_empty() {
-                            // to special
+                            // send to special users
                             if !(target_type & ChannelFounder).is_empty() {
                                 if let Some(ref founders) = chanobj.modes.founders {
                                     founders.iter().try_for_each(|u| {
@@ -135,6 +138,7 @@ impl super::MainState {
                                 }
                             }
                         } else {
+                            // send to all users
                             chanobj.users.keys().try_for_each(|u| {
                                 if u != user_nick {
                                     state.users.get(u).unwrap().send_msg_display(
@@ -154,6 +158,7 @@ impl super::MainState {
                 if let Some(cur_user) = state.users.get(*target) {
                     cur_user.send_msg_display(&conn_state.user_state.source, msg_str)?;
                     if !notice {
+                        // if user away
                         if let Some(ref away) = cur_user.away {
                             self.feed_msg(&mut conn_state.stream, RplAway301{ client,
                                         nick: target, message: &away }).await?;
@@ -170,7 +175,7 @@ impl super::MainState {
         }
         }
         
-        {
+        {   // update last activity if something sent
             if something_done {
                 let mut state = self.state.write().await;
                 let mut user = state.users.get_mut(user_nick).unwrap();
@@ -191,14 +196,17 @@ impl super::MainState {
         self.process_privmsg_notice(conn_state, targets, text, true).await
     }
     
+    // routine to send who info about user
     pub(super) async fn send_who_info<'a>(&self, conn_state: &mut ConnState,
             channel: Option<(&'a str, &ChannelUserModes)>,
             user: &User, cmd_user: &User) -> Result<(), Box<dyn Error>> {
         if !user.modes.invisible || !user.channels.is_disjoint(&cmd_user.channels) {
             let client = conn_state.user_state.client_name();
             let mut flags = String::new();
+            // if user away
             if user.away.is_some() { flags.push('G');
             } else { flags.push('H'); }
+            // if user is operator
             if user.modes.is_local_oper() {
                 flags.push('*');
             }
@@ -220,6 +228,7 @@ impl super::MainState {
         let user = state.users.get(user_nick).unwrap();
         
         if mask.contains('*') || mask.contains('?') {
+            // if wilcards
             for (_, u) in &state.users {
                 if match_wildcard(mask, &u.nick) || match_wildcard(mask, &u.source) ||
                     match_wildcard(mask, &u.realname) {
@@ -227,6 +236,7 @@ impl super::MainState {
                 }
             }
         } else if validate_channel(mask).is_ok() {
+            // if channel
             if let Some(channel) = state.channels.get(mask) {
                 for (u, chum) in &channel.users {
                     self.send_who_info(conn_state, Some((&channel.name, chum)),
@@ -258,6 +268,7 @@ impl super::MainState {
             let mut nicks = HashSet::<String>::new();
             let mut real_nickmasks = vec![];
             
+            // collect real nickmasks (wildcards) and nicks
             nickmasks.iter().for_each(|nickmask| {
                 if nickmask.contains('*') || nickmask.contains('?') {
                     // wildcard
@@ -270,6 +281,7 @@ impl super::MainState {
             });
             
             if !real_nickmasks.is_empty() {
+                // if filter users by using real nickmasks and insert to nicks
                 state.users.keys().for_each(|nick| {
                     if real_nickmasks.iter().any(|mask| match_wildcard(mask, nick)) {
                         nicks.insert(nick.to_string());
@@ -301,12 +313,14 @@ impl super::MainState {
                     .filter_map(|chname| {
                     let ch = state.channels.get(chname).unwrap();
                     if !ch.modes.secret {
+                        // put channel only if not secret
                         Some(WhoIsChannelStruct{ prefix: Some(ch.users.get(&arg_user.nick)
                             .unwrap().to_string(&conn_state.caps)).clone(),
                             channel: &ch.name })
                     } else { None }
                     }).collect::<Vec<_>>();
                 
+                // divide channel replies by chunks
                 for chr_chunk in channel_replies.chunks(30) {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsChannels319{ client,
                             nick: &nick, channels: &chr_chunk }).await?;
@@ -340,9 +354,12 @@ impl super::MainState {
         } else {
             let state = self.state.read().await;
             if let Some(hist) = state.nick_histories.get(&nickname.to_string()) {
+                // get hist_count - length if zero or not given
                 let hist_count = if let Some(c) = count {
                     if c > 0 { c } else { hist.len() }
                 } else { hist.len() };
+                
+                // loop to send whowas replies
                 for entry in hist.iter().rev().take(hist_count) {
                     self.feed_msg(&mut conn_state.stream, RplWhoWasUser314{ client,
                             nick: &nickname, username: &entry.username,
@@ -371,6 +388,7 @@ impl super::MainState {
         let user = state.users.get(user_nick).unwrap();
         
         if user.modes.oper {
+            // only operator can kill user
             if let Some(user_to_kill) = state.users.get_mut(nickname) {
                 if let Some(sender) = user_to_kill.quit_sender.take() {
                     sender.send((user_nick.to_string(), comment.to_string()))
@@ -415,6 +433,7 @@ impl super::MainState {
             let user_nick = conn_state.user_state.nick.as_ref().unwrap();
             let user = state.users.get(user_nick).unwrap();
             
+            // only operator can kill server
             if user.modes.oper {
                 for u in state.users.values_mut() {
                     if let Some(sender) = u.quit_sender.take() {
@@ -439,9 +458,11 @@ impl super::MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let mut user = state.users.get_mut(user_nick).unwrap();
         if let Some(t) = text {
+            // set away
             user.away = Some(t.to_string());
             self.feed_msg(&mut conn_state.stream, RplNowAway306{ client }).await?;
         } else {
+            // unset away
             user.away = None;
             self.feed_msg(&mut conn_state.stream, RplUnAway305{ client }).await?;
         }
@@ -471,6 +492,7 @@ impl super::MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let user = state.users.get(user_nick).unwrap();
         
+        // only local operator or higher can send message to wallops
         if user.modes.is_local_oper() {
             state.wallops_users.iter().try_for_each(|wu| state.users.get(wu).unwrap()
                 .send_message(msg, &conn_state.user_state.source))?;

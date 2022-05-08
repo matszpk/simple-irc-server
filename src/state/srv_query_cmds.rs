@@ -213,6 +213,8 @@ impl super::MainState {
             let mut margs_it = margs.iter();
             let mut mode_set = false;
             for mchar in mchars.chars() {
+                // check privileges before run and send error privileges
+                // will be not satisfied.
                 match mchar {
                     'q' => {
                         if !chum.founder {
@@ -255,16 +257,19 @@ impl super::MainState {
                                         .unwrap_or_default();
                                 let norm_bmask = normalize_sourcemask(bmask);
                                 if mode_set {
+                                    // put to applied modes
                                     modes_params_string += " +b ";
                                     modes_params_string += &norm_bmask;
                                     
                                     ban.insert(norm_bmask.clone());
+                                    // add to ban_info
                                     chanobj.ban_info.insert(norm_bmask.clone(), BanInfo{
                                         who: conn_state.user_state.nick
                                                 .as_ref().unwrap().to_string(),
                                         set_time: SystemTime::now()
                                             .duration_since(UNIX_EPOCH).unwrap().as_secs() });
                                 } else {
+                                    // put to applied modes
                                     modes_params_string += " -b ";
                                     modes_params_string += &norm_bmask;
                                     
@@ -285,7 +290,7 @@ impl super::MainState {
                                             RplBanList367{ client, channel: target, mask: &b,
                                                 who: &ban_info.who,
                                                 set_ts: ban_info.set_time }).await?;
-                                    } else {
+                                    } else { // if not found
                                         self.feed_msg(&mut conn_state.stream,
                                             RplBanList367{ client, channel: target,
                                             mask: &b, who: "", set_ts: 0 }).await?;
@@ -303,11 +308,13 @@ impl super::MainState {
                                         .unwrap_or_default();
                                 let norm_emask = normalize_sourcemask(emask);
                                 if mode_set {
+                                    // put to applied modes
                                     modes_params_string += " +e ";
                                     modes_params_string += &norm_emask;
                                     
                                     exp.insert(norm_emask.clone());
                                 } else {
+                                    // put to applied modes
                                     modes_params_string += " -e ";
                                     modes_params_string += &norm_emask;
                                     
@@ -326,8 +333,7 @@ impl super::MainState {
                                 }
                             }
                             self.feed_msg(&mut conn_state.stream, 
-                                RplEndOfExceptList349{ client,
-                                        channel: target }).await?;
+                                RplEndOfExceptList349{ client, channel: target }).await?;
                         }
                     },
                     'I' => {
@@ -337,11 +343,13 @@ impl super::MainState {
                                         .unwrap_or_default();
                                 let norm_imask = normalize_sourcemask(imask);
                                 if mode_set {
+                                    // put to applied modes
                                     modes_params_string += " +I ";
                                     modes_params_string += &norm_imask;
                                     
                                     exp.insert(norm_imask.clone());
                                 } else {
+                                    // put to applied modes
                                     modes_params_string += " -I ";
                                     modes_params_string += &norm_imask;
                                     
@@ -360,8 +368,7 @@ impl super::MainState {
                                 }
                             }
                             self.feed_msg(&mut conn_state.stream, 
-                                RplEndOfInviteList347{ client,
-                                        channel: target }).await?;
+                                RplEndOfInviteList347{ client, channel: target }).await?;
                         }
                     },
                     'o'|'v'|'h'|'q'|'a' => {
@@ -371,11 +378,13 @@ impl super::MainState {
                                 'o' => {
                                     if if_op {
                                         if mode_set {
+                                            // put to applied modes
                                             modes_params_string += " +o ";
                                             modes_params_string += &arg;
                                     
                                             chanobj.add_operator(&arg);
                                         } else {
+                                            // put to applied modes
                                             modes_params_string += " -o ";
                                             modes_params_string += &arg;
                                             
@@ -386,11 +395,13 @@ impl super::MainState {
                                 'v' => {
                                     if if_half_op {
                                         if mode_set {
+                                            // put to applied modes
                                             modes_params_string += " +v ";
                                             modes_params_string += &arg;
                                             
                                             chanobj.add_voice(&arg);
                                         } else {
+                                            // put to applied modes
                                             modes_params_string += " -v ";
                                             modes_params_string += &arg;
                                             
@@ -401,11 +412,13 @@ impl super::MainState {
                                 'h' => {
                                     if if_op {
                                         if mode_set {
+                                            // put to applied modes
                                             modes_params_string += " +h ";
                                             modes_params_string += &arg;
                                             
                                             chanobj.add_half_operator(&arg);
                                         } else {
+                                            // put to applied modes
                                             modes_params_string += " -h ";
                                             modes_params_string += &arg;
                                             
@@ -416,11 +429,13 @@ impl super::MainState {
                                 'q' => {
                                     if chum.founder {
                                         if mode_set {
+                                            // put to applied modes
                                             modes_params_string += " +q ";
                                             modes_params_string += &arg;
                                             
                                             chanobj.add_founder(&arg);
                                         } else {
+                                            // put to applied modes
                                             modes_params_string += " -q ";
                                             modes_params_string += &arg;
                                             
@@ -431,11 +446,13 @@ impl super::MainState {
                                 'a' => {
                                     if chum.is_protected() {
                                         if mode_set {
+                                            // put to applied modes
                                             modes_params_string += " +a ";
                                             modes_params_string += &arg;
                                             
                                             chanobj.add_protected(&arg);
                                         } else {
+                                            // put to applied modes
                                             modes_params_string += " -a ";
                                             modes_params_string += &arg;
                                             
@@ -454,11 +471,13 @@ impl super::MainState {
                         if if_half_op {
                             chanobj.modes.client_limit = if mode_set {
                                 let arg = margs_it.next().unwrap();
+                                // put to applied modes
                                 modes_params_string += " +l ";
                                 modes_params_string += &arg;
                                             
                                 Some(arg.parse::<usize>().unwrap())
                             } else {
+                                // put to applied modes
                                 unset_modes_string.push('l');
                                 None };
                         }
@@ -467,36 +486,43 @@ impl super::MainState {
                         if if_half_op { chanobj.modes.key =
                             if mode_set {
                                 let arg = margs_it.next().unwrap();
+                                // put to applied modes
                                 modes_params_string += " +k ";
                                 modes_params_string += &arg;
                                 
                                 Some(arg.to_string())
                             } else {
+                            // put to applied modes
                             unset_modes_string.push('k');
                             None }; }
                     },
                     'i' => if if_half_op {
                         chanobj.modes.invite_only = mode_set;
+                        // put to applied modes
                         if mode_set { set_modes_string.push('i'); }
                         else { unset_modes_string.push('i'); }
                     },
                     'm' => if if_half_op {
                         chanobj.modes.moderated = mode_set;
+                        // put to applied modes
                         if mode_set { set_modes_string.push('m'); }
                         else { unset_modes_string.push('m'); }
                     },
                     't' => if if_half_op {
                         chanobj.modes.protected_topic = mode_set;
+                        // put to applied modes
                         if mode_set { set_modes_string.push('t'); }
                         else { unset_modes_string.push('t'); }
                     },
                     'n' => if if_half_op {
                         chanobj.modes.no_external_messages = mode_set;
+                        // put to applied modes
                         if mode_set { set_modes_string.push('n'); }
                         else { unset_modes_string.push('n'); }
                     },
                     's' => if if_half_op {
                         chanobj.modes.secret = mode_set;
+                        // put to applied modes
                         if mode_set { set_modes_string.push('s'); }
                         else { unset_modes_string.push('s'); }
                     },
@@ -505,6 +531,7 @@ impl super::MainState {
             }
         }
         
+        // send applied modes to user
         if !set_modes_string.is_empty() || !unset_modes_string.is_empty() ||
                 !modes_params_string.is_empty() {
             let mut mode_string = String::new();
@@ -555,12 +582,14 @@ impl super::MainState {
                             if !user.modes.invisible {
                                 user.modes.invisible = true;
                                 state.invisible_users_count += 1;
+                                // put to applied modes
                                 set_modes_string.push('i');
                             }
                         } else {
                             if user.modes.invisible {
                                 user.modes.invisible = false;
                                 state.invisible_users_count -= 1;
+                                // put to applied modes
                                 unset_modes_string.push('i');
                             }
                         }
@@ -570,6 +599,7 @@ impl super::MainState {
                             if !user.modes.registered {
                                 if conn_state.user_state.registered {
                                     user.modes.registered = true;
+                                    // put to applied modes
                                     set_modes_string.push('r');
                                 } else {
                                     self.feed_msg(&mut conn_state.stream,
@@ -579,6 +609,7 @@ impl super::MainState {
                         } else {
                             if user.modes.registered {
                                 user.modes.registered = false;
+                                // put to applied modes
                                 unset_modes_string.push('r');
                                 self.feed_msg(&mut conn_state.stream,
                                     ErrYourConnRestricted484{ client }).await?;
@@ -590,12 +621,14 @@ impl super::MainState {
                             if !user.modes.wallops {
                                 state.wallops_users.insert(user_nick.to_string());
                                 user.modes.wallops = true;
+                                // put to applied modes
                                 set_modes_string.push('w');
                             }
                         } else {
                             if user.modes.wallops {
                                 state.wallops_users.remove(&user_nick.to_string());
                                 user.modes.wallops = false;
+                                // put to applied modes
                                 unset_modes_string.push('w');
                             }
                         }
@@ -607,6 +640,7 @@ impl super::MainState {
                                     user.modes.oper = true;
                                     if !user.modes.local_oper {
                                         state.operators_count += 1;
+                                        // put to applied modes
                                         set_modes_string.push('o');
                                     }
                                 } else {
@@ -619,6 +653,7 @@ impl super::MainState {
                                 user.modes.oper = false;
                                 if !user.modes.local_oper {
                                     state.operators_count -= 1;
+                                    // put to applied modes
                                     unset_modes_string.push('o');
                                 }
                             }
@@ -631,6 +666,7 @@ impl super::MainState {
                                     user.modes.oper = true;
                                     if !user.modes.oper {
                                         state.operators_count += 1;
+                                        // put to applied modes
                                         set_modes_string.push('O');
                                     }
                                 } else {
@@ -643,6 +679,7 @@ impl super::MainState {
                                 user.modes.oper = false;
                                 if !user.modes.oper {
                                     state.operators_count -= 1;
+                                    // put to applied modes
                                     unset_modes_string.push('O');
                                 }
                             }
@@ -653,6 +690,7 @@ impl super::MainState {
             }
         }
         
+        // send applied modes to user
         if !set_modes_string.is_empty() || !unset_modes_string.is_empty() {
             let mut mode_string = String::new();
             if !set_modes_string.is_empty() {
