@@ -1238,6 +1238,8 @@ mod test {
             line_stream.next().await.unwrap().unwrap();
             line_stream.next().await.unwrap().unwrap();
             
+            time::sleep(Duration::from_millis(50)).await;
+            
             line_stream.send("JOIN #smartwatches,#ebooks,#smartglasses,#wearables"
                         .to_string()).await.unwrap();
             assert_eq!(":irc.irc 475 geek #ebooks :Cannot join channel (+k)".to_string(),
