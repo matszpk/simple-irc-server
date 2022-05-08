@@ -48,6 +48,7 @@ use Reply::*;
 struct User {
     hostname: String,
     sender: UnboundedSender<String>,
+    // quit_sender - used by KILL command.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
     name: String,
     realname: String,
@@ -84,6 +85,7 @@ impl User {
                     signon: now_ts } }
     }
     
+    // update nick - mainly source
     fn update_nick(&mut self, user_state: &ConnUserState) {
         if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
         self.source = user_state.source.clone();
@@ -125,6 +127,7 @@ impl ChannelUserModes {
     fn is_half_operator(&self) -> bool {
         self.founder || self.protected || self.operator || self.half_oper
     }
+    // if only half operator - no protected, no founder and no operator
     fn is_only_half_operator(&self) -> bool {
         !self.founder && !self.protected && !self.operator && self.half_oper
     }
@@ -150,6 +153,7 @@ impl ChannelUserModes {
     fn to_string(&self, caps: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
+        // after put the highest user mode, put other if caps multi-prefix is enabled.
         if (caps.multi_prefix || out.is_empty()) && self.protected { out.push('&'); }
         if (caps.multi_prefix || out.is_empty()) && self.operator { out.push('@'); }
         if (caps.multi_prefix || out.is_empty()) && self.half_oper { out.push('%'); }
@@ -158,6 +162,7 @@ impl ChannelUserModes {
     }
 }
 
+// get target type for PRIVMSG and channel name
 fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
     use PrivMsgTargetType::*;
     let mut out = Channel.into();
@@ -172,12 +177,14 @@ fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
             b'%' => out |= Channel|ChannelHalfOper,
             b'+' => out |= Channel|ChannelVoice,
             b'#' => {
+                // if global channel
                 if i+1 < target.len() { out_str = &target[i..]; }
                 else { out &= !ChannelAll; }
                 break;
             }
             _ => {
                 if last_amp {
+                    // only one ampersand - then not protected
                     if amp_count < 2 { out &= !ChannelProtected; }
                     out_str = &target[i-1..];
                 } else { out &= !ChannelAll; }
@@ -185,6 +192,7 @@ fn get_privmsg_target_type(target: &str) -> (FlagSet<PrivMsgTargetType>, &str) {
             }
         }
         if c == b'&' {
+            // if not last character then count ampersand, otherwise is not channel
             if i+1 < target.len() {
                 last_amp = true;
                 amp_count += 1;
@@ -229,6 +237,7 @@ struct ChannelDefaultModes {
 }
 
 impl ChannelDefaultModes {
+    // create new channel default modes from ChannelModes and clean up this ChannelModes.
     fn new_from_modes_and_cleanup(modes: &mut ChannelModes) -> Self {
         ChannelDefaultModes{
             operators: modes.operators.take().unwrap_or_default(),
@@ -248,6 +257,7 @@ struct Channel {
     ban_info: HashMap<String, BanInfo>,
     users: HashMap<String, ChannelUserModes>,
     creation_time: u64,
+    // if channel is preconfigured - it comes from configuration
     preconfigured: bool,
 }
 
@@ -264,6 +274,7 @@ impl Channel {
     
     fn add_user(&mut self, user_nick: &String) {
         let mut chum = ChannelUserModes::default();
+        // apply default modes for user in channel
         if self.default_modes.half_operators.contains(user_nick) {
             chum.half_oper = true;
             let mut half_ops = self.modes.half_operators.take()
@@ -305,6 +316,7 @@ impl Channel {
         self.modes.rename_user(old_nick, nick.clone());
     }
     
+    // remove user from channel - and from lists
     fn remove_user(&mut self, nick: &str) {
         self.remove_operator(nick);
         self.remove_half_operator(nick);
@@ -314,6 +326,7 @@ impl Channel {
         self.users.remove(nick);
     }
     
+    // add/remove user from list
     fn add_operator(&mut self, nick: &str) {
         let mut ops = self.modes.operators.take().unwrap_or_default();
         ops.insert(nick.to_string());
@@ -436,12 +449,13 @@ impl ConnUserState {
     
     fn update_source(&mut self) {
         let mut s = String::new();
+        // generate source - nick!username@host
         if let Some(ref nick) = self.nick {
             s.push_str(&nick);
             s.push('!');
         }
         if let Some(ref name) = self.name {
-            s.push('~');
+            s.push('~');  // username is defined same user
             s.push_str(&name);
         }
         s.push('@');
@@ -466,11 +480,17 @@ pub(crate) struct ConnState {
     receiver: UnboundedReceiver<String>,
     // sender and receiver used for sending ping task for 
     ping_sender: Option<UnboundedSender<()>>,
+    // ping_receiver - process method receives ping and sent ping to client.
     ping_receiver: UnboundedReceiver<()>,
+    // timeout_sender - sender to send timeout - it will sent by pong_client_timeout
     timeout_sender: Arc<UnboundedSender<()>>,
+    // timeout_receiver - process method receives that
     timeout_receiver: UnboundedReceiver<()>,
     pong_notifier: Option<oneshot::Sender<()>>,
+    // quit receiver - receive KILL from other user.
     quit_receiver: oneshot::Receiver<(String, String)>,
+    // quit_sender - quit sender to send KILL - sender will be later taken after
+    // correct authentication and it will be stored in User structure.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
     
     user_state: ConnUserState,
@@ -507,10 +527,11 @@ impl ConnState {
             tokio::spawn(ping_client_waker(Duration::from_secs(config.ping_timeout),
                     self.quit.clone(), self.ping_sender.take().unwrap()));
         } else {
-            panic!("Ping waker ran!");
+            panic!("Ping waker ran!"); // unexpected!
         }
     }
     
+    // run pong timeout process - that send timeout aftet some time.
     fn run_pong_timeout(&mut self, config: &MainConfig) {
         let (pong_notifier, pong_receiver) = oneshot::channel();
         self.pong_notifier = Some(pong_notifier);
@@ -538,6 +559,7 @@ async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedS
 async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
                     quit: Arc<AtomicI32>, sender: Arc<UnboundedSender<()>>) {
     if let Err(_) = tmo.await {
+        // do not send if client already quits from IRC server.
         if quit.load(Ordering::SeqCst) == 0 {
             sender.send(()).unwrap();
         }
@@ -560,6 +582,7 @@ impl VolatileState {
     fn new_from_config(config: &MainConfig) -> VolatileState {
         let mut channels = HashMap::new();
         if let Some(ref cfg_channels) = config.channels {
+            // create new channels from configuration
             cfg_channels.iter().for_each(|c| {
                 let mut ch_modes = c.modes.clone();
                 let def_ch_modes = ChannelDefaultModes::new_from_modes_and_cleanup(
@@ -582,6 +605,7 @@ impl VolatileState {
                 quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver) }
     }
     
+    // add user to volatile state - includes stats likes invisible users count, etc.
     fn add_user(&mut self, user: User) {
         if user.modes.invisible {
             self.invisible_users_count += 1;
@@ -598,6 +622,8 @@ impl VolatileState {
         }
     }
     
+    // remove user from channel and remove channel from user.
+    // remove same channel if no more users at channel.
     fn remove_user_from_channel<'a>(&mut self, channel: &'a str, nick: &'a str) {
         if let Some(chanobj) = self.channels.get_mut(channel) {
             chanobj.remove_user(nick);
@@ -610,6 +636,7 @@ impl VolatileState {
         }
     }
     
+    // remove user - including stats like invisible users.
     fn remove_user(&mut self, nick: &str) {
         if let Some(user) = self.users.remove(nick) {
             if user.modes.is_local_oper() {
@@ -626,6 +653,7 @@ impl VolatileState {
         }
     }
     
+    // used to maintain nick history that is read by WHOWAS command.
     fn insert_to_nick_history(&mut self, old_nick: &String, nhe: NickHistoryEntry) {
         if !self.nick_histories.contains_key(old_nick) {
             self.nick_histories.insert(old_nick.to_string(), vec![]);
@@ -648,6 +676,7 @@ pub(crate) struct MainState {
 
 impl MainState {
     pub(crate) fn new_from_config(config: MainConfig) -> MainState {
+        // create indexes for configured users and operators.
         let mut user_config_idxs = HashMap::new();
         if let Some(ref users) = config.users {
             users.iter().enumerate().for_each(|(i,u)| { 
@@ -664,9 +693,11 @@ impl MainState {
                 created: Local::now().to_rfc2822() }
     }
     
+    // try to register connection state - print error if too many connections.
     pub(crate) fn register_conn_state(&self, ip_addr: IpAddr,
                     stream: Framed<TcpStream, IRCLinesCodec>) -> Option<ConnState> {
         if let Some(max_conns) = self.config.max_connections {
+            // increment counter of connections count.
             if self.conns_count.fetch_add(1, Ordering::SeqCst) < max_conns {
                 Some(ConnState::new(ip_addr, stream, self.conns_count.clone()))
             } else {
@@ -727,6 +758,7 @@ impl MainState {
             msg_str_res = conn_state.stream.next() => {
                 let msg = match msg_str_res {
                     Some(Ok(ref msg_str)) => {
+                        // try parse message from this line.
                         match Message::from_shared_str(&msg_str) {
                             Ok(msg) => msg,
                             Err(e) => {
@@ -747,6 +779,7 @@ impl MainState {
                             }
                         }
                     }
+                    // if line is longer than max line length.
                     Some(Err(LinesCodecError::MaxLineLengthExceeded)) => {
                         let client = conn_state.user_state.client_name();
                         self.feed_msg(&mut conn_state.stream,
@@ -760,6 +793,7 @@ impl MainState {
                 
                 let cmd = match Command::from_message(&msg) {
                     Ok(cmd) => cmd,
+                    // handle errors while parsing command.
                     Err(e) => {
                         use crate::CommandError::*;
                         let client = conn_state.user_state.client_name();
@@ -806,6 +840,8 @@ impl MainState {
                     CAP{ .. } | AUTHENTICATE{ } | PASS{ .. } | NICK{ .. } |
                             USER{ .. } | QUIT{ } => {},
                     _ => {
+                        // expect CAP, AUTHENTICATE, PASS, NICK, USER, QUIT -
+                        // other commands need authenication.
                         if !conn_state.user_state.authenticated {
                             self.feed_msg(&mut conn_state.stream, ErrNotRegistered451{         
                                     client: conn_state.user_state.client_name() }).await?;
@@ -892,12 +928,14 @@ impl MainState {
         }
     }
     
+    // helper to feed messages
     async fn feed_msg<T: fmt::Display>(&self,
             stream: &mut Framed<TcpStream, IRCLinesCodec>, t: T)
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
+    // helper to feed messages
     async fn feed_msg_source<T: fmt::Display>(&self,
             stream: &mut Framed<TcpStream, IRCLinesCodec>, source: &str, t: T)
             -> Result<(), LinesCodecError> {
@@ -905,6 +943,7 @@ impl MainState {
     }
 }
 
+// main process to handle commands from client.
 async fn user_state_process(main_state: Arc<MainState>,
             stream: TcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
@@ -918,6 +957,7 @@ async fn user_state_process(main_state: Arc<MainState>,
     }
 }
 
+// main routine to run server
 pub(crate) async fn run_server(config: MainConfig) ->
         Result<(Arc<MainState>, JoinHandle<()>), Box<dyn Error>> {
     let listener = TcpListener::bind((config.listen, config.port)).await?;
