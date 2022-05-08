@@ -59,9 +59,10 @@ impl Decoder for IRCLinesCodec {
 }
 
 pub(crate) fn validate_source(s: &str) -> bool {
-    if s.contains(':') {
+    if s.contains(':') {  // if have ':' then is not source
         false
     } else {
+        // must be in format nick[!username[@host]]
         let excl = s.find('!');
         let atchar = s.find('@');
         if let Some(excl_pos) = excl {
@@ -116,6 +117,7 @@ pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result
                     is_channel = i+1 < channel.len();
                     break; }
                 _ => {
+                    // if last special character is & - then local channel
                     is_channel = last_amp;
                     break; }
             }
@@ -182,6 +184,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                         if mode_set {
                             if let Some(arg) = margs_it.next() {
                                 if let Err(e) = arg.parse::<usize>() {
+                                    // if argument is not number, then error
                                     return Err(InvalidModeParam{ target: target.to_string(),
                                             modechar: c, param: arg.to_string(),
                                             description: e.to_string() });
@@ -202,7 +205,7 @@ pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, V
                         if mode_set {
                             if margs_it.next().is_some() {
                                 arg_param_idx += 1;
-                            } else {
+                            } else { // no argument
                                 return Err(InvalidModeParam{ target: target.to_string(),
                                             modechar: c, param: "".to_string(),
                                             description: "No argument".to_string() });
@@ -277,6 +280,7 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
     (!pattern.is_empty() && pattern.as_bytes()[pattern.len()-1] == b'*') || t.is_empty()
 }
 
+// normalize source mask - for example '*' to '*!*@*'
 pub(crate) fn normalize_sourcemask(mask: &str) -> String {
     let mut out = String::new();
     if let Some(p) = mask.find('!') {

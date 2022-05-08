@@ -72,11 +72,13 @@ impl<'a> Message<'a> {
                 if !validate_source(s) {
                     return Err(MessageError::WrongSource);
                 }
-                Some(s)
+                Some(s) // return source
             } else { None };
+            // get command name
             let command = if let Some(cmd) = rest_words.next() { cmd }
             else { return Err(MessageError::NoCommand); };
             
+            // get command's parameters
             let mut params = rest_words.collect::<Vec<_>>();
             if let Some(lp) = last_param {
                 params.push(lp);    // add last parameter
@@ -88,17 +90,20 @@ impl<'a> Message<'a> {
         }
     }
     
+    // convert message to string with custom source.
     pub(crate) fn to_string_with_source<'b>(&self, source: &'b str) -> String {
         let mut out = ":".to_string();
         out += source;
         out.push(' ');
         out += self.command;
         if !self.params.is_empty() {
+            // join with other and join parameters together except last parameter
             self.params[..self.params.len()-1].iter().for_each(|s| {
                 out.push(' ');
                 out += s;
             });
             let last = self.params[self.params.len()-1];
+            // if last parameter have ':', spaces then add it as last (:last param).
             if last.find(|c|  c==':' || c == ' ' || c == '\t').is_some() ||
                             last.is_empty() {
                 out += " :";
@@ -111,6 +116,7 @@ impl<'a> Message<'a> {
     }
 }
 
+// Needed command ids for command error.
 #[const_table]
 pub(crate) enum CommandId {
     CommandName{ pub(crate) name: &'static str },
@@ -249,6 +255,7 @@ pub(crate) enum Command<'a> {
 use Command::*;
 
 impl<'a> Command<'a> {
+    // parse command from message. for internal use
     fn parse_from_message(message: &Message<'a>) -> Result<Self, CommandError> {
         match message.command.to_ascii_uppercase().as_str() {
             "CAP" => {
@@ -264,11 +271,14 @@ impl<'a> Command<'a> {
                                     CAPId, message.params[0].to_string()))
                     };
                     
+                    // get capabilities list and version
                     let (caps, version) = if subcommand == CapCommand::REQ {
+                        // subcommand REQ have capabilities list.
                         (param_it.next().map(|x| x.split_ascii_whitespace().
                                     collect::<Vec<_>>()),
                         None)
                     } else if subcommand == CapCommand::LS {
+                        // subcommand LS can have version
                         let v = if let Some(s) = param_it.next() {
                             if let Ok(value) = s.parse() { Some(value) }
                             else { return Err(WrongParameter(CAPId, 1)); }
@@ -325,13 +335,14 @@ impl<'a> Command<'a> {
             "JOIN" => {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
+                    // channels are separated by ','
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
+                    // keys are separated by ','
                     let keys_opt = param_it.next().map(|x|
                         x.split(',').collect::<Vec<_>>());
                     if let Some(ref keys) = keys_opt {
                         if keys.len() != channels.len() {
-                            return Err(ParameterDoesntMatch(
-                                    JOINId, 1)); }
+                            return Err(ParameterDoesntMatch(JOINId, 1)); }
                     }
                     Ok(JOIN{ channels, keys: keys_opt })
                 } else {
@@ -340,6 +351,7 @@ impl<'a> Command<'a> {
             "PART" => {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
+                    // channels are separated by ','
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let reason = param_it.next().map(|x| *x);
                     Ok(PART{ channels, reason })
@@ -357,6 +369,7 @@ impl<'a> Command<'a> {
             }
             "NAMES" => {
                 if !message.params.is_empty() {
+                    // channels are separated by ','
                     Ok(NAMES{ channels: message.params[0].split(',').collect::<Vec<_>>() })
                 } else {
                     Ok(NAMES{ channels: vec![] }) }
@@ -364,6 +377,7 @@ impl<'a> Command<'a> {
             "LIST" => {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
+                    // channels are separated by ','
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let server = param_it.next().map(|x| *x);
                     Ok(LIST{ channels, server })
@@ -382,6 +396,7 @@ impl<'a> Command<'a> {
                 if message.params.len() >= 2 {
                     let mut param_it = message.params.iter();
                     let channel = param_it.next().unwrap();
+                    // users are separated by ','
                     let users = param_it.next().unwrap().split(',').collect::<Vec<_>>();
                     let comment = param_it.next().map(|x| *x);
                     Ok(KICK{ channel, users, comment })
@@ -403,6 +418,7 @@ impl<'a> Command<'a> {
                     let target_server = param_it.next().unwrap();
                     let port = param_it.next().map(|x| x.parse()).transpose();
                     let remote_server = param_it.next().map(|x| *x);
+                    // check whether port is number
                     match port {
                         Err(_) => {
                             Err(WrongParameter(CONNECTId, 1))
@@ -457,9 +473,12 @@ impl<'a> Command<'a> {
                             
                             let mut modestring = *s;
                             let mut mode_args = vec![];
+                            // collect mode arguments until next mode string.
                             while let Some(s) = param_it.next() {
                                 if s.starts_with("+") || s.starts_with("-") {
+                                    // push modestring and mode arguments to modes
                                     modes.push((modestring, mode_args));
+                                    // next mode string
                                     modestring = *s;
                                     mode_args = vec![];
                                 } else {
@@ -478,6 +497,7 @@ impl<'a> Command<'a> {
             }
             "PRIVMSG" => {
                 if message.params.len() >= 2 {
+                    // targets are separated by ','
                     Ok(PRIVMSG{ targets: message.params[0].split(',').collect::<Vec<_>>(),
                         text: message.params[1] })
                 } else {
@@ -485,6 +505,7 @@ impl<'a> Command<'a> {
             }
             "NOTICE" => {
                 if message.params.len() >= 2 {
+                    // targets are separated by ','
                     Ok(NOTICE{ targets: message.params[0].split(',').collect::<Vec<_>>(),
                         text: message.params[1] })
                 } else {
@@ -499,7 +520,8 @@ impl<'a> Command<'a> {
             "WHOIS" => {
                 if !message.params.is_empty() {
                     if message.params.len() >= 2 {
-                       Ok(WHOIS{ target: Some(message.params[0]),
+                        // nickmasks are separated by ','
+                        Ok(WHOIS{ target: Some(message.params[0]),
                             nickmasks: message.params[1].split(',').collect::<Vec<_>>() })
                     } else {
                         Ok(WHOIS{ target: None, nickmasks:
@@ -514,6 +536,7 @@ impl<'a> Command<'a> {
                     let nickname = param_it.next().unwrap();
                     let count = param_it.next().map(|x| x.parse()).transpose();
                     let server = param_it.next().map(|x| *x);
+                    // check whether count is number
                     match count {
                         Err(_) => {
                             Err(WrongParameter(WHOWASId, 1))
@@ -558,9 +581,11 @@ impl<'a> Command<'a> {
         }
     }
     
+    // get Command from message
     pub(crate) fn from_message(message: &Message<'a>) -> Result<Self, CommandError> {
         match Self::parse_from_message(message) {
             Ok(x) => {
+                // and validate command parameters
                 match x.validate() {
                     Ok(()) => Ok(x),
                     Err(e) => Err(e)
@@ -651,6 +676,7 @@ impl<'a> Command<'a> {
             }
             STATS{ query, server } => {
                 match query {
+                    // check query
                     'c'|'h'|'i'|'k'|'l'|'m'|'o'|'u'|'y' => {
                         if let Some(s) = server {
                             validate_server(s, WrongParameter(STATSId, 1))?;
@@ -680,10 +706,12 @@ impl<'a> Command<'a> {
             }
             PRIVMSG{ targets, .. } => {
                 targets.iter().try_for_each(|n| validate_username(n)
+                    // in PRIVMSG we can use prefixed channels
                     .map_err(|_| WrongParameter(PRIVMSGId, 0)).or(
                     validate_prefixed_channel(n, WrongParameter(PRIVMSGId, 0)))) }
             NOTICE{ targets, .. } => {
                  targets.iter().try_for_each(|n| validate_username(n)
+                    // in NOTICE we can use prefixed channels
                     .map_err(|_| WrongParameter(NOTICEId, 0)).or(
                     validate_prefixed_channel(n, WrongParameter(NOTICEId, 0)))) }
             //WHO{ mask } => { Ok(()) }

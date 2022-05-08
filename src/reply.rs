@@ -33,6 +33,7 @@ pub(crate) struct NameReplyStruct<'a> {
     pub(crate) nick: &'a str,
 }
 
+// all replies used by this IRC server.
 pub(crate) enum Reply<'a> {
     RplWelcome001{ client: &'a str, networkname: &'a str, nick: &'a str,
             user: &'a str, host: &'a str },

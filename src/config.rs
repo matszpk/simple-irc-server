@@ -97,6 +97,8 @@ impl UserModes {
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Validate, Default)]
 pub(crate) struct ChannelModes {
+    // If channel modes we use Option to avoid unnecessary field definition if list
+    // in this field should be. The administrator can omit fields for empty lists.
     pub(crate) ban: Option<HashSet<String>>,
     pub(crate) exception: Option<HashSet<String>>,
     pub(crate) client_limit: Option<usize>,
@@ -115,6 +117,8 @@ pub(crate) struct ChannelModes {
 }
 
 impl ChannelModes {
+    // create new channel modes for new channel created by user. By default,
+    // user that created channel is founder and operator in this channel.
     pub(crate) fn new_for_channel(user_nick: String) -> Self {
         let mut def = ChannelModes::default();
         def.operators = Some([ user_nick.clone() ].into());
@@ -129,6 +133,7 @@ impl ChannelModes {
                 |e| match_wildcard(&e, &source))))
     }
     
+    // rename user - just rename nick in lists.
     pub(crate) fn rename_user(&mut self, old_nick: &String, nick: String) {
         if let Some(ref mut operators) = self.operators {
             operators.remove(old_nick);
@@ -263,6 +268,8 @@ pub(crate) struct MainConfig {
     pub(crate) dns_lookup: bool,
     pub(crate) default_user_modes: UserModes,
     pub(crate) tls: Option<TLSConfig>,
+    // If MainConfig modes we use Option to avoid unnecessary field definition if list
+    // in this field should be. The administrator can omit fields for empty lists.
     #[validate]
     pub(crate) operators: Option<Vec<OperatorConfig>>,
     #[validate]
@@ -272,7 +279,9 @@ pub(crate) struct MainConfig {
 }
 
 impl MainConfig {
+    // create new main config from command line.
     pub(crate) fn new(cli: Cli) -> Result<MainConfig, Box<dyn Error>> {
+        // get config path.
         let config_path = cli.config.as_deref().unwrap_or("simple-irc-server.toml");
         let mut config_file = File::open(config_path)?;
         let mut config_str = String::new();
