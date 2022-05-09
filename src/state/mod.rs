@@ -20,6 +20,7 @@
 use std::ops::Drop;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::fs::File;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::net::{IpAddr, SocketAddr};
@@ -955,6 +956,24 @@ async fn user_state_process(main_state: Arc<MainState>,
         }
         main_state.remove_user(&conn_state).await;
     }
+}
+
+pub(crate) fn initialize_logging(config: &MainConfig) {
+    use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
+    let s = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()
+        .add_directive(config.log_level.into()))
+        .with_span_events(FmtSpan::FULL)
+        .with_file(true).with_line_number(true).with_thread_ids(true)
+        // disable ansi color for files
+        .with_ansi(config.log_file.is_none());
+    if let Some(ref log_file) = config.log_file {
+        if let Ok(f) = File::create(log_file) {
+            s.with_writer(f).init();
+        } else {
+            eprintln!("No log file");
+            s.init()
+        }
+    } else { s.init(); }
 }
 
 // main routine to run server

@@ -1333,7 +1333,7 @@ mod test {
             assert_eq!(":sonny!~sonnyx@127.0.0.1 MODE #mychannel +b nick*!*@* +b \
                     *digger.com!*@* +e nicki*!*@* +I guru*!*@*".to_string(),
                     line_stream.next().await.unwrap().unwrap());
-            time::sleep(Duration::from_millis(50)).await;
+            time::sleep(Duration::from_millis(100)).await;
             let set_time = {
                 let state = main_state.state.read().await;
                 let channel = state.channels.get("#mychannel").unwrap();
@@ -1407,6 +1407,7 @@ mod test {
                     +e nicki*!*@* +I guru*!*@*".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             
+            time::sleep(Duration::from_millis(100)).await;
             {
                 let state = main_state.state.read().await;
                 let channel = state.channels.get("#mychannel").unwrap();
