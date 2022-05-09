@@ -20,13 +20,17 @@
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
+use std::str::FromStr;
 use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
 use clap;
 use toml;
+use serde;
+use serde::Deserializer;
 use serde_derive::Deserialize;
 use validator::Validate;
+use tracing;
 
 use crate::utils::validate_channel;
 use crate::utils::validate_username;
@@ -51,6 +55,8 @@ pub(crate) struct Cli {
     tls_cert_file: Option<String>,
     #[clap(short='K', long, help="TLS certificate key file")]
     tls_cert_key_file: Option<String>,
+    #[clap(short='L', long, help="Log file path")]
+    log_file: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Deserialize, Debug)]
@@ -267,6 +273,9 @@ pub(crate) struct MainConfig {
     pub(crate) pong_timeout: u64,
     pub(crate) dns_lookup: bool,
     pub(crate) default_user_modes: UserModes,
+    pub(crate) log_file: Option<String>,
+    #[serde(deserialize_with="tracing_log_level_deserialize")]
+    pub(crate) log_level: tracing::Level,
     pub(crate) tls: Option<TLSConfig>,
     // If MainConfig modes we use Option to avoid unnecessary field definition if list
     // in this field should be. The administrator can omit fields for empty lists.
@@ -276,6 +285,25 @@ pub(crate) struct MainConfig {
     pub(crate) users: Option<Vec<UserConfig>>,
     #[validate]
     pub(crate) channels: Option<Vec<ChannelConfig>>,
+}
+
+struct TracingLevelVisitor;
+
+impl<'de> serde::de::Visitor<'de> for TracingLevelVisitor {
+    type Value = tracing::Level;
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("TracingLevel")
+    }
+    
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        tracing::Level::from_str(v).map_err(|e| 
+            serde::de::Error::custom(e))
+    }
+}
+
+fn tracing_log_level_deserialize<'de, D: Deserializer<'de>>(ds: D)
+            -> Result<tracing::Level, D::Error> {
+    ds.deserialize_str(TracingLevelVisitor)
 }
 
 impl MainConfig {
@@ -300,6 +328,9 @@ impl MainConfig {
             }
             if let Some(network) = cli.network {
                 config.network = network;
+            }
+            if let Some(log_file) = cli.log_file {
+                config.log_file = Some(log_file)
             }
             config.dns_lookup = config.dns_lookup || cli.dns_lookup;
             
@@ -359,7 +390,9 @@ impl Default for MainConfig {
             operators: None,
             users: None,
             default_user_modes: UserModes::default(),
-            tls: None }
+            tls: None,
+            log_file: None,
+            log_level: tracing::Level::INFO }
     }
 }
 
@@ -392,7 +425,8 @@ mod test {
         let file_handle = TempFileHandle::new("temp_config.toml");
         let cli = Cli{ config: Some(file_handle.path.clone()),
             listen: None, port: None, name: None, network: None,
-            dns_lookup: false, tls_cert_file: None, tls_cert_key_file: None };
+            dns_lookup: false, tls_cert_file: None, tls_cert_key_file: None,
+            log_file: None };
         
         fs::write(file_handle.path.as_str(), 
             r##"
@@ -410,6 +444,7 @@ ping_timeout = 100
 pong_timeout = 30
 motd = "Hello, guys!"
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -476,6 +511,8 @@ no_external_messages = false
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: false,
+            log_file: None,
+            log_level: tracing::Level::INFO,
             tls: Some(TLSConfig{ cert_file: "cert.crt".to_string(),
                 cert_key_file: "cert_key.crt".to_string() }),
             default_user_modes: UserModes {
@@ -530,7 +567,8 @@ no_external_messages = false
             name: Some("ircer.localhost".to_string()),
             network: Some("SomeNetwork".to_string()),
             dns_lookup: true, tls_cert_file: Some("some_cert.crt".to_string()),
-            tls_cert_key_file: Some("some_key.crt".to_string()) };
+            tls_cert_key_file: Some("some_key.crt".to_string()),
+            log_file: Some("irc.log".to_string()) };
             
         let result = MainConfig::new(cli2).map_err(|e| e.to_string());
         assert_eq!(Ok(MainConfig{
@@ -549,6 +587,8 @@ no_external_messages = false
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: true,
+            log_file: Some("irc.log".to_string()),
+            log_level: tracing::Level::INFO,
             tls: Some(TLSConfig{ cert_file: "some_cert.crt".to_string(),
                 cert_key_file: "some_key.crt".to_string() }),
             default_user_modes: UserModes {
@@ -604,7 +644,7 @@ no_external_messages = false
             name: Some("ircer.localhost".to_string()),
             network: Some("SomeNetwork".to_string()),
             dns_lookup: true, tls_cert_file: Some("some_cert.crt".to_string()),
-            tls_cert_key_file: None };
+            tls_cert_key_file: None, log_file: None };
         let result = MainConfig::new(cli2).map_err(|e| e.to_string());
         assert_eq!(Err("error: TLS certifcate file and certificate key file together \
                 are required".to_string()), result);
@@ -623,6 +663,8 @@ network = "IRCInetwork"
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_file = "log.log"
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -670,6 +712,8 @@ no_external_messages = false
             ping_timeout: 100,
             pong_timeout: 30,
             dns_lookup: false,
+            log_file: Some("log.log".to_string()),
+            log_level: tracing::Level::INFO,
             tls: None,
             default_user_modes: UserModes {
                 invisible: false, oper: false, local_oper: false,
@@ -726,6 +770,7 @@ max_joins = 10
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -796,6 +841,7 @@ max_joins = 10
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -863,6 +909,7 @@ max_joins = 10
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -930,6 +977,7 @@ max_joins = 10
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
@@ -998,6 +1046,7 @@ max_joins = 10
 ping_timeout = 100
 pong_timeout = 30
 dns_lookup = false
+log_level = "INFO"
 
 [default_user_modes]
 invisible = false
