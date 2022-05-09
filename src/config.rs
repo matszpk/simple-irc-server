@@ -25,7 +25,7 @@ use std::io::Read;
 use std::net::IpAddr;
 use clap;
 use toml;
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::Deserialize;
 use validator::Validate;
 
 use crate::utils::validate_channel;
@@ -53,13 +53,13 @@ pub(crate) struct Cli {
     tls_cert_key_file: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Deserialize, Debug)]
 pub(crate) struct TLSConfig {
     pub(crate) cert_file: String,
     pub(crate) cert_key_file: String,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Deserialize, Debug, Validate)]
 pub(crate) struct OperatorConfig {
     #[validate(custom = "validate_username")]
     pub(crate) name: String,
@@ -68,7 +68,7 @@ pub(crate) struct OperatorConfig {
     pub(crate) mask: Option<String>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Deserialize, Debug, Default)]
 pub(crate) struct UserModes {
     pub(crate) invisible: bool,
     pub(crate) oper: bool,
@@ -95,7 +95,7 @@ impl UserModes {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Validate, Default)]
+#[derive(Clone, PartialEq, Eq, Deserialize, Debug, Validate, Default)]
 pub(crate) struct ChannelModes {
     // If channel modes we use Option to avoid unnecessary field definition if list
     // in this field should be. The administrator can omit fields for empty lists.
@@ -227,7 +227,7 @@ impl fmt::Display for ChannelModes {
     }
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Deserialize, Debug, Validate)]
 pub(crate) struct ChannelConfig {
     #[validate(custom = "validate_channel")]
     pub(crate) name: String,
@@ -236,7 +236,7 @@ pub(crate) struct ChannelConfig {
     pub(crate) modes: ChannelModes,
 }
 
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Deserialize, Debug, Validate)]
 pub(crate) struct UserConfig {
     #[validate(custom = "validate_username")]
     pub(crate) name: String,
@@ -248,7 +248,7 @@ pub(crate) struct UserConfig {
 }
 
 /// Main configuration structure.
-#[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Validate)]
+#[derive(PartialEq, Eq, Deserialize, Debug, Validate)]
 pub(crate) struct MainConfig {
     #[validate(contains = ".")]
     pub(crate) name: String,
