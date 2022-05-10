@@ -37,6 +37,7 @@ use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
 use flagset::{flags, FlagSet};
+use tracing::*;
 
 use crate::config::*;
 use crate::reply::*;
@@ -629,6 +630,7 @@ impl VolatileState {
         if let Some(chanobj) = self.channels.get_mut(channel) {
             chanobj.remove_user(nick);
             if chanobj.users.is_empty() && !chanobj.preconfigured {
+                info!("Channel {} has been removed", channel);
                 self.channels.remove(channel);
             }
         }
@@ -703,7 +705,7 @@ impl MainState {
                 Some(ConnState::new(ip_addr, stream, self.conns_count.clone()))
             } else {
                 self.conns_count.fetch_sub(1, Ordering::SeqCst);
-                eprintln!("Too many connections");
+                error!("Too many connections for IP {}", ip_addr);
                 None
             }
         } else {
@@ -744,12 +746,15 @@ impl MainState {
                 Ok(())
             }
             Some(_) = conn_state.timeout_receiver.recv() => {
+                info!("Pong timeout for {}", conn_state.user_state.source);
                 self.feed_msg(&mut conn_state.stream,
                             "ERROR :Pong timeout, connection will be closed.").await?;
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
             Ok((killer, comment)) = &mut conn_state.quit_receiver => {
+                info!("User {} killed by {}: {}", conn_state.user_state.source,
+                            killer, comment);
                 self.feed_msg(&mut conn_state.stream,
                         format!("ERROR :User killed by {}: {}", killer, comment)).await?;
                 conn_state.quit.store(1, Ordering::SeqCst);
@@ -951,9 +956,10 @@ async fn user_state_process(main_state: Arc<MainState>,
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
         while !conn_state.is_quit() {
             if let Err(e) = main_state.process(&mut conn_state).await {
-                eprintln!("Error: {}" , e);
+                error!("Error for {}: {}", conn_state.user_state.source, e);
             }
         }
+        info!("User {} gone from from server", conn_state.user_state.source);
         main_state.remove_user(&conn_state).await;
     }
 }
@@ -970,7 +976,7 @@ pub(crate) fn initialize_logging(config: &MainConfig) {
         if let Ok(f) = File::create(log_file) {
             s.with_writer(f).init();
         } else {
-            eprintln!("No log file");
+            error!("No log file {}", log_file);
             s.init()
         }
     } else { s.init(); }
@@ -992,11 +998,11 @@ pub(crate) async fn run_server(config: MainConfig) ->
                         Ok((stream, addr)) => {
                             tokio::spawn(user_state_process(
                                         main_state.clone(), stream, addr)); }
-                        Err(e) => { eprintln!("Accept connection error: {}", e); }
+                        Err(e) => { error!("Accept connection error: {}", e); }
                     };
                 }
                 Ok(msg) = &mut quit_receiver => {
-                    println!("Server quit: {}", msg);
+                    info!("Server quit: {}", msg);
                     do_quit = true;
                 }
             };
@@ -1647,9 +1653,14 @@ mod test {
     use std::sync::atomic::AtomicU16;
     
     static PORT_COUNTER :AtomicU16 = AtomicU16::new(7888);
+    //use std::sync::Once;
+    //static LOGGING_START: Once = Once::new();
     
     pub(crate) async fn run_test_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
+        //LOGGING_START.call_once(|| {
+        //    initialize_logging(&MainConfig::default());
+        //});
         let mut config = config;
         config.port = PORT_COUNTER.fetch_add(1, Ordering::SeqCst);
         let port = config.port;

@@ -124,6 +124,8 @@ impl super::MainState {
                 user.channels.insert(chname.clone());
                 user.invited_to.remove(&chname);
                 if *create {
+                    info!("User {} create channel {}", conn_state.user_state.source,
+                                chname_str);
                     state.channels.insert(chname.clone(), Channel::new(
                                 chname.clone(), user_nick.clone()));
                 } else {

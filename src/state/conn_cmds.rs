@@ -92,7 +92,8 @@ impl super::MainState {
                 }
             CapCommand::REQ => {
                 conn_state.caps_negotation = true;
-                if let Some(cs) = caps {
+                if let Some(ref cs) = caps {
+                    info!("CAPS REQ for {}: {:?}", conn_state.user_state.source, caps);
                     let mut new_caps = conn_state.caps;
                     // accept if all capabilities matches
                     if cs.iter().all(|c| new_caps.apply_cap(c)) {
@@ -160,6 +161,8 @@ impl super::MainState {
                                         registered = true;
                                         users[*uidx].password.as_ref()
                                     } else {
+                                        info!("Auth failed for {}: user mask doesn't match",
+                                                conn_state.user_state.source);
                                         self.feed_msg(&mut conn_state.stream,
                                             "ERROR: user mask doesn't match").await?;
                                         return Ok(());
@@ -248,8 +251,10 @@ impl super::MainState {
                 
                 // run ping waker for this connection
                 conn_state.run_ping_waker(&self.config);
+                info!("Auth succeed for {}", conn_state.user_state.source);
             } else {
                 // if authentication failed
+                info!("Auth failed for {}", conn_state.user_state.source);
                 let client = conn_state.user_state.client_name();
                 conn_state.quit.store(1, Ordering::SeqCst);
                 self.feed_msg(&mut conn_state.stream, ErrPasswdMismatch464{ client }).await?;
@@ -392,9 +397,11 @@ impl super::MainState {
                 // do it if all is ok.
                 user.modes.oper = true;
                 state.operators_count += 1;
+                info!("New IRC operator {}", conn_state.user_state.source);
                 self.feed_msg(&mut conn_state.stream, RplYoureOper381{ client }).await?;
             }
         } else {
+            info!("Operator authentication failed for {}", conn_state.user_state.source);
             self.feed_msg(&mut conn_state.stream, ErrNoOperHost491{ client }).await?;
         }
         Ok(())
@@ -403,6 +410,7 @@ impl super::MainState {
     pub(super) async fn process_quit(&self, conn_state: &mut ConnState)
             -> Result<(), Box<dyn Error>> {
         conn_state.quit.store(1, Ordering::SeqCst);
+        info!("User {} quit", conn_state.user_state.source);
         self.feed_msg(&mut conn_state.stream, "ERROR: Closing connection").await?;
         Ok(())
     }

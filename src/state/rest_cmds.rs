@@ -1143,27 +1143,27 @@ mod test {
             let signon = { main_state.state.read().await.users
                             .get("harry").unwrap().signon };
             
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             line_stream.send("WHOIS harry".to_string()).await.unwrap();
             for expected in [
                 ":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy",
                 ":irc.irc 312 fanny harry irc.irc :This is IRC server",
                 &format!(":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                            .unwrap().as_secs() - signon, signon),
+                             now - signon, signon),
                 ":irc.irc 318 fanny harry :End of /WHOIS list" ] {
                 assert_eq!(expected, line_stream.next().await.unwrap().unwrap());
             }
             
             let signon = { main_state.state.read().await.users
                             .get("fanny").unwrap().signon };
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             harry_stream.send("WHOIS fanny".to_string()).await.unwrap();
             for expected in [
                 ":irc.irc 311 harry fanny ~fanny 127.0.0.1 * :Fanny BumBumBum",
                 ":irc.irc 312 harry fanny irc.irc :This is IRC server",
                 ":irc.irc 313 harry fanny :is an IRC operator",
                 &format!(":irc.irc 317 harry fanny {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap().as_secs() - signon, signon),
+                             now - signon, signon),
                 ":irc.irc 378 harry fanny :is connecting from 127.0.0.1",
                 ":irc.irc 379 harry fanny :is using modes +o",
                 ":irc.irc 318 harry fanny :End of /WHOIS list" ] {
@@ -1192,17 +1192,16 @@ mod test {
                         state.users.get("henry").unwrap().signon)
             };
             
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             line_stream.send("WHOIS *ry".to_string()).await.unwrap();
             let mut expecteds = [ ":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy",
                 ":irc.irc 312 fanny harry irc.irc :This is IRC server",
                 &format!(":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap().as_secs() - signon, signon),
+                            now - signon, signon),
                 ":irc.irc 311 fanny henry ~henry 127.0.0.1 * :Henry Solo",
                 ":irc.irc 312 fanny henry irc.irc :This is IRC server",
                 &format!(":irc.irc 317 fanny henry {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap().as_secs() - signon2, signon2),
+                            now - signon2, signon2),
                  ].iter().map(|x| x.to_string()).collect::<Vec<_>>();
             expecteds.sort();
             let mut results = vec![];
@@ -1248,19 +1247,18 @@ mod test {
                         state.users.get("jerry").unwrap().signon)
             };
             
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
             line_stream.send("WHOIS *rry".to_string()).await.unwrap();
             let mut expecteds = [ 
                 ":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy",
                 ":irc.irc 312 fanny harry irc.irc :This is IRC server",
                 ":irc.irc 319 fanny harry :#mychannel",
                 &format!(":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap().as_secs() - signon, signon),
+                            now - signon, signon),
                 ":irc.irc 311 fanny jerry ~jerry 127.0.0.1 * :Jerry Lazy",
                 ":irc.irc 312 fanny jerry irc.irc :This is IRC server",
                 &format!(":irc.irc 317 fanny jerry {} {} :seconds idle, signon time",
-                            SystemTime::now().duration_since(UNIX_EPOCH)
-                                .unwrap().as_secs() - signon2, signon2)
+                            now - signon2, signon2)
                 ].iter().map(|x| x.to_string()).collect::<Vec<_>>();
             expecteds.sort();
             let mut results = vec![];
