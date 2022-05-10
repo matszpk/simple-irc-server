@@ -307,7 +307,6 @@ impl super::MainState {
                 if !state.users.contains_key(&nick_str) {
                     let old_source = conn_state.user_state.source.clone();
                     let mut user = state.users.remove(&old_nick).unwrap();
-                    let invisible = user.modes.invisible;
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
                     for ch in &user.channels {
