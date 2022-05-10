@@ -325,10 +325,7 @@ impl super::MainState {
                     }
                     
                     for (_,u) in &state.users {
-                        // do not set change of nick to other users
-                        if !invisible || u.nick == nick {
-                            u.send_message(msg, &old_source)?;
-                        }
+                        u.send_message(msg, &old_source)?;
                     }
                 } else {    // if nick in use
                     let client = conn_state.user_state.client_name();
