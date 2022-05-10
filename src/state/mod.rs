@@ -1009,7 +1009,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
         let certs = rustls_pemfile::certs(
                 &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
                 .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
-        let mut keys: Vec<PrivateKey> = rustls_pemfile::certs(
+        let mut keys: Vec<PrivateKey> = rustls_pemfile::pkcs8_private_keys(
                 &mut BufReader::new(File::open(tlsconfig.cert_key_file.clone())?))
                 .map(|mut keys| keys.drain(..).map(PrivateKey).collect())?;
         
@@ -1711,6 +1711,39 @@ mod test {
     //use std::sync::Once;
     //static LOGGING_START: Once = Once::new();
     
+    use rcgen;
+    use std::env::temp_dir;
+    use std::fs;
+    
+    pub(crate) struct GeneratedCert {
+        cert_file: String,
+        cert_key_file: String,
+    }
+    
+    impl GeneratedCert {
+        fn new(cert_file: &str, cert_key_file: &str) -> Self {
+            let subject_alt_names = vec!["hello.world.example".to_string(),
+                    "localhost".to_string()];
+            let cert = rcgen::generate_simple_self_signed(subject_alt_names).unwrap();
+            let cert_file_path = temp_dir().join(cert_file)
+                        .to_string_lossy().to_string();
+            let cert_key_file_path = temp_dir().join(cert_key_file)
+                        .to_string_lossy().to_string();
+            fs::write(cert_file_path.as_str(),
+                        &cert.serialize_pem().unwrap()).unwrap();
+            fs::write(cert_key_file_path.as_str(),
+                        &cert.serialize_private_key_pem()).unwrap();
+            GeneratedCert{ cert_file: cert_file_path, cert_key_file: cert_key_file_path }
+        }
+    }
+    
+    impl Drop for GeneratedCert {
+        fn drop(&mut self) {
+            fs::remove_file(self.cert_file.as_str()).unwrap();
+            fs::remove_file(self.cert_key_file.as_str()).unwrap();
+        }
+    }
+    
     pub(crate) async fn run_test_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
         //LOGGING_START.call_once(|| {
@@ -1750,6 +1783,59 @@ mod test {
         let mut line_stream = login_to_test(port, nick, name, realname).await;
         for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
         line_stream
+    }
+    
+    pub(crate) async fn run_test_tls_server(config: MainConfig)
+            -> (GeneratedCert, Arc<MainState>, JoinHandle<()>, u16) {
+        //LOGGING_START.call_once(|| {
+        //    initialize_logging(&MainConfig::default());
+        //});
+        let gen_cert = GeneratedCert::new("xx", "xxkey");
+        let mut config = config;
+        config.tls = Some(TLSConfig{ cert_file: gen_cert.cert_file.clone(),
+                        cert_key_file: gen_cert.cert_key_file.clone() });
+        config.port = PORT_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let port = config.port;
+        let (main_state, handle) = run_server(config).await.unwrap();
+        (gen_cert, main_state, handle, port)
+    }
+    
+    use std::convert::TryFrom;
+    use tokio_rustls::TlsConnector;
+    
+    pub(crate) async fn connect_to_test_tls(gen_cert: &GeneratedCert, port: u16)
+                    -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
+        
+        let mut certs: Vec<Certificate> = rustls_pemfile::certs(
+                &mut BufReader::new(File::open(gen_cert.cert_file.clone()).unwrap()))
+                .map(|mut certs| certs.drain(..).map(Certificate).collect()).unwrap();
+        let dnsname = rustls::client::ServerName::try_from("localhost").unwrap();
+        
+        let mut cert_store = rustls::RootCertStore{ roots: vec![] };
+        cert_store.add(&certs.remove(0)).unwrap();
+        let config = Arc::new(rustls::ClientConfig::builder()
+                    .with_safe_defaults()
+                    .with_root_certificates(cert_store)
+                    .with_no_client_auth());
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        Framed::new(TlsConnector::from(config).connect(dnsname, stream).await.unwrap(),
+                        IRCLinesCodec::new_with_max_length(2000))
+    }
+    
+    #[tokio::test]
+    async fn test_server_tls_first() {
+        let (gen_cert, main_state, handle, port) = 
+                        run_test_tls_server(MainConfig::default()).await;
+        {
+            let mut line_stream = connect_to_test_tls(&gen_cert, port).await;
+            line_stream.send("NICK mati".to_string()).await.unwrap();
+            line_stream.send("USER mati 8 * :MatiSzpaki".to_string()).await.unwrap();
+            for i in 0..18 {
+                println!("{}: {}", i, line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
     }
     
     #[tokio::test]

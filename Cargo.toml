@@ -36,3 +36,5 @@ features = ["fmt", "ansi", "env-filter", "tracing-log"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = [ "full", "test-util" ] }
+rcgen = { version = "0.9", features = [ "pem" ] }
+webpki = "0.22"
