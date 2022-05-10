@@ -307,6 +307,7 @@ impl super::MainState {
                 if !state.users.contains_key(&nick_str) {
                     let old_source = conn_state.user_state.source.clone();
                     let mut user = state.users.remove(&old_nick).unwrap();
+                    let invisible = user.modes.invisible;
                     conn_state.user_state.set_nick(nick_str.clone());
                     user.update_nick(&conn_state.user_state);
                     for ch in &user.channels {
@@ -324,7 +325,8 @@ impl super::MainState {
                     }
                     
                     for (_,u) in &state.users {
-                        if !u.modes.invisible || u.nick == nick {
+                        // do not set change of nick to other users
+                        if !invisible || u.nick == nick {
                             u.send_message(msg, &old_source)?;
                         }
                     }
