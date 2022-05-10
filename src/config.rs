@@ -59,7 +59,7 @@ pub(crate) struct Cli {
     log_file: Option<String>,
 }
 
-#[derive(PartialEq, Eq, Deserialize, Debug)]
+#[derive(PartialEq, Eq, Deserialize, Debug, Clone)]
 pub(crate) struct TLSConfig {
     pub(crate) cert_file: String,
     pub(crate) cert_key_file: String,

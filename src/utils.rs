@@ -18,13 +18,60 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 use std::error::Error;
+use std::io;
+use std::pin::Pin;
+use futures::task::{Poll, Context};
+use tokio::io::{ReadBuf};
 use bytes::{BufMut, BytesMut};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpStream;
+use tokio_rustls::server::TlsStream;
 use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
 
 use crate::command::CommandId::*;
 use crate::command::CommandError;
 use crate::command::CommandError::*;
+
+#[derive(Debug)]
+pub(crate) enum DualTcpStream {
+    PlainStream(TcpStream),
+    SecureStream(TlsStream<TcpStream>),
+}
+
+impl AsyncRead for DualTcpStream {
+    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>)
+            -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
+            DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncWrite for DualTcpStream {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8])
+            -> Poll<io::Result<usize>> {
+        match self.get_mut() {
+            DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
+            DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
+        }
+    }
+    
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_flush(cx),
+            DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_flush(cx),
+        }
+    }
+    
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
+            DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
+        }
+    }
+}
 
 // special LinesCodec for IRC - encode with "\r\n".
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

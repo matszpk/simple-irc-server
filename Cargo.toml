@@ -26,6 +26,8 @@ bytes = "1.1.0"
 const-table = "0.1.0"
 flagset = "0.4"
 tokio-rustls = "0.23"
+rustls = "0.20"
+rustls-pemfile = "1.0"
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"

@@ -21,6 +21,8 @@ use std::ops::Drop;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
+use std::io;
+use std::io::{BufReader};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::net::{IpAddr, SocketAddr};
@@ -30,13 +32,17 @@ use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::{Framed, LinesCodecError};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver,UnboundedSender};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tokio::time;
 use futures::SinkExt;
 use chrono::prelude::*;
 use flagset::{flags, FlagSet};
+use rustls;
+use rustls_pemfile;
+use tokio_rustls::rustls::{Certificate, PrivateKey};
+use tokio_rustls::TlsAcceptor;
 use tracing::*;
 
 use crate::config::*;
@@ -477,7 +483,7 @@ impl ConnUserState {
 
 #[derive(Debug)]
 pub(crate) struct ConnState {
-    stream: Framed<TcpStream, IRCLinesCodec>,
+    stream: Framed<DualTcpStream, IRCLinesCodec>,
     sender: Option<UnboundedSender<String>>,
     receiver: UnboundedReceiver<String>,
     // sender and receiver used for sending ping task for 
@@ -504,7 +510,7 @@ pub(crate) struct ConnState {
 }
 
 impl ConnState {
-    fn new(ip_addr: IpAddr, stream: Framed<TcpStream, IRCLinesCodec>,
+    fn new(ip_addr: IpAddr, stream: Framed<DualTcpStream, IRCLinesCodec>,
             conns_count: Arc<AtomicUsize>) -> ConnState {
         let (sender, receiver) = unbounded_channel();
         let (ping_sender, ping_receiver) = unbounded_channel();
@@ -698,7 +704,7 @@ impl MainState {
     
     // try to register connection state - print error if too many connections.
     pub(crate) fn register_conn_state(&self, ip_addr: IpAddr,
-                    stream: Framed<TcpStream, IRCLinesCodec>) -> Option<ConnState> {
+                    stream: Framed<DualTcpStream, IRCLinesCodec>) -> Option<ConnState> {
         if let Some(max_conns) = self.config.max_connections {
             // increment counter of connections count.
             if self.conns_count.fetch_add(1, Ordering::SeqCst) < max_conns {
@@ -936,14 +942,14 @@ impl MainState {
     
     // helper to feed messages
     async fn feed_msg<T: fmt::Display>(&self,
-            stream: &mut Framed<TcpStream, IRCLinesCodec>, t: T)
+            stream: &mut Framed<DualTcpStream, IRCLinesCodec>, t: T)
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
     // helper to feed messages
     async fn feed_msg_source<T: fmt::Display>(&self,
-            stream: &mut Framed<TcpStream, IRCLinesCodec>, source: &str, t: T)
+            stream: &mut Framed<DualTcpStream, IRCLinesCodec>, source: &str, t: T)
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", source, t)).await
     }
@@ -951,7 +957,7 @@ impl MainState {
 
 // main process to handle commands from client.
 async fn user_state_process(main_state: Arc<MainState>,
-            stream: TcpStream, addr: SocketAddr) {
+            stream: DualTcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
         while !conn_state.is_quit() {
@@ -961,6 +967,15 @@ async fn user_state_process(main_state: Arc<MainState>,
         }
         info!("User {} gone from from server", conn_state.user_state.source);
         main_state.remove_user(&conn_state).await;
+    }
+}
+
+async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
+            acceptor: TlsAcceptor, addr: SocketAddr) {
+    match acceptor.accept(stream).await {
+        Ok(tls_stream) => user_state_process(main_state,
+                DualTcpStream::SecureStream(tls_stream), addr).await,
+        Err(e) => error!("Can't accept TLS connection: {}", e),
     }
 }
 
@@ -986,28 +1001,68 @@ pub(crate) fn initialize_logging(config: &MainConfig) {
 pub(crate) async fn run_server(config: MainConfig) ->
         Result<(Arc<MainState>, JoinHandle<()>), Box<dyn Error>> {
     let listener = TcpListener::bind((config.listen, config.port)).await?;
+    let cloned_tls = config.tls.clone();
     let main_state = Arc::new(MainState::new_from_config(config));
     let main_state_to_return = main_state.clone();
-    let handle = tokio::spawn(async move {
-        let mut quit_receiver = main_state.get_quit_receiver().await;
-        let mut do_quit = false;
-        while !do_quit {
-            tokio::select! {
-                res = listener.accept() => {
-                    match res {
-                        Ok((stream, addr)) => {
-                            tokio::spawn(user_state_process(
-                                        main_state.clone(), stream, addr)); }
-                        Err(e) => { error!("Accept connection error: {}", e); }
-                    };
-                }
-                Ok(msg) = &mut quit_receiver => {
-                    info!("Server quit: {}", msg);
-                    do_quit = true;
-                }
-            };
-        }
-    });
+    let handle = if let Some(tlsconfig) = cloned_tls  {
+        
+        let certs = rustls_pemfile::certs(
+                &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
+                .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
+        let mut keys: Vec<PrivateKey> = rustls_pemfile::certs(
+                &mut BufReader::new(File::open(tlsconfig.cert_key_file.clone())?))
+                .map(|mut keys| keys.drain(..).map(PrivateKey).collect())?;
+        
+        let config = rustls::ServerConfig::builder()
+            .with_safe_defaults()
+            .with_no_client_auth()
+            .with_single_cert(certs, keys.remove(0))
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+            
+        let acceptor = TlsAcceptor::from(Arc::new(config));
+        tokio::spawn(async move {
+            let mut quit_receiver = main_state.get_quit_receiver().await;
+            let mut do_quit = false;
+            while !do_quit {
+                tokio::select! {
+                    res = listener.accept() => {
+                        match res {
+                            Ok((stream, addr)) => {
+                                tokio::spawn(user_state_process_tls(main_state.clone(),
+                                        stream, acceptor.clone(), addr));
+                            }
+                            Err(e) => { error!("Accept connection error: {}", e); }
+                        };
+                    }
+                    Ok(msg) = &mut quit_receiver => {
+                        info!("Server quit: {}", msg);
+                        do_quit = true;
+                    }
+                };
+            }
+        })
+    } else {
+        tokio::spawn(async move {
+            let mut quit_receiver = main_state.get_quit_receiver().await;
+            let mut do_quit = false;
+            while !do_quit {
+                tokio::select! {
+                    res = listener.accept() => {
+                        match res {
+                            Ok((stream, addr)) => {
+                                tokio::spawn(user_state_process(main_state.clone(),
+                                        DualTcpStream::PlainStream(stream), addr)); }
+                            Err(e) => { error!("Accept connection error: {}", e); }
+                        };
+                    }
+                    Ok(msg) = &mut quit_receiver => {
+                        info!("Server quit: {}", msg);
+                        do_quit = true;
+                    }
+                };
+            }
+        })
+    };
     Ok((main_state_to_return, handle))
 }
 
