@@ -39,6 +39,12 @@ pub(crate) enum DualTcpStream {
     SecureStream(TlsStream<TcpStream>),
 }
 
+impl DualTcpStream {
+    pub(crate) fn is_secure(&self) -> bool {
+        matches!(*self, DualTcpStream::SecureStream(_))
+    }
+}
+
 impl AsyncRead for DualTcpStream {
     fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>)
             -> Poll<io::Result<()>> {

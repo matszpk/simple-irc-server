@@ -336,6 +336,12 @@ impl super::MainState {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsModes379{ client,
                             nick: &nick, modes: &arg_user.modes.to_string() }).await?;
                 }
+                // if you connected through TLS connection, then server is working with TLS.
+                // then all users is using secure connection.
+                if conn_state.is_secure() {
+                    self.feed_msg(&mut conn_state.stream, RplWhoIsSecure671{ client,
+                            nick: &nick }).await?;
+                }
             }
             self.feed_msg(&mut conn_state.stream, RplEndOfWhoIs318{ client,
                 nick: &nickmasks.join(",") }).await?;
@@ -1169,6 +1175,38 @@ mod test {
                 ":irc.irc 318 harry fanny :End of /WHOIS list" ] {
                 assert_eq!(expected, harry_stream.next().await.unwrap().unwrap());
             }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_whois_tls() {
+        let (gen_cert, main_state, handle, port) = 
+                        run_test_tls_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_tls_and_skip(&gen_cert, port,
+                    "fanny", "fanny", "Fanny BumBumBum").await;
+            let mut harry_stream = login_to_test_tls_and_skip(&gen_cert, port,
+                    "harry", "harry", "Harry Lazy").await;
+            
+            time::sleep(Duration::from_millis(50)).await;
+            let signon = { main_state.state.read().await.users
+                            .get("harry").unwrap().signon };
+            
+            let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+            line_stream.send("WHOIS harry".to_string()).await.unwrap();
+            for expected in [
+                ":irc.irc 311 fanny harry ~harry 127.0.0.1 * :Harry Lazy",
+                ":irc.irc 312 fanny harry irc.irc :This is IRC server",
+                &format!(":irc.irc 317 fanny harry {} {} :seconds idle, signon time",
+                             now - signon, signon),
+                ":irc.irc 671 fanny harry :is using a secure connection",
+                ":irc.irc 318 fanny harry :End of /WHOIS list" ] {
+                assert_eq!(expected, line_stream.next().await.unwrap().unwrap());
+            }
+            harry_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;

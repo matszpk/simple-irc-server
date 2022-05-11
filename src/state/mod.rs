@@ -547,6 +547,10 @@ impl ConnState {
                 time::timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
                     self.quit.clone(), self.timeout_sender.clone()));
     }
+    
+    pub(crate) fn is_secure(&self) -> bool {
+        self.stream.get_ref().is_secure()
+    }
 }
 
 impl Drop for ConnState {
@@ -1707,7 +1711,8 @@ mod test {
     
     use std::sync::atomic::AtomicU16;
     
-    static PORT_COUNTER :AtomicU16 = AtomicU16::new(7888);
+    static PORT_COUNTER: AtomicU16 = AtomicU16::new(7888);
+    static CERT_COUNTER: AtomicU16 = AtomicU16::new(0);
     //use std::sync::Once;
     //static LOGGING_START: Once = Once::new();
     
@@ -1790,7 +1795,9 @@ mod test {
         //LOGGING_START.call_once(|| {
         //    initialize_logging(&MainConfig::default());
         //});
-        let gen_cert = GeneratedCert::new("xx", "xxkey");
+        let cert_id = CERT_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let gen_cert = GeneratedCert::new(&format!("cert_{}.pem", cert_id),
+                        &format!("cert_key_{}.pem", cert_id));
         let mut config = config;
         config.tls = Some(TLSConfig{ cert_file: gen_cert.cert_file.clone(),
                         cert_key_file: gen_cert.cert_key_file.clone() });
@@ -1822,20 +1829,21 @@ mod test {
                         IRCLinesCodec::new_with_max_length(2000))
     }
     
-    #[tokio::test]
-    async fn test_server_tls_first() {
-        let (gen_cert, main_state, handle, port) = 
-                        run_test_tls_server(MainConfig::default()).await;
-        {
-            let mut line_stream = connect_to_test_tls(&gen_cert, port).await;
-            line_stream.send("NICK mati".to_string()).await.unwrap();
-            line_stream.send("USER mati 8 * :MatiSzpaki".to_string()).await.unwrap();
-            for i in 0..18 {
-                println!("{}: {}", i, line_stream.next().await.unwrap().unwrap());
-            }
-        }
-        
-        quit_test_server(main_state, handle).await;
+    pub(crate) async fn login_to_test_tls<'a>(gen_cert: &GeneratedCert, port: u16,
+                nick: &'a str, name: &'a str, realname: &'a str)
+                -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
+        let mut line_stream = connect_to_test_tls(gen_cert, port).await;
+        line_stream.send(format!("NICK {}", nick)).await.unwrap();
+        line_stream.send(format!("USER {} 8 * :{}", name, realname)).await.unwrap();
+        line_stream
+    }
+    
+    pub(crate) async fn login_to_test_tls_and_skip<'a>(gen_cert: &GeneratedCert, port: u16,
+                nick: &'a str, name: &'a str, realname: &'a str)
+                -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
+        let mut line_stream = login_to_test_tls(gen_cert, port, nick, name, realname).await;
+        for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+        line_stream
     }
     
     #[tokio::test]
@@ -1964,6 +1972,64 @@ mod test {
         {   // after close
             let state = main_state.state.read().await;
             assert_eq!(HashSet::new(), HashSet::from_iter(state.users.keys().cloned()));
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_server_tls_first() {
+        let (gen_cert, main_state, handle, port) = 
+                        run_test_tls_server(MainConfig::default()).await;
+        {
+            let mut line_stream = login_to_test_tls(&gen_cert, port, "mati", "mat",
+                            "MatiSzpaki").await;
+            assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
+                    Network, mati!~mat@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(concat!(":irc.irc 002 mati :Your host is irc.irc, running \
+                    version ", env!("CARGO_PKG_NAME"), "-",
+                    env!("CARGO_PKG_VERSION")).to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(format!(":irc.irc 003 mati :This server was created {}",
+                    main_state.created),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(concat!(":irc.irc 004 mati irc.irc ", env!("CARGO_PKG_NAME"), "-",
+                    env!("CARGO_PKG_VERSION"), " Oiorw Iabehiklmnopqstv"),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati AWAYLEN=1000 CASEMAPPING=ascii \
+                    CHANMODES=Iabehiklmnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
+                    HOSTLEN=1000 INVEX=I KEYLEN=1000 :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati KICKLEN=1000 LINELEN=2000 MAXLIST=beI:1000 \
+                    MAXNICKLEN=200 MAXPARA=500 MAXTARGETS=500 MODES=500 NETWORK=IRCnetwork \
+                    NICKLEN=200 PREFIX=(qaohv)~&@%+ :are supported by this server"
+                    .to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 005 mati SAFELIST STATUSMSG=~&@%+ TOPICLEN=1000 USERLEN=200 \
+                    USERMODES=Oiorw :are supported by this server".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 251 mati :There are 1 users and 0 invisible \
+                    on 1 servers".to_string(), line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 252 mati 0 :operator(s) online".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 253 mati 0 :unknown connection(s)".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 254 mati 0 :channels formed".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 255 mati :I have 1 clients and 1 servers".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 265 mati 1 1 :Current local users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 266 mati 1 1 :Current global users 1, max 1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 375 mati :- irc.irc Message of the day - ".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 372 mati :Hello, world!".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 376 mati :End of /MOTD command.".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 221 mati +".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;

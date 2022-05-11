@@ -146,7 +146,7 @@ pub(crate) enum Reply<'a> {
     ErrUsersDontMatch502{ client: &'a str },
     ErrHelpNotFound524{ client: &'a str, subject: &'a str },
     //RplStartTls670{ client: &'a str },
-    //RplWhoIsSecure671{ client: &'a str, nick: &'a str },
+    RplWhoIsSecure671{ client: &'a str, nick: &'a str },
     //ErrStartTls691{ client: &'a str },
     ErrInvalidModeParam696{ client: &'a str, target: &'a str, modechar: char,
         param: &'a str, description: &'a str },
@@ -391,8 +391,8 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "524 {} {} :No help available on this topic", client, subject) }
             //RplStartTls670{ client } => {
             //    write!(f, "670 {} :STARTTLS successful, proceed with TLS handshake", client) }
-            //RplWhoIsSecure671{ client, nick } => {
-            //    write!(f, "671 {} {} :is using a secure connection", client, nick) }
+            RplWhoIsSecure671{ client, nick } => {
+                write!(f, "671 {} {} :is using a secure connection", client, nick) }
             //ErrStartTls691{ client } => {
             //    write!(f, "691 {} :STARTTLS failed (Wrong moon phase)", client) }
             ErrInvalidModeParam696{ client, target, modechar, param, description } => {
