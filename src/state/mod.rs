@@ -43,6 +43,8 @@ use rustls;
 use rustls_pemfile;
 use tokio_rustls::rustls::{Certificate, PrivateKey};
 use tokio_rustls::TlsAcceptor;
+use trust_dns_resolver::{TokioHandle, TokioAsyncResolver};
+use lazy_static::lazy_static;
 use tracing::*;
 
 use crate::config::*;
@@ -96,6 +98,12 @@ impl User {
     // update nick - mainly source
     fn update_nick(&mut self, user_state: &ConnUserState) {
         if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
+        self.source = user_state.source.clone();
+    }
+    
+    // update nick - mainly source
+    fn update_hostname(&mut self, user_state: &ConnUserState) {
+        self.nick = user_state.hostname.clone();
         self.source = user_state.source.clone();
     }
     
@@ -430,6 +438,7 @@ impl CapState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ConnUserState {
+    ip_addr: IpAddr,
     hostname: String,
     name: Option<String>,
     realname: Option<String>,
@@ -444,7 +453,7 @@ impl ConnUserState {
     fn new(ip_addr: IpAddr) -> ConnUserState {
         let mut source = "@".to_string();
         source.push_str(&ip_addr.to_string());
-        ConnUserState{ hostname: ip_addr.to_string(),
+        ConnUserState{ ip_addr, hostname: ip_addr.to_string(),
             name: None, realname: None, nick: None, source, password: None,
             authenticated: false, registered: false }
     }
@@ -471,6 +480,10 @@ impl ConnUserState {
         self.source = s;
     }
     
+    fn set_hostname(&mut self, hostname: String) {
+        self.hostname = hostname;
+        self.update_source();
+    }
     fn set_name(&mut self, name: String) {
         self.name = Some(name);
         self.update_source();
@@ -500,6 +513,9 @@ pub(crate) struct ConnState {
     // quit_sender - quit sender to send KILL - sender will be later taken after
     // correct authentication and it will be stored in User structure.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
+    // receiver for dns lookup
+    dns_lookup_receiver: oneshot::Receiver<Option<String>>,
+    dns_lookup_sender: Option<oneshot::Sender<Option<String>>>,
     
     user_state: ConnUserState,
     
@@ -516,11 +532,15 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
         let (quit_sender, quit_receiver) = oneshot::channel();
+        let (dns_lookup_sender, dns_lookup_receiver) = oneshot::channel();
+        
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
-            pong_notifier: None, quit_sender: Some(quit_sender), quit_receiver,
+            pong_notifier: None,
+            quit_sender: Some(quit_sender), quit_receiver,
+            dns_lookup_sender: Some(dns_lookup_sender), dns_lookup_receiver,
             caps_negotation: false, caps: CapState::default(),
             quit: Arc::new(AtomicI32::new(0)),
             conns_count }
@@ -546,6 +566,10 @@ impl ConnState {
         tokio::spawn(pong_client_timeout(
                 time::timeout(Duration::from_secs(config.pong_timeout), pong_receiver),
                     self.quit.clone(), self.timeout_sender.clone()));
+    }
+    
+    fn run_dns_lookup(&mut self) {
+        dns_lookup(self.dns_lookup_sender.take().unwrap(), self.user_state.ip_addr);
     }
     
     pub(crate) fn is_secure(&self) -> bool {
@@ -770,6 +794,18 @@ impl MainState {
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
+            Ok(hostname_opt) = &mut conn_state.dns_lookup_receiver => {
+                if let Some(hostname) = hostname_opt {
+                    conn_state.user_state.set_hostname(hostname);
+                    if let Some(nick) = &conn_state.user_state.nick {
+                        let mut state = self.state.write().await;
+                        if let Some(user) = state.users.get_mut(nick) {
+                            user.update_hostname(&conn_state.user_state);
+                        }
+                    }
+                }
+                Ok(())
+            }
             
             msg_str_res = conn_state.stream.next() => {
                 let msg = match msg_str_res {
@@ -964,6 +1000,9 @@ async fn user_state_process(main_state: Arc<MainState>,
             stream: DualTcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
+        if main_state.config.dns_lookup {
+            conn_state.run_dns_lookup();
+        }
         while !conn_state.is_quit() {
             if let Err(e) = main_state.process(&mut conn_state).await {
                 error!("Error for {}: {}", conn_state.user_state.source, e);
@@ -1001,9 +1040,64 @@ pub(crate) fn initialize_logging(config: &MainConfig) {
     } else { s.init(); }
 }
 
+lazy_static! {
+    static ref DNS_RESOLVER: std::sync::RwLock<Option<Arc::<TokioAsyncResolver>>> =
+                std::sync::RwLock::new(None);
+}
+
+fn initialize_dns_resolver() {
+    let mut r = DNS_RESOLVER.write().unwrap();
+    if r.is_none() {
+        *r = Some(Arc::new({
+            // for windows or linux
+            #[cfg(any(unix, windows))]
+            { // use the system resolver configuration
+                TokioAsyncResolver::from_system_conf(TokioHandle)
+            }
+
+            // for other
+            #[cfg(not(any(unix, windows)))]
+            {
+                // Directly reference the config types
+                use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+
+                // Get a new resolver with the google nameservers as
+                // the upstream recursive resolvers
+                TokioAsyncResolver::tokio(
+                    ResolverConfig::google(),
+                    ResolverOpts::default())
+            }
+        }.expect("failed to create resolver")));
+    }
+}
+
+fn dns_lookup(sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
+    let r = DNS_RESOLVER.read().unwrap();
+    let resolver = (*r).clone().unwrap();
+    tokio::spawn(dns_lookup_process(resolver.clone(), sender, ip));
+}
+
+async fn dns_lookup_process(resolver: Arc<TokioAsyncResolver>,
+                sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
+    let r = match resolver.reverse_lookup(ip).await {
+        Ok(lookup) => {
+            if let Some(x) = lookup.iter().next() {
+                sender.send(Some(x.to_string()))
+            } else { sender.send(None) }
+        }
+        Err(_) => { sender.send(None) }
+    };
+    if r.is_err() {
+        error!("Error while sending dns lookup");
+    }
+}
+
 // main routine to run server
 pub(crate) async fn run_server(config: MainConfig) ->
         Result<(Arc<MainState>, JoinHandle<()>), Box<dyn Error>> {
+    if config.dns_lookup {
+        initialize_dns_resolver();
+    }
     let listener = TcpListener::bind((config.listen, config.port)).await?;
     let cloned_tls = config.tls.clone();
     let main_state = Arc::new(MainState::new_from_config(config));
@@ -1081,6 +1175,7 @@ mod test {
         config.default_user_modes = UserModes{ invisible: true, oper: false,
                 local_oper: false, registered: true, wallops: false };
         let user_state = ConnUserState{
+            ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "bobby.com".to_string(),
             name: Some("mati1".to_string()),
             realname: Some("Matthew Somebody".to_string()),
@@ -1412,18 +1507,21 @@ mod test {
     #[test]
     fn test_conn_user_state() {
         let mut cus = ConnUserState::new("192.168.1.7".parse().unwrap());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(), name: None,
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(), name: None,
                 realname: None, nick: None, source: "@192.168.1.7".to_string(),
                 password: None, authenticated: false, registered: false }, cus);
         assert_eq!("192.168.1.7", cus.client_name());
         cus.set_name("boro".to_string());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(),
                 name: Some("boro".to_string()),
                 realname: None, nick: None, source: "~boro@192.168.1.7".to_string(),
                 password: None, authenticated: false, registered: false }, cus);
         assert_eq!("boro", cus.client_name());
         cus.set_nick("buru".to_string());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(),
                 name: Some("boro".to_string()),
                 realname: None, nick: Some("buru".to_string()),
                 source: "buru!~boro@192.168.1.7".to_string(),
@@ -1431,18 +1529,21 @@ mod test {
         assert_eq!("buru", cus.client_name());
         
         let mut cus = ConnUserState::new("192.168.1.7".parse().unwrap());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(), name: None,
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(), name: None,
                 realname: None, nick: None, source: "@192.168.1.7".to_string(),
                 password: None, authenticated: false, registered: false }, cus);
         assert_eq!("192.168.1.7", cus.client_name());
         cus.set_nick("boro".to_string());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(),
                 nick: Some("boro".to_string()),
                 realname: None, name: None, source: "boro!@192.168.1.7".to_string(),
                 password: None, authenticated: false, registered: false }, cus);
         assert_eq!("boro", cus.client_name());
         cus.set_name("buru".to_string());
-        assert_eq!(ConnUserState{ hostname: "192.168.1.7".to_string(),
+        assert_eq!(ConnUserState{ ip_addr: "192.168.1.7".parse().unwrap(),
+                hostname: "192.168.1.7".to_string(),
                 nick: Some("boro".to_string()),
                 realname: None, name: Some("buru".to_string()),
                 source: "boro!~buru@192.168.1.7".to_string(),
@@ -1499,7 +1600,7 @@ mod test {
             ChannelConfig{ name: "#something".to_string(), topic: None,
                         modes: ChannelModes::default() } ]);
         let mut state = VolatileState::new_from_config(&config);
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "bobby.com".to_string(),
             name: Some("matix".to_string()),
             realname: Some("Matthew Somebody".to_string()),
@@ -1540,7 +1641,7 @@ mod test {
                         modes: ChannelModes::default() } ]);
         let mut state = VolatileState::new_from_config(&config);
         
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "bobby.com".to_string(),
             name: Some("matix".to_string()),
             realname: Some("Matthew Somebody".to_string()),
@@ -1553,7 +1654,7 @@ mod test {
         state.add_user(user);
         assert_eq!(1, state.max_users_count);
         
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "flowers.com".to_string(),
             name: Some("tulip".to_string()),
             realname: Some("Tulipan".to_string()),
@@ -1566,7 +1667,7 @@ mod test {
         state.add_user(user);
         assert_eq!(2, state.max_users_count);
         
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "digger.com".to_string(),
             name: Some("greggy".to_string()),
             realname: Some("Gregory Digger".to_string()),
@@ -1581,7 +1682,7 @@ mod test {
         assert_eq!(3, state.max_users_count);
         assert_eq!(1, state.invisible_users_count);
         
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "miller.com".to_string(),
             name: Some("johnny".to_string()),
             realname: Some("John Miller".to_string()),
@@ -1597,7 +1698,7 @@ mod test {
         assert_eq!(1, state.invisible_users_count);
         assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
         
-        let user_state = ConnUserState{
+        let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
             hostname: "guru.com".to_string(),
             name: Some("admin".to_string()),
             realname: Some("Great Admin".to_string()),

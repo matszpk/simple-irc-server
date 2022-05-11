@@ -11,6 +11,7 @@ keywords = ["irc"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lazy_static = "1.4"
 tokio = { version = "1.0", features = [ "full" ] }
 tokio-util = { version = "0.7.0", features = [ "codec" ] }
 tokio-stream = "0.1"
@@ -28,6 +29,7 @@ flagset = "0.4"
 tokio-rustls = "0.23"
 rustls = "0.20"
 rustls-pemfile = "1.0"
+trust-dns-resolver = "0.21"
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"
