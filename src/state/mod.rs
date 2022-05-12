@@ -509,7 +509,7 @@ pub(crate) struct ConnState {
     timeout_receiver: UnboundedReceiver<()>,
     pong_notifier: Option<oneshot::Sender<()>>,
     // quit receiver - receive KILL from other user.
-    quit_receiver: oneshot::Receiver<(String, String)>,
+    quit_receiver: Fuse<oneshot::Receiver<(String, String)>>,
     // quit_sender - quit sender to send KILL - sender will be later taken after
     // correct authentication and it will be stored in User structure.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
@@ -539,7 +539,8 @@ impl ConnState {
             ping_sender: Some(ping_sender), ping_receiver,
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
             pong_notifier: None,
-            quit_sender: Some(quit_sender), quit_receiver,
+            quit_sender: Some(quit_sender),
+            quit_receiver: quit_receiver.fuse(),
             dns_lookup_sender: Some(dns_lookup_sender),
             dns_lookup_receiver: dns_lookup_receiver.fuse(),
             caps_negotation: false, caps: CapState::default(),
