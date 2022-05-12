@@ -840,7 +840,11 @@ impl MainState {
                     },
                     Some(Err(e)) => return Err(Box::new(e)),
                     // if end of stream
-                    None => return Ok(()),
+                    None => {
+                        conn_state.quit.store(1, Ordering::SeqCst);
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::UnexpectedEof, "unexpected eof")))
+                    }
                 };
                 
                 let cmd = match Command::from_message(&msg) {
@@ -1996,9 +2000,6 @@ mod test {
             line_stream.send(toolong).await.unwrap();
             assert_eq!(":irc.irc 417 127.0.0.1 :Input line was too long".to_string(),
                         line_stream.next().await.unwrap().unwrap());
-            line_stream.send("MODE #bam +l xxx".to_string()).await.unwrap();
-            assert_eq!(":irc.irc 696 127.0.0.1 #bam l xxx :invalid digit found in string"
-                        .to_string(), line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;

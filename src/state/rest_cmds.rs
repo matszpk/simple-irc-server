@@ -878,7 +878,8 @@ mod test {
                     "Alan Bodarski").await;
             let mut line_stream2 = login_to_test_and_skip(port, "bowie", "bowie",
                     "Bowie Catcher").await;
-            login_to_test_and_skip(port, "cedric", "cedric", "Cedric Maximus").await;
+            let mut cedric_stream = login_to_test_and_skip(port, "cedric", "cedric",
+                    "Cedric Maximus").await;
             
             time::sleep(Duration::from_millis(50)).await;
             {
@@ -893,6 +894,7 @@ mod test {
             // directly this message
             assert_eq!(":bowie!~bowie@127.0.0.1 PRIVMSG alan :Hello boys".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            cedric_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
@@ -1032,9 +1034,12 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
-            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
-            login_to_test_and_skip(port, "jarry", "jarry", "Jarry Lazy").await;
-            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            let mut stream1 = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
+            let mut stream2 = login_to_test_and_skip(port, "jarry", "jarry",
+                    "Jarry Lazy").await;
+            let mut stream3 = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Lazy").await;
             
             line_stream.send("WHO j*rry".to_string()).await.unwrap();
             assert!(equal_list(":irc.irc 352 fanny * ",
@@ -1055,6 +1060,10 @@ mod test {
                                 &line_stream.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            
+            for stream in [&mut stream1, &mut stream2, &mut stream3] {
+                stream.send("QUIT :Bye".to_string()).await.unwrap();
+            }
         }
         
         quit_test_server(main_state, handle).await;
@@ -1068,10 +1077,12 @@ mod test {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
             
-            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jerry_stream = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
             let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
                         "Jarry Lazy").await;
-            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Lazy").await;
             
             time::sleep(Duration::from_millis(50)).await;
             jarry_stream.send("MODE jarry +i".to_string()).await.unwrap();
@@ -1085,6 +1096,10 @@ mod test {
                                 &line_stream.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            
+            for stream in [&mut jerry_stream, &mut jarry_stream, &mut harry_stream] {
+                stream.send("QUIT :Bye".to_string()).await.unwrap();
+            }
         }
         
         quit_test_server(main_state, handle).await;
@@ -1098,7 +1113,8 @@ mod test {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
             
-            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jerry_stream = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
             let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
                         "Jarry Lazy").await;
             let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
@@ -1123,6 +1139,7 @@ mod test {
                                 &line_stream.next().await.unwrap().unwrap()]));
             assert_eq!(":irc.irc 315 fanny *rry :End of WHO list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            jerry_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
@@ -1219,9 +1236,12 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
-            login_to_test_and_skip(port, "henry", "henry", "Henry Solo").await;
-            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
-            login_to_test_and_skip(port, "dizzy", "dizzy", "Dizzy Multi").await;
+            let mut stream1 = login_to_test_and_skip(port, "henry", "henry",
+                        "Henry Solo").await;
+            let mut stream2 = login_to_test_and_skip(port, "harry", "harry",
+                        "Harry Lazy").await;
+            let mut stream3 = login_to_test_and_skip(port, "dizzy", "dizzy",
+                        "Dizzy Multi").await;
             
             time::sleep(Duration::from_millis(50)).await;
             let (signon, signon2) = {
@@ -1248,6 +1268,9 @@ mod test {
             assert_eq!(expecteds, results);
             assert_eq!(":irc.irc 318 fanny *ry :End of /WHOIS list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            for stream in [&mut stream1, &mut stream2, &mut stream3] {
+                stream.send("QUIT :Bye".to_string()).await.unwrap();
+            }
         }
         
         quit_test_server(main_state, handle).await;
@@ -1261,7 +1284,8 @@ mod test {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
             
-            login_to_test_and_skip(port, "jerry", "jerry", "Jerry Lazy").await;
+            let mut jerry_stream = login_to_test_and_skip(port, "jerry", "jerry",
+                    "Jerry Lazy").await;
             let mut jarry_stream = login_to_test_and_skip(port, "jarry", "jarry",
                         "Jarry Lazy").await;
             let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
@@ -1305,6 +1329,7 @@ mod test {
             assert_eq!(expecteds, results);
             assert_eq!(":irc.irc 318 fanny *rry :End of /WHOIS list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            jerry_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
@@ -1418,9 +1443,12 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
                     "Fanny BumBumBum").await;
-            login_to_test_and_skip(port, "henry", "henry", "Henry Solo").await;
-            login_to_test_and_skip(port, "harry", "harry", "Harry Lazy").await;
-            login_to_test_and_skip(port, "dizzy", "dizzy", "Dizzy Multi").await;
+            let mut henry_stream = login_to_test_and_skip(port, "henry", "henry",
+                    "Henry Solo").await;
+            let mut harry_stream = login_to_test_and_skip(port, "harry", "harry",
+                    "Harry Lazy").await;
+            let mut dizzy_stream = login_to_test_and_skip(port, "dizzy", "dizzy",
+                    "Dizzy Multi").await;
             
             time::sleep(Duration::from_millis(50)).await;
             let (signon, signon2, signon3) = {
@@ -1454,6 +1482,10 @@ mod test {
             assert_eq!(expecteds, results);
             assert_eq!(":irc.irc 318 fanny *ry,dizzy :End of /WHOIS list".to_string(),
                     line_stream.next().await.unwrap().unwrap());
+            
+            for stream in [&mut henry_stream, &mut harry_stream, &mut dizzy_stream] {
+                stream.send("QUIT :Bye".to_string()).await.unwrap();
+            }
         }
         
         quit_test_server(main_state, handle).await;
@@ -1593,7 +1625,7 @@ mod test {
             assert_eq!(":irc.irc 481 fanny :Permission Denied- You're not an IRC \
                         operator".to_string(), line_stream.next().await.unwrap().unwrap());
             time::sleep(Duration::from_millis(50)).await;
-            assert!(main_state.state.read().await.users.contains_key("dizzy"));
+            assert!(!main_state.state.read().await.users.contains_key("dizzy"));
         }
         
         quit_test_server(main_state, handle).await;
@@ -1665,9 +1697,10 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
                     "Bunny BumBumBum").await;
+            let mut xstreams = vec![];
             for i in 0..50 {
-                login_to_test_and_skip(port, &format!("binny{}", i),
-                        &format!("binny{}", i), &format!("Binny{} BigBang", i)).await;
+                xstreams.push(login_to_test_and_skip(port, &format!("binny{}", i),
+                        &format!("binny{}", i), &format!("Binny{} BigBang", i)).await);
             }
             
             line_stream.send(format!("USERHOST {}", (0..50).map(|x| format!("binny{}", x))

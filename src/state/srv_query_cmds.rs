@@ -863,8 +863,10 @@ mod test {
             
             let mut zephyr_stream = login_to_test_and_skip(port, "zephyr", "zephyr",
                     "Zephyr Monumental").await;
-            login_to_test_and_skip(port, "leon", "leon", "Leon the Professionalist").await;
-            login_to_test_and_skip(port, "amanda", "amanda", "Amanda Fruity").await;
+            let mut leon_stream = login_to_test_and_skip(port, "leon", "leon",
+                    "Leon the Professionalist").await;
+            let mut amanda_stream = login_to_test_and_skip(port, "amanda", "amanda",
+                        "Amanda Fruity").await;
             let mut emilia_stream = login_to_test_and_skip(port, "emilia", "emilia",
                         "Emilia Fuzzy").await;
             emilia_stream.send("QUIT".to_string()).await.unwrap();
@@ -900,6 +902,8 @@ mod test {
                 assert_eq!(expected.to_string(),
                         zephyr_stream.next().await.unwrap().unwrap());
             }
+            leon_stream.send("QUIT :Bye".to_string()).await.unwrap();
+            amanda_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
@@ -993,7 +997,8 @@ mod test {
         {
             let mut line_stream = login_to_test_and_skip(port, "sonny", "sonnyx",
                     "Sonny Sunset").await;
-            login_to_test_and_skip(port, "norton", "norton", "Norton Norton2").await;
+            let mut norton_stream = login_to_test_and_skip(port, "norton", "norton",
+                    "Norton Norton2").await;
             
             line_stream.send("MODE sonny".to_string()).await.unwrap();
             assert_eq!(":irc.irc 221 sonny +".to_string(),
@@ -1032,6 +1037,7 @@ mod test {
             line_stream.send("MODE norton +w".to_string()).await.unwrap();
             assert_eq!(":irc.irc 502 sonny :Cant change mode for other users".to_string(),
                         line_stream.next().await.unwrap().unwrap());
+            norton_stream.send("QUIT :Bye".to_string()).await.unwrap();
         }
         
         quit_test_server(main_state, handle).await;
