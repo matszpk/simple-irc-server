@@ -514,8 +514,8 @@ pub(crate) struct ConnState {
     // correct authentication and it will be stored in User structure.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
     // receiver for dns lookup
-    dns_lookup_receiver: oneshot::Receiver<Option<String>>,
-    dns_lookup_sender: Option<oneshot::Sender<Option<String>>>,
+    dns_lookup_receiver: UnboundedReceiver<Option<String>>,
+    dns_lookup_sender: Option<UnboundedSender<Option<String>>>,
     
     user_state: ConnUserState,
     
@@ -532,7 +532,7 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
         let (quit_sender, quit_receiver) = oneshot::channel();
-        let (dns_lookup_sender, dns_lookup_receiver) = oneshot::channel();
+        let (dns_lookup_sender, dns_lookup_receiver) = unbounded_channel();
         
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
@@ -794,7 +794,7 @@ impl MainState {
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
-            Ok(hostname_opt) = &mut conn_state.dns_lookup_receiver => {
+            Some(hostname_opt) = conn_state.dns_lookup_receiver.recv() => {
                 if let Some(hostname) = hostname_opt {
                     conn_state.user_state.set_hostname(hostname);
                     if let Some(nick) = &conn_state.user_state.nick {
@@ -1071,18 +1071,22 @@ fn initialize_dns_resolver() {
     }
 }
 
-fn dns_lookup(sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
+fn dns_lookup(sender: UnboundedSender<Option<String>>, ip: IpAddr) {
     let r = DNS_RESOLVER.read().unwrap();
     let resolver = (*r).clone().unwrap();
     tokio::spawn(dns_lookup_process(resolver.clone(), sender, ip));
 }
 
 async fn dns_lookup_process(resolver: Arc<TokioAsyncResolver>,
-                sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
+                sender: UnboundedSender<Option<String>>, ip: IpAddr) {
     let r = match resolver.reverse_lookup(ip).await {
         Ok(lookup) => {
             if let Some(x) = lookup.iter().next() {
-                sender.send(Some(x.to_string()))
+                let namex = x.to_string();
+                let name = if namex.as_bytes()[namex.len()-1] == b'.' {
+                    namex[..namex.len()-1].to_string()
+                } else { namex };
+                sender.send(Some(name))
             } else { sender.send(None) }
         }
         Err(_) => { sender.send(None) }
