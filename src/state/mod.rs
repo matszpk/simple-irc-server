@@ -36,7 +36,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
 use tokio::task::JoinHandle;
 use tokio::time;
-use futures::SinkExt;
+use futures::{SinkExt, future::Fuse, future::FutureExt};
 use chrono::prelude::*;
 use flagset::{flags, FlagSet};
 use rustls;
@@ -514,8 +514,8 @@ pub(crate) struct ConnState {
     // correct authentication and it will be stored in User structure.
     quit_sender: Option<oneshot::Sender<(String, String)>>,
     // receiver for dns lookup
-    dns_lookup_receiver: UnboundedReceiver<Option<String>>,
-    dns_lookup_sender: Option<UnboundedSender<Option<String>>>,
+    dns_lookup_receiver: Fuse<oneshot::Receiver<Option<String>>>,
+    dns_lookup_sender: Option<oneshot::Sender<Option<String>>>,
     
     user_state: ConnUserState,
     
@@ -532,7 +532,7 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
         let (quit_sender, quit_receiver) = oneshot::channel();
-        let (dns_lookup_sender, dns_lookup_receiver) = unbounded_channel();
+        let (dns_lookup_sender, dns_lookup_receiver) = oneshot::channel();
         
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
@@ -540,7 +540,8 @@ impl ConnState {
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
             pong_notifier: None,
             quit_sender: Some(quit_sender), quit_receiver,
-            dns_lookup_sender: Some(dns_lookup_sender), dns_lookup_receiver,
+            dns_lookup_sender: Some(dns_lookup_sender),
+            dns_lookup_receiver: dns_lookup_receiver.fuse(),
             caps_negotation: false, caps: CapState::default(),
             quit: Arc::new(AtomicI32::new(0)),
             conns_count }
@@ -794,7 +795,7 @@ impl MainState {
                 conn_state.quit.store(1, Ordering::SeqCst);
                 Ok(())
             }
-            Some(hostname_opt) = conn_state.dns_lookup_receiver.recv() => {
+            Ok(hostname_opt) = &mut conn_state.dns_lookup_receiver => {
                 if let Some(hostname) = hostname_opt {
                     conn_state.user_state.set_hostname(hostname);
                     if let Some(nick) = &conn_state.user_state.nick {
@@ -1075,14 +1076,14 @@ fn initialize_dns_resolver() {
     }
 }
 
-fn dns_lookup(sender: UnboundedSender<Option<String>>, ip: IpAddr) {
+fn dns_lookup(sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
     let r = DNS_RESOLVER.read().unwrap();
     let resolver = (*r).clone().unwrap();
     tokio::spawn(dns_lookup_process(resolver.clone(), sender, ip));
 }
 
 async fn dns_lookup_process(resolver: Arc<TokioAsyncResolver>,
-                sender: UnboundedSender<Option<String>>, ip: IpAddr) {
+                sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
     let r = match resolver.reverse_lookup(ip).await {
         Ok(lookup) => {
             if let Some(x) = lookup.iter().next() {
