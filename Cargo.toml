@@ -35,10 +35,10 @@ trust-dns-resolver = { version = "0.21", optional = true }
 
 [features]
 # prefer rustls for almost systems
-rustls = [ "dep:rustls", "dep:tokio-rustls", "dep:rustls-pemfile" ]
+tls_rustls = [ "rustls", "tokio-rustls", "rustls-pemfile" ]
 # use openssl if rustls with ring doesn't work - for example old non-SSE2 machines
-openssl = [ "dep:openssl", "dep:tokio-openssl" ]
-dns_lookup = [ "dep:trust-dns-resolver", "dep:lazy_static" ]
+tls_openssl = [ "openssl", "tokio-openssl" ]
+dns_lookup = [ "trust-dns-resolver", "lazy_static" ]
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"
