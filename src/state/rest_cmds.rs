@@ -1199,13 +1199,12 @@ mod test {
     
     #[tokio::test]
     async fn test_command_whois_tls() {
-        let (gen_cert, main_state, handle, port) = 
-                        run_test_tls_server(MainConfig::default()).await;
+        let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;
         
         {
-            let mut line_stream = login_to_test_tls_and_skip(&gen_cert, port,
+            let mut line_stream = login_to_test_tls_and_skip(port,
                     "fanny", "fanny", "Fanny BumBumBum").await;
-            let mut harry_stream = login_to_test_tls_and_skip(&gen_cert, port,
+            let mut harry_stream = login_to_test_tls_and_skip(port,
                     "harry", "harry", "Harry Lazy").await;
             
             time::sleep(Duration::from_millis(50)).await;

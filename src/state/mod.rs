@@ -1821,44 +1821,11 @@ mod test {
     }
     
     use std::sync::atomic::AtomicU16;
+    use std::path::PathBuf;
     
     static PORT_COUNTER: AtomicU16 = AtomicU16::new(7888);
-    static CERT_COUNTER: AtomicU16 = AtomicU16::new(0);
     //use std::sync::Once;
     //static LOGGING_START: Once = Once::new();
-    
-    use rcgen;
-    use std::env::temp_dir;
-    use std::fs;
-    
-    pub(crate) struct GeneratedCert {
-        cert_file: String,
-        cert_key_file: String,
-    }
-    
-    impl GeneratedCert {
-        fn new(cert_file: &str, cert_key_file: &str) -> Self {
-            let subject_alt_names = vec!["hello.world.example".to_string(),
-                    "localhost".to_string()];
-            let cert = rcgen::generate_simple_self_signed(subject_alt_names).unwrap();
-            let cert_file_path = temp_dir().join(cert_file)
-                        .to_string_lossy().to_string();
-            let cert_key_file_path = temp_dir().join(cert_key_file)
-                        .to_string_lossy().to_string();
-            fs::write(cert_file_path.as_str(),
-                        &cert.serialize_pem().unwrap()).unwrap();
-            fs::write(cert_key_file_path.as_str(),
-                        &cert.serialize_private_key_pem()).unwrap();
-            GeneratedCert{ cert_file: cert_file_path, cert_key_file: cert_key_file_path }
-        }
-    }
-    
-    impl Drop for GeneratedCert {
-        fn drop(&mut self) {
-            fs::remove_file(self.cert_file.as_str()).unwrap();
-            fs::remove_file(self.cert_key_file.as_str()).unwrap();
-        }
-    }
     
     pub(crate) async fn run_test_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
@@ -1901,31 +1868,43 @@ mod test {
         line_stream
     }
     
+    fn get_cert_file_path() -> String {
+        let mut path = PathBuf::new();
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push("test_data");
+        path.push("cert.crt");
+        path.to_string_lossy().to_string()
+    }
+    
+    fn get_cert_key_file_path() -> String {
+        let mut path = PathBuf::new();
+        path.push(env!("CARGO_MANIFEST_DIR"));
+        path.push("test_data");
+        path.push("cert_key.crt");
+        path.to_string_lossy().to_string()
+    }
+    
     pub(crate) async fn run_test_tls_server(config: MainConfig)
-            -> (GeneratedCert, Arc<MainState>, JoinHandle<()>, u16) {
+            -> (Arc<MainState>, JoinHandle<()>, u16) {
         //LOGGING_START.call_once(|| {
         //    initialize_logging(&MainConfig::default());
         //});
-        let cert_id = CERT_COUNTER.fetch_add(1, Ordering::SeqCst);
-        let gen_cert = GeneratedCert::new(&format!("cert_{}.pem", cert_id),
-                        &format!("cert_key_{}.pem", cert_id));
         let mut config = config;
-        config.tls = Some(TLSConfig{ cert_file: gen_cert.cert_file.clone(),
-                        cert_key_file: gen_cert.cert_key_file.clone() });
+        config.tls = Some(TLSConfig{ cert_file: get_cert_file_path(),
+            cert_key_file: get_cert_key_file_path() });
         config.port = PORT_COUNTER.fetch_add(1, Ordering::SeqCst);
         let port = config.port;
         let (main_state, handle) = run_server(config).await.unwrap();
-        (gen_cert, main_state, handle, port)
+        (main_state, handle, port)
     }
     
     use std::convert::TryFrom;
     use tokio_rustls::TlsConnector;
     
-    pub(crate) async fn connect_to_test_tls(gen_cert: &GeneratedCert, port: u16)
-                    -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
-        
+    pub(crate) async fn connect_to_test_tls(port: u16)
+                -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
         let mut certs: Vec<Certificate> = rustls_pemfile::certs(
-                &mut BufReader::new(File::open(gen_cert.cert_file.clone()).unwrap()))
+                &mut BufReader::new(File::open(get_cert_file_path()).unwrap()))
                 .map(|mut certs| certs.drain(..).map(Certificate).collect()).unwrap();
         let dnsname = rustls::client::ServerName::try_from("localhost").unwrap();
         
@@ -1940,19 +1919,19 @@ mod test {
                         IRCLinesCodec::new_with_max_length(2000))
     }
     
-    pub(crate) async fn login_to_test_tls<'a>(gen_cert: &GeneratedCert, port: u16,
+    pub(crate) async fn login_to_test_tls<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
-        let mut line_stream = connect_to_test_tls(gen_cert, port).await;
+        let mut line_stream = connect_to_test_tls(port).await;
         line_stream.send(format!("NICK {}", nick)).await.unwrap();
         line_stream.send(format!("USER {} 8 * :{}", name, realname)).await.unwrap();
         line_stream
     }
     
-    pub(crate) async fn login_to_test_tls_and_skip<'a>(gen_cert: &GeneratedCert, port: u16,
+    pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
-        let mut line_stream = login_to_test_tls(gen_cert, port, nick, name, realname).await;
+        let mut line_stream = login_to_test_tls(port, nick, name, realname).await;
         for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
         line_stream
     }
@@ -2087,10 +2066,9 @@ mod test {
     
     #[tokio::test]
     async fn test_server_tls_first() {
-        let (gen_cert, main_state, handle, port) = 
-                        run_test_tls_server(MainConfig::default()).await;
+        let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;
         {
-            let mut line_stream = login_to_test_tls(&gen_cert, port, "mati", "mat",
+            let mut line_stream = login_to_test_tls(port, "mati", "mat",
                             "MatiSzpaki").await;
             assert_eq!(":irc.irc 001 mati :Welcome to the IRCnetwork \
                     Network, mati!~mat@127.0.0.1".to_string(),
