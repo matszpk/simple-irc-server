@@ -8,8 +8,6 @@ description = "Simple IRC server"
 categories = ["network-programming"]
 keywords = ["irc"]
 
-# TODO: add option to build with tokio-openssl package. remove rcgen
-
 [dependencies]
 tokio = { version = "1.0", features = [ "full" ] }
 tokio-util = { version = "0.7.0", features = [ "codec" ] }
