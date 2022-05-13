@@ -26,10 +26,14 @@ validator = { version = "0.14", features = [ "derive" ] }
 bytes = "1.1.0"
 const-table = "0.1.0"
 flagset = "0.4"
-tokio-rustls = "0.23"
-rustls = "0.20"
-rustls-pemfile = "1.0"
+tokio-rustls = { version = "0.23", optional = true }
+rustls = { version = "0.20", optional = true }
+rustls-pemfile = { version = "1.0", optional = true }
 trust-dns-resolver = "0.21"
+
+[features]
+default = [ "rustls" ]
+rustls = [ "dep:rustls", "dep:tokio-rustls", "dep:rustls-pemfile" ]
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"
@@ -38,4 +42,3 @@ features = ["fmt", "ansi", "env-filter", "tracing-log"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = [ "full", "test-util" ] }
-webpki = "0.22"

@@ -25,6 +25,7 @@ use tokio::io::{ReadBuf};
 use bytes::{BufMut, BytesMut};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
+#[cfg(feature = "rustls")]
 use tokio_rustls::server::TlsStream;
 use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
@@ -33,6 +34,7 @@ use crate::command::CommandId::*;
 use crate::command::CommandError;
 use crate::command::CommandError::*;
 
+#[cfg(feature = "rustls")]
 #[derive(Debug)]
 pub(crate) enum DualTcpStream {
     PlainStream(TcpStream),

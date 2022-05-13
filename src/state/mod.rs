@@ -39,9 +39,13 @@ use tokio::time;
 use futures::{SinkExt, future::Fuse, future::FutureExt};
 use chrono::prelude::*;
 use flagset::{flags, FlagSet};
+#[cfg(feature = "rustls")]
 use rustls;
+#[cfg(feature = "rustls")]
 use rustls_pemfile;
+#[cfg(feature = "rustls")]
 use tokio_rustls::rustls::{Certificate, PrivateKey};
+#[cfg(feature = "rustls")]
 use tokio_rustls::TlsAcceptor;
 use trust_dns_resolver::{TokioHandle, TokioAsyncResolver};
 use lazy_static::lazy_static;
@@ -1019,6 +1023,7 @@ async fn user_state_process(main_state: Arc<MainState>,
     }
 }
 
+#[cfg(feature = "rustls")]
 async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
             acceptor: TlsAcceptor, addr: SocketAddr) {
     match acceptor.accept(stream).await {
@@ -1112,20 +1117,22 @@ pub(crate) async fn run_server(config: MainConfig) ->
     let cloned_tls = config.tls.clone();
     let main_state = Arc::new(MainState::new_from_config(config));
     let main_state_to_return = main_state.clone();
-    let handle = if let Some(tlsconfig) = cloned_tls  {
+    let handle = if let Some(tlsconfig) = cloned_tls {
         
-        let certs = rustls_pemfile::certs(
-                &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
-                .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
-        let mut keys: Vec<PrivateKey> = rustls_pemfile::pkcs8_private_keys(
-                &mut BufReader::new(File::open(tlsconfig.cert_key_file.clone())?))
-                .map(|mut keys| keys.drain(..).map(PrivateKey).collect())?;
-        
-        let config = rustls::ServerConfig::builder()
-            .with_safe_defaults()
-            .with_no_client_auth()
-            .with_single_cert(certs, keys.remove(0))
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+        #[cfg(feature = "rustls")]
+        let config = {
+            let certs = rustls_pemfile::certs(
+                    &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
+                    .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
+            let mut keys: Vec<PrivateKey> = rustls_pemfile::pkcs8_private_keys(
+                    &mut BufReader::new(File::open(tlsconfig.cert_key_file.clone())?))
+                    .map(|mut keys| keys.drain(..).map(PrivateKey).collect())?;
+            
+            rustls::ServerConfig::builder().with_safe_defaults()
+                .with_no_client_auth()
+                .with_single_cert(certs, keys.remove(0))
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?
+        };
             
         let acceptor = TlsAcceptor::from(Arc::new(config));
         tokio::spawn(async move {
@@ -1136,6 +1143,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
                     res = listener.accept() => {
                         match res {
                             Ok((stream, addr)) => {
+                                #[cfg(feature = "rustls")]
                                 tokio::spawn(user_state_process_tls(main_state.clone(),
                                         stream, acceptor.clone(), addr));
                             }
@@ -1899,8 +1907,10 @@ mod test {
     }
     
     use std::convert::TryFrom;
+    #[cfg(feature = "rustls")]
     use tokio_rustls::TlsConnector;
     
+    #[cfg(feature = "rustls")]
     pub(crate) async fn connect_to_test_tls(port: u16)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
         let mut certs: Vec<Certificate> = rustls_pemfile::certs(
@@ -1919,6 +1929,7 @@ mod test {
                         IRCLinesCodec::new_with_max_length(2000))
     }
     
+    #[cfg(feature = "rustls")]
     pub(crate) async fn login_to_test_tls<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
