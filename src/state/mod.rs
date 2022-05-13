@@ -54,7 +54,9 @@ use tokio_rustls::TlsAcceptor;
 use openssl::ssl::{Ssl, SslAcceptor, SslFiletype, SslMethod};
 #[cfg(feature = "openssl")]
 use tokio_openssl::SslStream;
+#[cfg(feature = "dns_lookup")]
 use trust_dns_resolver::{TokioHandle, TokioAsyncResolver};
+#[cfg(feature = "dns_lookup")]
 use lazy_static::lazy_static;
 use tracing::*;
 
@@ -113,6 +115,7 @@ impl User {
     }
     
     // update nick - mainly source
+    #[cfg(feature = "dns_lookup")]
     fn update_hostname(&mut self, user_state: &ConnUserState) {
         self.nick = user_state.hostname.clone();
         self.source = user_state.source.clone();
@@ -491,6 +494,7 @@ impl ConnUserState {
         self.source = s;
     }
     
+    #[cfg(feature = "dns_lookup")]
     fn set_hostname(&mut self, hostname: String) {
         self.hostname = hostname;
         self.update_source();
@@ -526,6 +530,7 @@ pub(crate) struct ConnState {
     quit_sender: Option<oneshot::Sender<(String, String)>>,
     // receiver for dns lookup
     dns_lookup_receiver: Fuse<oneshot::Receiver<Option<String>>>,
+    #[cfg(feature = "dns_lookup")]
     dns_lookup_sender: Option<oneshot::Sender<Option<String>>>,
     
     user_state: ConnUserState,
@@ -543,7 +548,10 @@ impl ConnState {
         let (ping_sender, ping_receiver) = unbounded_channel();
         let (timeout_sender, timeout_receiver) = unbounded_channel();
         let (quit_sender, quit_receiver) = oneshot::channel();
+        #[cfg(feature = "dns_lookup")]
         let (dns_lookup_sender, dns_lookup_receiver) = oneshot::channel();
+        #[cfg(not(feature = "dns_lookup"))]
+        let (_, dns_lookup_receiver) = oneshot::channel();
         
         ConnState{ stream, sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
@@ -552,6 +560,7 @@ impl ConnState {
             pong_notifier: None,
             quit_sender: Some(quit_sender),
             quit_receiver: quit_receiver.fuse(),
+            #[cfg(feature = "dns_lookup")]
             dns_lookup_sender: Some(dns_lookup_sender),
             dns_lookup_receiver: dns_lookup_receiver.fuse(),
             caps_negotation: false, caps: CapState::default(),
@@ -581,6 +590,7 @@ impl ConnState {
                     self.quit.clone(), self.timeout_sender.clone()));
     }
     
+    #[cfg(feature = "dns_lookup")]
     fn run_dns_lookup(&mut self) {
         dns_lookup(self.dns_lookup_sender.take().unwrap(), self.user_state.ip_addr);
     }
@@ -808,6 +818,7 @@ impl MainState {
                 Ok(())
             }
             Ok(hostname_opt) = &mut conn_state.dns_lookup_receiver => {
+                #[cfg(feature = "dns_lookup")]
                 if let Some(hostname) = hostname_opt {
                     conn_state.user_state.set_hostname(hostname);
                     if let Some(nick) = &conn_state.user_state.nick {
@@ -817,6 +828,8 @@ impl MainState {
                         }
                     }
                 }
+                #[cfg(not(feature = "dns_lookup"))]
+                info!("Unexpected dns lookup: {:?}", hostname_opt);
                 Ok(())
             }
             
@@ -1017,9 +1030,15 @@ async fn user_state_process(main_state: Arc<MainState>,
             stream: DualTcpStream, addr: SocketAddr) {
     let line_stream = Framed::new(stream, IRCLinesCodec::new_with_max_length(2000));
     if let Some(mut conn_state) = main_state.register_conn_state(addr.ip(), line_stream) {
+        #[cfg(feature = "dns_lookup")]
         if main_state.config.dns_lookup {
             conn_state.run_dns_lookup();
         }
+        #[cfg(not(feature = "dns_lookup"))]
+        if main_state.config.dns_lookup {
+            error!("DNS lookup is not enabled!");
+        }
+        
         while !conn_state.is_quit() {
             if let Err(e) = main_state.process(&mut conn_state).await {
                 error!("Error for {}: {}", conn_state.user_state.source, e);
@@ -1078,11 +1097,13 @@ pub(crate) fn initialize_logging(config: &MainConfig) {
     } else { s.init(); }
 }
 
+#[cfg(feature = "dns_lookup")]
 lazy_static! {
     static ref DNS_RESOLVER: std::sync::RwLock<Option<Arc::<TokioAsyncResolver>>> =
                 std::sync::RwLock::new(None);
 }
 
+#[cfg(feature = "dns_lookup")]
 fn initialize_dns_resolver() {
     let mut r = DNS_RESOLVER.write().unwrap();
     if r.is_none() {
@@ -1109,12 +1130,14 @@ fn initialize_dns_resolver() {
     }
 }
 
+#[cfg(feature = "dns_lookup")]
 fn dns_lookup(sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
     let r = DNS_RESOLVER.read().unwrap();
     let resolver = (*r).clone().unwrap();
     tokio::spawn(dns_lookup_process(resolver.clone(), sender, ip));
 }
 
+#[cfg(feature = "dns_lookup")]
 async fn dns_lookup_process(resolver: Arc<TokioAsyncResolver>,
                 sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
     let r = match resolver.reverse_lookup(ip).await {
@@ -1137,6 +1160,7 @@ async fn dns_lookup_process(resolver: Arc<TokioAsyncResolver>,
 // main routine to run server
 pub(crate) async fn run_server(config: MainConfig) ->
         Result<(Arc<MainState>, JoinHandle<()>), Box<dyn Error>> {
+    #[cfg(feature = "dns_lookup")]
     if config.dns_lookup {
         initialize_dns_resolver();
     }

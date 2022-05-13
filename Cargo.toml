@@ -11,7 +11,6 @@ keywords = ["irc"]
 # TODO: add option to build with tokio-openssl package. remove rcgen
 
 [dependencies]
-lazy_static = "1.4"
 tokio = { version = "1.0", features = [ "full" ] }
 tokio-util = { version = "0.7.0", features = [ "codec" ] }
 tokio-stream = "0.1"
@@ -31,13 +30,15 @@ rustls = { version = "0.20", optional = true }
 rustls-pemfile = { version = "1.0", optional = true }
 tokio-openssl = { version = "0.6", optional = true }
 openssl = { version = "0.10", optional = true }
-trust-dns-resolver = "0.21"
+lazy_static = { version = "1.4", optional = true }
+trust-dns-resolver = { version = "0.21", optional = true }
 
 [features]
 # prefer rustls for almost systems
 rustls = [ "dep:rustls", "dep:tokio-rustls", "dep:rustls-pemfile" ]
 # use openssl if rustls with ring doesn't work - for example old non-SSE2 machines
 openssl = [ "dep:openssl", "dep:tokio-openssl" ]
+dns_lookup = [ "dep:trust-dns-resolver", "dep:lazy_static" ]
 
 [dependencies.tracing-subscriber] 
 version = "0.3.1"
