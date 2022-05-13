@@ -32,7 +32,6 @@ rustls-pemfile = { version = "1.0", optional = true }
 trust-dns-resolver = "0.21"
 
 [features]
-default = [ "rustls" ]
 rustls = [ "dep:rustls", "dep:tokio-rustls", "dep:rustls-pemfile" ]
 
 [dependencies.tracing-subscriber] 

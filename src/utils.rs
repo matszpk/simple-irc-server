@@ -22,8 +22,8 @@ use std::io;
 use std::pin::Pin;
 use futures::task::{Poll, Context};
 use tokio::io::{ReadBuf};
-use bytes::{BufMut, BytesMut};
 use tokio::io::{AsyncRead, AsyncWrite};
+use bytes::{BufMut, BytesMut};
 use tokio::net::TcpStream;
 #[cfg(feature = "rustls")]
 use tokio_rustls::server::TlsStream;
@@ -34,16 +34,16 @@ use crate::command::CommandId::*;
 use crate::command::CommandError;
 use crate::command::CommandError::*;
 
-#[cfg(feature = "rustls")]
 #[derive(Debug)]
 pub(crate) enum DualTcpStream {
     PlainStream(TcpStream),
+    #[cfg(feature = "rustls")]
     SecureStream(TlsStream<TcpStream>),
 }
 
 impl DualTcpStream {
     pub(crate) fn is_secure(&self) -> bool {
-        matches!(*self, DualTcpStream::SecureStream(_))
+        !matches!(*self, DualTcpStream::PlainStream(_))
     }
 }
 
@@ -52,6 +52,7 @@ impl AsyncRead for DualTcpStream {
             -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
+            #[cfg(feature = "rustls")]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
         }
     }
@@ -62,6 +63,7 @@ impl AsyncWrite for DualTcpStream {
             -> Poll<io::Result<usize>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
+            #[cfg(feature = "rustls")]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
         }
     }
@@ -69,6 +71,7 @@ impl AsyncWrite for DualTcpStream {
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_flush(cx),
+            #[cfg(feature = "rustls")]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_flush(cx),
         }
     }
@@ -76,6 +79,7 @@ impl AsyncWrite for DualTcpStream {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
+            #[cfg(feature = "rustls")]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
         }
     }

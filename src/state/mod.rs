@@ -22,7 +22,8 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
 use std::io;
-use std::io::{BufReader};
+#[cfg(feature = "rustls")]
+use std::io::BufReader;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::net::{IpAddr, SocketAddr};
@@ -1117,10 +1118,12 @@ pub(crate) async fn run_server(config: MainConfig) ->
     let cloned_tls = config.tls.clone();
     let main_state = Arc::new(MainState::new_from_config(config));
     let main_state_to_return = main_state.clone();
-    let handle = if let Some(tlsconfig) = cloned_tls {
+    let handle = if cloned_tls.is_some() {
         
         #[cfg(feature = "rustls")]
+        {
         let config = {
+            let tlsconfig = cloned_tls.unwrap();
             let certs = rustls_pemfile::certs(
                     &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
                     .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
@@ -1156,6 +1159,12 @@ pub(crate) async fn run_server(config: MainConfig) ->
                     }
                 };
             }
+        })
+        }
+        
+        #[cfg(not(feature = "rustls"))]
+        tokio::spawn(async move {
+            error!("Unsupported TLS")
         })
     } else {
         tokio::spawn(async move {
@@ -1829,7 +1838,6 @@ mod test {
     }
     
     use std::sync::atomic::AtomicU16;
-    use std::path::PathBuf;
     
     static PORT_COUNTER: AtomicU16 = AtomicU16::new(7888);
     //use std::sync::Once;
@@ -1876,6 +1884,10 @@ mod test {
         line_stream
     }
     
+    #[cfg(feature = "rustls")]
+    use std::path::PathBuf;
+    
+    #[cfg(feature = "rustls")]
     fn get_cert_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1884,6 +1896,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
+    #[cfg(feature = "rustls")]
     fn get_cert_key_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1892,6 +1905,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
+    #[cfg(feature = "rustls")]
     pub(crate) async fn run_test_tls_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
         //LOGGING_START.call_once(|| {
@@ -1905,7 +1919,8 @@ mod test {
         let (main_state, handle) = run_server(config).await.unwrap();
         (main_state, handle, port)
     }
-    
+
+    #[cfg(feature = "rustls")]
     use std::convert::TryFrom;
     #[cfg(feature = "rustls")]
     use tokio_rustls::TlsConnector;
@@ -1939,6 +1954,7 @@ mod test {
         line_stream
     }
     
+    #[cfg(feature = "rustls")]
     pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
@@ -2075,6 +2091,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
+    #[cfg(feature = "rustls")]
     #[tokio::test]
     async fn test_server_tls_first() {
         let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;
@@ -2132,6 +2149,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
+    #[cfg(feature = "rustls")]
     #[tokio::test]
     async fn test_server_timeouts() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
