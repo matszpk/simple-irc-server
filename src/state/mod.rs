@@ -1942,10 +1942,10 @@ mod test {
         line_stream
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature="openssl"))]
     use std::path::PathBuf;
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature="openssl"))]
     fn get_cert_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1954,7 +1954,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature="openssl"))]
     fn get_cert_key_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1963,7 +1963,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature="openssl"))]
     pub(crate) async fn run_test_tls_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
         //LOGGING_START.call_once(|| {
@@ -2016,6 +2016,43 @@ mod test {
     pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
+        let mut line_stream = login_to_test_tls(port, nick, name, realname).await;
+        for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
+        line_stream
+    }
+    
+    #[cfg(feature = "openssl")]
+    use openssl::ssl::SslConnector;
+    
+    #[cfg(feature = "openssl")]
+    pub(crate) async fn connect_to_test_tls(port: u16)
+                -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
+        connector.set_ca_file(get_cert_file_path()).unwrap();
+        
+        let ssl = connector.build().configure().unwrap().into_ssl("localhost").unwrap();
+        
+        let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let mut tls_stream = SslStream::new(ssl, stream).unwrap();
+        use std::pin::Pin;
+        Pin::new(&mut tls_stream).connect().await.unwrap();
+        Framed::new(tls_stream, IRCLinesCodec::new_with_max_length(2000))
+    }
+    
+    #[cfg(feature = "openssl")]
+    pub(crate) async fn login_to_test_tls<'a>(port: u16,
+                nick: &'a str, name: &'a str, realname: &'a str)
+                -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
+        let mut line_stream = connect_to_test_tls(port).await;
+        line_stream.send(format!("NICK {}", nick)).await.unwrap();
+        line_stream.send(format!("USER {} 8 * :{}", name, realname)).await.unwrap();
+        line_stream
+    }
+    
+    #[cfg(feature = "openssl")]
+    pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
+                nick: &'a str, name: &'a str, realname: &'a str)
+                -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
         let mut line_stream = login_to_test_tls(port, nick, name, realname).await;
         for _ in 0..18 { line_stream.next().await.unwrap().unwrap(); }
         line_stream
@@ -2149,7 +2186,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature = "openssl"))]
     #[tokio::test]
     async fn test_server_tls_first() {
         let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;
@@ -2207,7 +2244,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(any(feature = "rustls", feature = "openssl"))]
     #[tokio::test]
     async fn test_server_timeouts() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
