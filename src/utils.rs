@@ -386,8 +386,9 @@ lazy_static! {
                 Some(ARGON2_OUT_LEN)).unwrap());
 }
 
-pub(crate) fn argon2_hash_password<'a>(password: &'a str) -> PasswordHash<'a> {
-    ARGON2.hash_password(password.as_bytes(), ARGON2_SALT.as_str()).unwrap()
+pub(crate) fn argon2_hash_password<'a>(password: &'a str) -> String {
+    ARGON2.hash_password(password.as_bytes(), ARGON2_SALT.as_str())
+                .unwrap().hash.unwrap().to_string()
 }
 
 pub(crate) fn argon2_verify_password<'a>(password: &'a str, hash_str: &'a str)
@@ -646,7 +647,6 @@ mod test {
     #[test]
     fn test_argon2_password_hash() {
         let phash = argon2_hash_password("lalalaXX");
-        assert!(argon2_verify_password("lalalaXX",
-                    &phash.hash.unwrap().to_string()).is_ok());
+        assert!(argon2_verify_password("lalalaXX", &phash).is_ok());
     }
 }
