@@ -20,6 +20,7 @@
 use std::error::Error;
 use std::io;
 use std::pin::Pin;
+use std::convert::TryFrom;
 use futures::task::{Poll, Context};
 use tokio::io::{ReadBuf};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -31,6 +32,10 @@ use tokio_rustls::server::TlsStream;
 use tokio_openssl::SslStream;
 use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
+use argon2::{self, Argon2};
+use argon2::password_hash;
+use argon2::password_hash::{SaltString, PasswordHash, PasswordHasher, PasswordVerifier};
+use lazy_static::lazy_static;
 
 use crate::command::CommandId::*;
 use crate::command::CommandError;
@@ -364,6 +369,39 @@ pub(crate) fn normalize_sourcemask(mask: &str) -> String {
     out
 }
 
+//  argon2
+
+static ARGON2_M_COST: u32 = 8192;
+static ARGON2_T_COST: u32 = 4;
+static ARGON2_P_COST: u32 = 1;
+static ARGON2_OUT_LEN: usize = 64;
+
+lazy_static! {
+    static ref ARGON2_SALT: SaltString = SaltString::b64_encode(
+            option_env!("PASSWORD_SALT").unwrap_or(
+                    "br8f4efc3F4heecdsdS").as_bytes()).unwrap();
+    static ref ARGON2: Argon2<'static> = Argon2::new(argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            argon2::Params::new(ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST,
+                Some(ARGON2_OUT_LEN)).unwrap());
+}
+
+pub(crate) fn argon2_hash_password<'a>(password: &'a str) -> PasswordHash<'a> {
+    ARGON2.hash_password(password.as_bytes(), ARGON2_SALT.as_str()).unwrap()
+}
+
+pub(crate) fn argon2_verify_password<'a>(password: &'a str, hash_str: &'a str)
+            -> password_hash::errors::Result<()> {
+    let password_hash = PasswordHash{
+        algorithm: argon2::Algorithm::Argon2id.ident(),
+        version: Some(argon2::Version::V0x13.into()),
+        params: password_hash::ParamsString::try_from(ARGON2.params()).unwrap(),
+        salt: Some(ARGON2_SALT.as_salt()),
+        hash: Some(password_hash::Output::b64_decode(hash_str)?),
+    };
+    ARGON2.verify_password(password.as_bytes(), &password_hash)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -603,5 +641,12 @@ mod test {
         assert_eq!("u*xn!b*o@*", &normalize_sourcemask("u*xn!b*o"));
         assert_eq!("*!*@*", &normalize_sourcemask("*"));
         assert_eq!("bob.com!*@*", &normalize_sourcemask("bob.com"));
+    }
+    
+    #[test]
+    fn test_argon2_password_hash() {
+        let phash = argon2_hash_password("lalalaXX");
+        assert!(argon2_verify_password("lalalaXX",
+                    &phash.hash.unwrap().to_string()).is_ok());
     }
 }
