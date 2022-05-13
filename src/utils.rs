@@ -25,9 +25,9 @@ use tokio::io::{ReadBuf};
 use tokio::io::{AsyncRead, AsyncWrite};
 use bytes::{BufMut, BytesMut};
 use tokio::net::TcpStream;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use tokio_rustls::server::TlsStream;
-#[cfg(feature = "openssl")]
+#[cfg(feature = "tls_openssl")]
 use tokio_openssl::SslStream;
 use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
@@ -39,9 +39,9 @@ use crate::command::CommandError::*;
 #[derive(Debug)]
 pub(crate) enum DualTcpStream {
     PlainStream(TcpStream),
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     SecureStream(TlsStream<TcpStream>),
-    #[cfg(feature = "openssl")]
+    #[cfg(feature = "tls_openssl")]
     SecureStream(SslStream<TcpStream>),
 }
 
@@ -56,7 +56,7 @@ impl AsyncRead for DualTcpStream {
             -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
-            #[cfg(any(feature = "openssl", feature = "rustls"))]
+            #[cfg(any(feature = "tls_openssl", feature = "tls_rustls"))]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_read(cx, buf),
         }
     }
@@ -67,7 +67,7 @@ impl AsyncWrite for DualTcpStream {
             -> Poll<io::Result<usize>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
-            #[cfg(any(feature = "openssl", feature = "rustls"))]
+            #[cfg(any(feature = "tls_openssl", feature = "tls_rustls"))]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_write(cx, buf),
         }
     }
@@ -75,7 +75,7 @@ impl AsyncWrite for DualTcpStream {
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_flush(cx),
-            #[cfg(any(feature = "openssl", feature = "rustls"))]
+            #[cfg(any(feature = "tls_openssl", feature = "tls_rustls"))]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_flush(cx),
         }
     }
@@ -83,7 +83,7 @@ impl AsyncWrite for DualTcpStream {
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.get_mut() {
             DualTcpStream::PlainStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
-            #[cfg(any(feature = "openssl", feature = "rustls"))]
+            #[cfg(any(feature = "tls_openssl", feature = "tls_rustls"))]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
         }
     }

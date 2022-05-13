@@ -1197,7 +1197,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    #[cfg(any(feature = "rustls", feature = "openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature = "tls_openssl"))]
     #[tokio::test]
     async fn test_command_whois_tls() {
         let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;

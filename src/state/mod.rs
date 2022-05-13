@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
 use std::io;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use std::io::BufReader;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -32,7 +32,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::TcpListener;
-#[cfg(any(feature = "rustls", feature = "openssl"))]
+#[cfg(any(feature = "tls_rustls", feature = "tls_openssl"))]
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -42,17 +42,17 @@ use tokio::time;
 use futures::{SinkExt, future::Fuse, future::FutureExt};
 use chrono::prelude::*;
 use flagset::{flags, FlagSet};
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use rustls;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use rustls_pemfile;
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use tokio_rustls::rustls::{Certificate, PrivateKey};
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 use tokio_rustls::TlsAcceptor;
-#[cfg(feature = "openssl")]
+#[cfg(feature = "tls_openssl")]
 use openssl::ssl::{Ssl, SslAcceptor, SslFiletype, SslMethod};
-#[cfg(feature = "openssl")]
+#[cfg(feature = "tls_openssl")]
 use tokio_openssl::SslStream;
 #[cfg(feature = "dns_lookup")]
 use trust_dns_resolver::{TokioHandle, TokioAsyncResolver};
@@ -1049,7 +1049,7 @@ async fn user_state_process(main_state: Arc<MainState>,
     }
 }
 
-#[cfg(feature = "rustls")]
+#[cfg(feature = "tls_rustls")]
 async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
             acceptor: TlsAcceptor, addr: SocketAddr) {
     match acceptor.accept(stream).await {
@@ -1059,7 +1059,7 @@ async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
     }
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "tls_openssl")]
 async fn user_state_process_tls_prepare(stream: TcpStream, acceptor: Arc<SslAcceptor>)
         -> Result<SslStream<TcpStream>, String> {
     let ssl = Ssl::new(acceptor.context()).map_err(|e| e.to_string())?;
@@ -1069,7 +1069,7 @@ async fn user_state_process_tls_prepare(stream: TcpStream, acceptor: Arc<SslAcce
     Ok(tls_stream)
 }
 
-#[cfg(feature = "openssl")]
+#[cfg(feature = "tls_openssl")]
 async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
             acceptor: Arc<SslAcceptor>, addr: SocketAddr) {
     match user_state_process_tls_prepare(stream, acceptor).await {
@@ -1170,7 +1170,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
     let main_state_to_return = main_state.clone();
     let handle = if cloned_tls.is_some() {
         
-        #[cfg(feature = "rustls")]
+        #[cfg(feature = "tls_rustls")]
         {
         let config = {
             let tlsconfig = cloned_tls.unwrap();
@@ -1211,7 +1211,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
         })
         }
         
-        #[cfg(feature = "openssl")]
+        #[cfg(feature = "tls_openssl")]
         {
         let tlsconfig = cloned_tls.unwrap();
         let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
@@ -1243,7 +1243,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
         }
        
         
-        #[cfg(not(any(feature = "rustls", feature = "openssl")))]
+        #[cfg(not(any(feature = "tls_rustls", feature = "tls_openssl")))]
         tokio::spawn(async move {
             error!("Unsupported TLS")
         })
@@ -1966,10 +1966,10 @@ mod test {
         line_stream
     }
     
-    #[cfg(any(feature = "rustls", feature="openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature="openssl"))]
     use std::path::PathBuf;
     
-    #[cfg(any(feature = "rustls", feature="openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature="openssl"))]
     fn get_cert_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1978,7 +1978,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
-    #[cfg(any(feature = "rustls", feature="openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature="openssl"))]
     fn get_cert_key_file_path() -> String {
         let mut path = PathBuf::new();
         path.push(env!("CARGO_MANIFEST_DIR"));
@@ -1987,7 +1987,7 @@ mod test {
         path.to_string_lossy().to_string()
     }
     
-    #[cfg(any(feature = "rustls", feature="openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature="openssl"))]
     pub(crate) async fn run_test_tls_server(config: MainConfig)
             -> (Arc<MainState>, JoinHandle<()>, u16) {
         //LOGGING_START.call_once(|| {
@@ -2002,12 +2002,12 @@ mod test {
         (main_state, handle, port)
     }
 
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     use std::convert::TryFrom;
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     use tokio_rustls::TlsConnector;
     
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     pub(crate) async fn connect_to_test_tls(port: u16)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
         let mut certs: Vec<Certificate> = rustls_pemfile::certs(
@@ -2026,7 +2026,7 @@ mod test {
                         IRCLinesCodec::new_with_max_length(2000))
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     pub(crate) async fn login_to_test_tls<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
@@ -2036,7 +2036,7 @@ mod test {
         line_stream
     }
     
-    #[cfg(feature = "rustls")]
+    #[cfg(feature = "tls_rustls")]
     pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<tokio_rustls::client::TlsStream<TcpStream>, IRCLinesCodec> {
@@ -2045,10 +2045,10 @@ mod test {
         line_stream
     }
     
-    #[cfg(feature = "openssl")]
+    #[cfg(feature = "tls_openssl")]
     use openssl::ssl::SslConnector;
     
-    #[cfg(feature = "openssl")]
+    #[cfg(feature = "tls_openssl")]
     pub(crate) async fn connect_to_test_tls(port: u16)
                 -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
         let mut connector = SslConnector::builder(SslMethod::tls()).unwrap();
@@ -2063,7 +2063,7 @@ mod test {
         Framed::new(tls_stream, IRCLinesCodec::new_with_max_length(2000))
     }
     
-    #[cfg(feature = "openssl")]
+    #[cfg(feature = "tls_openssl")]
     pub(crate) async fn login_to_test_tls<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
@@ -2073,7 +2073,7 @@ mod test {
         line_stream
     }
     
-    #[cfg(feature = "openssl")]
+    #[cfg(feature = "tls_openssl")]
     pub(crate) async fn login_to_test_tls_and_skip<'a>(port: u16,
                 nick: &'a str, name: &'a str, realname: &'a str)
                 -> Framed<SslStream<TcpStream>, IRCLinesCodec> {
@@ -2210,7 +2210,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    #[cfg(any(feature = "rustls", feature = "openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature = "tls_openssl"))]
     #[tokio::test]
     async fn test_server_tls_first() {
         let (main_state, handle, port) = run_test_tls_server(MainConfig::default()).await;
@@ -2268,7 +2268,7 @@ mod test {
         quit_test_server(main_state, handle).await;
     }
     
-    #[cfg(any(feature = "rustls", feature = "openssl"))]
+    #[cfg(any(feature = "tls_rustls", feature = "tls_openssl"))]
     #[tokio::test]
     async fn test_server_timeouts() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
