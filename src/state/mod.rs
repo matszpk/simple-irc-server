@@ -32,7 +32,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
 use tokio::net::TcpListener;
-#[cfg(feature = "rustls")]
+#[cfg(any(feature = "rustls", feature = "openssl"))]
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -50,6 +50,10 @@ use rustls_pemfile;
 use tokio_rustls::rustls::{Certificate, PrivateKey};
 #[cfg(feature = "rustls")]
 use tokio_rustls::TlsAcceptor;
+#[cfg(feature = "openssl")]
+use openssl::ssl::{Ssl, SslAcceptor, SslFiletype, SslMethod};
+#[cfg(feature = "openssl")]
+use tokio_openssl::SslStream;
 use trust_dns_resolver::{TokioHandle, TokioAsyncResolver};
 use lazy_static::lazy_static;
 use tracing::*;
@@ -1036,6 +1040,26 @@ async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
     }
 }
 
+#[cfg(feature = "openssl")]
+async fn user_state_process_tls_prepare(stream: TcpStream, acceptor: Arc<SslAcceptor>)
+        -> Result<SslStream<TcpStream>, String> {
+    let ssl = Ssl::new(acceptor.context()).map_err(|e| e.to_string())?;
+    let mut tls_stream = SslStream::new(ssl, stream).map_err(|e| e.to_string())?;
+    use std::pin::Pin;
+    Pin::new(&mut tls_stream).accept().await.map_err(|e| e.to_string())?;
+    Ok(tls_stream)
+}
+
+#[cfg(feature = "openssl")]
+async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
+            acceptor: Arc<SslAcceptor>, addr: SocketAddr) {
+    match user_state_process_tls_prepare(stream, acceptor).await {
+        Ok(stream) => user_state_process(main_state,
+                DualTcpStream::SecureStream(stream), addr).await,
+        Err(e) => error!("Can't accept TLS connection: {}", e),
+    };
+}
+
 pub(crate) fn initialize_logging(config: &MainConfig) {
     use tracing_subscriber::{fmt::format::FmtSpan, EnvFilter};
     let s = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env()
@@ -1148,7 +1172,6 @@ pub(crate) async fn run_server(config: MainConfig) ->
                     res = listener.accept() => {
                         match res {
                             Ok((stream, addr)) => {
-                                #[cfg(feature = "rustls")]
                                 tokio::spawn(user_state_process_tls(main_state.clone(),
                                         stream, acceptor.clone(), addr));
                             }
@@ -1164,7 +1187,39 @@ pub(crate) async fn run_server(config: MainConfig) ->
         })
         }
         
-        #[cfg(not(feature = "rustls"))]
+        #[cfg(feature = "openssl")]
+        {
+        let tlsconfig = cloned_tls.unwrap();
+        let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls())?;
+        acceptor.set_private_key_file(tlsconfig.cert_key_file, SslFiletype::PEM)?;
+        acceptor.set_certificate_chain_file(tlsconfig.cert_file)?;
+        let acceptor = Arc::new(acceptor.build());
+        
+        tokio::spawn(async move {
+            let mut quit_receiver = main_state.get_quit_receiver().await;
+            let mut do_quit = false;
+            while !do_quit {
+                tokio::select! {
+                    res = listener.accept() => {
+                        match res {
+                            Ok((stream, addr)) => {
+                                tokio::spawn(user_state_process_tls(main_state.clone(),
+                                        stream, acceptor.clone(), addr));
+                            }
+                            Err(e) => { error!("Accept connection error: {}", e); }
+                        };
+                    }
+                    Ok(msg) = &mut quit_receiver => {
+                        info!("Server quit: {}", msg);
+                        do_quit = true;
+                    }
+                };
+            }
+        })
+        }
+       
+        
+        #[cfg(not(any(feature = "rustls", feature = "openssl")))]
         tokio::spawn(async move {
             error!("Unsupported TLS")
         })
