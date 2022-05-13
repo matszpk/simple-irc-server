@@ -31,7 +31,9 @@ use std::error::Error;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{RwLock, oneshot};
 use tokio_stream::StreamExt;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
+#[cfg(feature = "rustls")]
+use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::sync::mpsc::error::SendError;
@@ -1194,6 +1196,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
 #[cfg(test)]
 mod test {
     use std::iter::FromIterator;
+    use tokio::net::TcpStream;
     use super::*;
     
     #[test]

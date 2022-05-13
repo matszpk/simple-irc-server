@@ -539,6 +539,7 @@ impl super::MainState {
 mod test {
     use super::*;
     use super::super::test::*;
+    use tokio::net::TcpStream;
     
     fn equal_channel_names<'a>(exp_msg: &'a str, exp_names: &'a[&'a str],
                 names_replies: &'a[&'a str]) -> bool {

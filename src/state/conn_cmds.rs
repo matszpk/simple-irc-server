@@ -419,6 +419,8 @@ mod test {
     use super::*;
     use super::super::test::*;
     
+    use tokio::net::TcpStream;
+    
     #[tokio::test]
     async fn test_auth_with_caps() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
