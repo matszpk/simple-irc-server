@@ -35,6 +35,7 @@ use validator::ValidationError;
 use argon2::{self, Argon2};
 use argon2::password_hash;
 use argon2::password_hash::{SaltString, PasswordHash, PasswordHasher, PasswordVerifier};
+use tokio;
 use lazy_static::lazy_static;
 
 use crate::command::CommandId::*;
@@ -371,8 +372,8 @@ pub(crate) fn normalize_sourcemask(mask: &str) -> String {
 
 //  argon2
 
-static ARGON2_M_COST: u32 = 8192;
-static ARGON2_T_COST: u32 = 4;
+static ARGON2_M_COST: u32 = 4096;
+static ARGON2_T_COST: u32 = 3;
 static ARGON2_P_COST: u32 = 1;
 static ARGON2_OUT_LEN: usize = 64;
 
@@ -401,6 +402,13 @@ pub(crate) fn argon2_verify_password<'a>(password: &'a str, hash_str: &'a str)
         hash: Some(password_hash::Output::b64_decode(hash_str)?),
     };
     ARGON2.verify_password(password.as_bytes(), &password_hash)
+}
+
+pub(crate) async fn argon2_verify_password_async<'a>(password: String, hash_str: String)
+            -> password_hash::errors::Result<()> {
+    tokio::task::spawn_blocking(move || {
+        argon2_verify_password(&password, &hash_str)
+    }).await.unwrap()
 }
 
 #[cfg(test)]
