@@ -849,7 +849,8 @@ mod test {
     async fn test_command_lusers() {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
-            OperatorConfig{ name: "tommy".to_string(), password: "zzzzz".to_string(),
+            OperatorConfig{ name: "tommy".to_string(),
+                        password: argon2_hash_password("zzzzz"),
                         mask: None }]);
         let (main_state, handle, port) = run_test_server(config).await;
         
@@ -1084,7 +1085,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "expert".to_string(),
-                    password: "NoWay".to_string(), mask: None }, ]);
+                    password: argon2_hash_password("NoWay"), mask: None }, ]);
         let (main_state, handle, port) = run_test_server(config).await;
         {
             let mut line_stream = login_to_test_and_skip(port, "roland", "roland",
@@ -1119,7 +1120,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "expert".to_string(),
-                    password: "NoWay".to_string(), mask: None }, ]);
+                    password: argon2_hash_password("NoWay"), mask: None }, ]);
         let (main_state, handle, port) = run_test_server(config).await;
         {
             let mut line_stream = login_to_test_and_skip(port, "roland", "roland",

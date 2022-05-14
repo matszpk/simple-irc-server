@@ -387,7 +387,7 @@ lazy_static! {
                 Some(ARGON2_OUT_LEN)).unwrap());
 }
 
-pub(crate) fn argon2_hash_password<'a>(password: &'a str) -> String {
+pub(crate) fn argon2_hash_password(password: &str) -> String {
     ARGON2.hash_password(password.as_bytes(), ARGON2_SALT.as_str())
                 .unwrap().hash.unwrap().to_string()
 }

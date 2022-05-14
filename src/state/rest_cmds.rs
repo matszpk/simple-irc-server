@@ -905,7 +905,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "fanny".to_string(),
-                    password: "Funny".to_string(), mask: None },
+                    password: argon2_hash_password("Funny"), mask: None },
         ]);
         let (main_state, handle, port) = run_test_server(config).await;
         
@@ -1150,7 +1150,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "fanny".to_string(),
-                    password: "Funny".to_string(), mask: None },
+                    password: argon2_hash_password("Funny"), mask: None },
         ]);
         let (main_state, handle, port) = run_test_server(config).await;
         
@@ -1585,7 +1585,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "fanny".to_string(),
-                    password: "Funny".to_string(), mask: None },
+                    password: argon2_hash_password("Funny"), mask: None },
         ]);
         let (main_state, handle, port) = run_test_server(config).await;
         
@@ -1636,7 +1636,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "fanny".to_string(),
-                    password: "Funny".to_string(), mask: None },
+                    password: argon2_hash_password("Funny"), mask: None },
         ]);
         let (_, _, port) = run_test_server(config).await;
         
@@ -1737,7 +1737,7 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "fanny".to_string(),
-                    password: "Funny".to_string(), mask: None },
+                    password: argon2_hash_password("Funny"), mask: None },
         ]);
         let (main_state, handle, port) = run_test_server(config).await;
         

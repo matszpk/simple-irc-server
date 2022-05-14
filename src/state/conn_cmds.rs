@@ -179,7 +179,8 @@ impl super::MainState {
                         if let Some(password) = password_opt {
                             // check password
                             let good = if let Some(ref entered_pwd) = user_state.password {
-                                *entered_pwd == *password
+                                argon2_verify_password_async(
+                                        entered_pwd.clone(), password.clone()).await.is_ok()
                             } else { false };
                             
                             user_state.authenticated = good;
@@ -379,7 +380,8 @@ impl super::MainState {
             let op_config = op_cfg_opt.as_ref().unwrap();
             
             // check password
-            let do_it = if op_config.password != password {
+            let do_it = if argon2_verify_password_async(password.to_string(),
+                        op_config.password.clone()).await.is_err() {
                 self.feed_msg(&mut conn_state.stream,
                         ErrPasswdMismatch464{ client }).await?;
                 false
@@ -482,7 +484,7 @@ mod test {
     #[tokio::test]
     async fn test_auth_with_password() {
         let mut config = MainConfig::default();
-        config.password = Some("blamblam".to_string());
+        config.password = Some(argon2_hash_password("blamblam"));
         let (main_state, handle, port) = run_test_server(config).await;
         
         for (pass, succeed) in [(None, false), (Some("blamblam2"), false),
@@ -517,10 +519,10 @@ mod test {
     #[tokio::test]
     async fn test_auth_with_user_configs() {
         let mut config = MainConfig::default();
-        config.password = Some("blamblam".to_string());
+        config.password = Some(argon2_hash_password("blamblam"));
         config.users = Some(vec![
             UserConfig{ name: "lucky".to_string(), nick: "luckboy".to_string(),
-                password: Some("top_secret".to_string()), mask: None },
+                password: Some(argon2_hash_password("top_secret")), mask: None },
             UserConfig{ name: "mati".to_string(), nick: "mat".to_string(),
                 password: None, mask: None },
             UserConfig{ name: "mati2".to_string(), nick: "mat2".to_string(),
@@ -632,7 +634,7 @@ mod test {
         let mut config = MainConfig::default();
         config.users = Some(vec![
             UserConfig{ name: "lucky".to_string(), nick: "luckboy".to_string(),
-                password: Some("top_secret".to_string()), mask: None },
+                password: Some(argon2_hash_password("top_secret")), mask: None },
             UserConfig{ name: "mati".to_string(), nick: "mat".to_string(),
                 password: None, mask: None },
             UserConfig{ name: "mati2".to_string(), nick: "mat2".to_string(),
@@ -906,12 +908,12 @@ mod test {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
             OperatorConfig{ name: "guru".to_string(),
-                    password: "NoWay".to_string(), mask: None },
+                    password: argon2_hash_password("NoWay"), mask: None },
             OperatorConfig{ name: "guru2".to_string(),
-                    password: "NoWay2".to_string(),
+                    password: argon2_hash_password("NoWay2"),
                     mask: Some("guruv*@*".to_string()) },
             OperatorConfig{ name: "guru3".to_string(),
-                    password: "NoWay3".to_string(),
+                    password: argon2_hash_password("NoWay3"),
                     mask: Some("guru4*@*".to_string()) },
         ]);
         let (main_state, handle, port) = run_test_server(config).await;
