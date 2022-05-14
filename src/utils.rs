@@ -677,4 +677,15 @@ mod test {
         assert!(argon2_verify_password_async("lalalaXY".to_string(),
                         phash).await.is_err());
     }
+    
+    #[test]
+    fn test_validate_password_hash() {
+        assert!(validate_password_hash("VgWezXctjWvsY6V7gzSQPnluUuAwq06m5IxwcIg3OfBIMM+zWCJ\
+        ntk8HEZDgh4ctFei3bqt1r0O1VIyOV7dL+w").is_ok());
+        assert_eq!(Err("Validation error: Wrong password hash length [{}]".to_string()),
+            validate_password_hash("zXctjWvsY6V7gzSQPnluUuAwq06m5IxwcIg3OfBIMM+zWCJ\
+                ntk8HEZDgh4ctFei3bqt1r0O1VIyOV7dL+w").map_err(|e| e.to_string()));
+        assert_eq!(Err("Validation error: Wrong base64 password hash [{}]".to_string()),
+            validate_password_hash("xxxxxxxxx").map_err(|e| e.to_string()));
+    }
 }
