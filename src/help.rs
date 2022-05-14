@@ -61,5 +61,6 @@ WHOIS
 WHOWAS"##),
     ("MAIN", r##"This is Simple IRC Server.
 Use 'HELP COMMANDS' to list of commands.
-Use 'HELP <command name>' if you want to print help about command."##)
+If you want get HELP about commands please refer to https://modern.ircdocs.horse/
+or https://datatracker.ietf.org/doc/html/rfc1459."##),
 ];
