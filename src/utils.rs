@@ -411,6 +411,16 @@ pub(crate) async fn argon2_verify_password_async(password: String, hash_str: Str
     }).await.unwrap()
 }
 
+pub(crate) fn validate_password_hash(hash_str: &str) -> Result<(), ValidationError> {
+    match password_hash::Output::b64_decode(hash_str) {
+        Ok(o) => {
+            if o.len() == ARGON2_OUT_LEN { Ok(()) }
+            else { Err(ValidationError::new("Wrong password hash length")) }
+        }
+        Err(_) => Err(ValidationError::new("Wrong base64 password hash"))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
