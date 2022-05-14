@@ -372,8 +372,8 @@ pub(crate) fn normalize_sourcemask(mask: &str) -> String {
 
 //  argon2
 
-static ARGON2_M_COST: u32 = 4096;
-static ARGON2_T_COST: u32 = 3;
+static ARGON2_M_COST: u32 = 2048;
+static ARGON2_T_COST: u32 = 2;
 static ARGON2_P_COST: u32 = 1;
 static ARGON2_OUT_LEN: usize = 64;
 
