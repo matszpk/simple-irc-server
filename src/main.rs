@@ -38,7 +38,6 @@ use utils::*;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    
     if cli.gen_password_hash {
         let password = if let Some(pwd) = cli.password {
             pwd
