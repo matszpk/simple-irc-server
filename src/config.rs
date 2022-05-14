@@ -39,6 +39,10 @@ use crate::utils::match_wildcard;
 #[derive(clap::Parser, Clone)]
 #[clap(author, version, about, long_about = None)]
 pub(crate) struct Cli {
+    #[clap(short, long, help="Generate password hash")]
+    pub(crate) gen_password_hash: bool,
+    #[clap(short='P', long, help="Password for generated password hash")]
+    pub(crate) password: Option<String>,
     #[clap(short, long, help="Configuration file path")]
     config: Option<String>,
     #[clap(short, long, help="Listen bind address")]

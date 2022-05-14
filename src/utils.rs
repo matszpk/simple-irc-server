@@ -404,7 +404,7 @@ pub(crate) fn argon2_verify_password<'a>(password: &'a str, hash_str: &'a str)
     ARGON2.verify_password(password.as_bytes(), &password_hash)
 }
 
-pub(crate) async fn argon2_verify_password_async<'a>(password: String, hash_str: String)
+pub(crate) async fn argon2_verify_password_async(password: String, hash_str: String)
             -> password_hash::errors::Result<()> {
     tokio::task::spawn_blocking(move || {
         argon2_verify_password(&password, &hash_str)
@@ -653,8 +653,18 @@ mod test {
     }
     
     #[test]
-    fn test_argon2_password_hash() {
+    fn test_test_argon2_verify_password() {
         let phash = argon2_hash_password("lalalaXX");
         assert!(argon2_verify_password("lalalaXX", &phash).is_ok());
+        assert!(argon2_verify_password("lalalaXY", &phash).is_err());
+    }
+    
+    #[tokio::test]
+    async fn test_argon2_verify_password_async() {
+        let phash = argon2_hash_password("lalalaXX");
+        assert!(argon2_verify_password_async("lalalaXX".to_string(),
+                        phash.clone()).await.is_ok());
+        assert!(argon2_verify_password_async("lalalaXY".to_string(),
+                        phash).await.is_err());
     }
 }

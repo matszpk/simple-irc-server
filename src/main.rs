@@ -28,19 +28,31 @@ use std::error::Error;
 use clap;
 use clap::Parser;
 use tokio;
+use rpassword::prompt_password;
 
 use config::*;
 use command::*;
 use state::*;
+use utils::*;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
-    let config = MainConfig::new(cli)?;
-    initialize_logging(&config);
-    // get handle of server
-    let (_, handle) = run_server(config).await?;
-    // and await for end
-    handle.await?;
+    
+    if cli.gen_password_hash {
+        let password = if let Some(pwd) = cli.password {
+            pwd
+        } else {
+            prompt_password("Enter password:")?
+        };
+        println!("Password Hash: {}", argon2_hash_password(&password));
+    } else {
+        let config = MainConfig::new(cli)?;
+        initialize_logging(&config);
+        // get handle of server
+        let (_, handle) = run_server(config).await?;
+        // and await for end
+        handle.await?;
+    }
     Ok(())
 }
