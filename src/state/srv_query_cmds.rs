@@ -219,29 +219,25 @@ impl super::MainState {
                     'q' => {
                         if !chum.founder {
                             self.feed_msg(&mut conn_state.stream,
-                                ErrChanOpPrivsNeeded482{ client,
-                                        channel: target }).await?;
+                                ErrChanOpPrivsNeeded482{ client, channel: target }).await?;
                         }
                     }
                     'a' => {
                         if !chum.is_protected() {
                             self.feed_msg(&mut conn_state.stream,
-                                ErrChanOpPrivsNeeded482{ client,
-                                        channel: target }).await?;
+                                ErrChanOpPrivsNeeded482{ client, channel: target }).await?;
                         }
                     }
                     'o'|'h' => {
                         if !if_op {
                             self.feed_msg(&mut conn_state.stream,
-                                ErrChanOpPrivsNeeded482{ client,
-                                        channel: target }).await?;
+                                ErrChanOpPrivsNeeded482{ client, channel: target }).await?;
                         }
                     }
                     'i'|'m'|'t'|'n'|'s'|'l'|'k'|'v' => {
                         if !if_half_op {
                             self.feed_msg(&mut conn_state.stream,
-                                ErrChanOpPrivsNeeded482{ client,
-                                        channel: target }).await?;
+                                ErrChanOpPrivsNeeded482{ client, channel: target }).await?;
                         }
                     }
                     _ => (),
