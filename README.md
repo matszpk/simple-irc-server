@@ -26,6 +26,24 @@ A server can be easily build with Cargo package system. Following features can b
 A tls-openssl should be used in old machines that doesn't support SSE2 instructions.
 A rustls uses 'ring' crate that newer instruction set in X86 processors.
 
+To build server with full support just enter:
+
+```
+cargo build --release --features=dns_lookup,tls_rustls
+```
+
+or
+
+```
+cargo build --release --features=dns_lookup,tls_openssl
+```
+
+You can build server without DNS lookup and TLS support by using simple command:
+
+```
+cargo build --release
+```
+
 To increase security you can specify environment variable PASSWORD_SALT during building
 to provide own salt for Argon2 password hashing. It can be just some text.
 
