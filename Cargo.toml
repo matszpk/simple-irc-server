@@ -1,7 +1,7 @@
 [package]
 name = "simple-irc-server"
 authors = ["Mateusz Szpakowski"]
-license = "GNU Lesser General Public License v2.1"
+license = "LGPL-2.1-or-later"
 version = "0.1.0"
 edition = "2018"
 description = "Simple IRC server"
