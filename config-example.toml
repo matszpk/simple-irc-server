@@ -8,7 +8,8 @@ admin_info2 = "IRCI is good server"
 info = "This is IRCI server"
 # Address from your server is listening connections.
 listen = "127.0.0.1"
-# port from your server is listening connections
+# TCP port from your server is listening connections. Typically can be 6667 or
+# for 6669 TLS connections.
 port = 6667
 # Optional password required to login to your IRC server. It should be password hash
 # by using server binary: './simple-irc-server -g [-P password]'.
