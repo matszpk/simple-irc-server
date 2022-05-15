@@ -1,0 +1,118 @@
+# Name of your IRC server.
+name = "irci.localhost"
+# Administrative info 1 about your server.
+admin_info = "IRCI is local IRC server"
+# Administrative info 2 about your server.
+admin_info2 = "IRCI is good server"
+# Info about your server.
+info = "This is IRCI server"
+# Address from your server is listening connections.
+listen = "127.0.0.1"
+# port from your server is listening connections
+port = 6667
+# Optional password required to login to your IRC server. It should be password hash
+# by using server binary: './simple-irc-server -g [-P password]'.
+password = "kABc9xjQBSwgV2WfM02/AV8rQhEpTzRjn+fYC1x3ab0hRul9S9EkxGS/GMckLQjn0gYEEX3ISmXDfetwTUwhpQ"
+# Name of IRC network.
+network = "IRCInetwork"
+# Maximal number of acceptable connections.
+max_connections = 4000
+# Maximal number of channels that user can join.
+max_joins = 100
+# Ping timeout. Maximal time between consecutive PING's in secods.
+ping_timeout = 100
+# Pong timeout. Maximal time between PING and PONG in seconds.
+pong_timeout = 30
+# MOTD - Message of the Day.
+motd = "Hello, guys!"
+# DNS Lookup. If true then server try to get domain name of the client from DNS.
+dns_lookup = true
+# Minimal log level. Log Levels from lowest:
+# TRACE, DEBUG, INFO, WARN, ERROR.
+log_level = "INFO"
+# Optional. Log to specified file.
+log_file = "irc.log"
+
+# Optional. Set secure TLS connection.
+[tls]
+# Certificate file.
+cert_file = "cert.crt"
+# Certificate key file.
+cert_key_file = "cert_key.crt"
+
+# Default user's mode that will be given after log in.
+[default_user_modes]
+# Invisible mode.
+invisible = false
+# Operator mode.
+oper = false
+# Local operator mode.
+local_oper = false
+# Registered mode.
+registered = true
+# Wallops mode.
+wallops = false
+
+# List of operators
+[[operators]]
+# Name of operator. It should be used in OPER as the first parameter.
+name = "matszpk"
+# Required password to authenticate an operator. It should be password hash
+# by using server binary: './simple-irc-server -g [-P password]'.
+password = "xVfVq4pvFosvOQb0IVaPMkK22u0ZF2Ki7XB9yRsGbnEbL6WXhQCdpOwDV62HZ0MS5RjqmfrQJT7lV3aohUa3uw"
+# Optional. Source mask of source that will be checked for user source.
+# Source is combination of the nick, name and host.
+mask = "*!*@localhost"
+
+# List of registered users.
+[[users]]
+# Name of user.
+name = "matszpk"
+# Nick of user.
+nick = "matszpk"
+# Required password to authenticate an user. It should be password hash
+# by using server binary: './simple-irc-server -g [-P password]'.
+password = "xVfVq4pvFosvOQb0IVaPMkK22u0ZF2Ki7XB9yRsGbnEbL6WXhQCdpOwDV62HZ0MS5RjqmfrQJT7lV3aohUa3uw"
+# Optional. Source mask of source that will be checked for user source.
+# Source is combination of the nick, name and host.
+mask = "*!*@localhost"
+
+# List of preconfigured channels.
+[[channels]]
+# Name of channel.
+name = "#maintopic"
+# Optional. Topic of channel.
+topic = "Some topic"
+
+# Channel modes.
+[channels.modes]
+# Optional. List of bans. It is list of source mask to sources that will be banned.
+ban = [ "*!*@localhost" ]
+# Optional. List of ban exceptions. It is list of source mask to sources that will be ignored
+# during determining bans.
+excpetion = [ "*!*@localhost" ]
+# Optional. List of invite exceptions. It is list of source mask to sources that
+# will be ignored during determining who must have invitation.
+invite_exception = [ "*!*@localhost" ]
+# Optional. Channel key that required to join.
+key = "blabla"
+# Optional. List of founders. It is list of nicks.
+founders = [ "matszpk" ]
+# Optional. List of protected users. It is list of nicks.
+protecteds = [ "matszpk" ]
+# Optional. List of operators. It is list of nicks.
+operators = [ "matszpk" ]
+# Optional. List of half operators. It is list of nicks.
+half_operators = [ "matszpk" ]
+# Optional. List of voices. It is list of nicks.
+half_operators = [ "matszpk" ]
+# If true then channel is moderated and user need voice channel's mode.
+moderated = false
+# If true then user need invitation to join channel.
+invite_only = false
+# If true then channel is secret.
+secret = false
+# If true then channel have protected topic.
+protected_topic = false
+# If true then nobody outside channel can send message to channel.
+no_external_messages = true
