@@ -54,7 +54,7 @@ registered = true
 # Wallops mode.
 wallops = false
 
-# List of operators
+# Optional. List of operators
 [[operators]]
 # Name of operator. It should be used in OPER as the first parameter.
 name = "matszpk"
@@ -65,7 +65,7 @@ password = "xVfVq4pvFosvOQb0IVaPMkK22u0ZF2Ki7XB9yRsGbnEbL6WXhQCdpOwDV62HZ0MS5Rjq
 # Source is combination of the nick, name and host.
 mask = "*!*@localhost"
 
-# List of registered users.
+# Optional. List of registered users.
 [[users]]
 # Name of user.
 name = "matszpk"
@@ -78,7 +78,7 @@ password = "xVfVq4pvFosvOQb0IVaPMkK22u0ZF2Ki7XB9yRsGbnEbL6WXhQCdpOwDV62HZ0MS5Rjq
 # Source is combination of the nick, name and host.
 mask = "*!*@localhost"
 
-# List of preconfigured channels.
+# Optional. List of preconfigured channels.
 [[channels]]
 # Name of channel.
 name = "#maintopic"
