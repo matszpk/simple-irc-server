@@ -2,7 +2,7 @@
 name = "simple-irc-server"
 authors = ["Mateusz Szpakowski"]
 license = "LGPL-2.1-or-later"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2018"
 description = "Simple IRC server"
 repository = "https://github.com/matszpk/simple-irc-server"
