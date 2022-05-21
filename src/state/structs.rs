@@ -45,7 +45,6 @@ pub(super) struct User {
     pub(super) quit_sender: Option<oneshot::Sender<(String, String)>>,
     pub(super) name: String,
     pub(super) realname: String,
-    pub(super) nick: String,
     pub(super) source: String, // IRC source for mask matching
     pub(super) modes: UserModes,
     pub(super) away: Option<String>,
@@ -67,7 +66,6 @@ impl User {
                 quit_sender: Some(quit_sender),
                 name: user_state.name.as_ref().unwrap().clone(),
                 realname: user_state.realname.as_ref().unwrap().clone(),
-                nick: user_state.nick.as_ref().unwrap().clone(),
                 source: user_state.source.clone(),
                 modes: user_modes, away: None,
                 channels: HashSet::new(), invited_to: HashSet::new(),
@@ -81,14 +79,13 @@ impl User {
     
     // update nick - mainly source
     pub(super) fn update_nick(&mut self, user_state: &ConnUserState) {
-        if let Some(ref nick) = user_state.nick { self.nick = nick.clone(); }
         self.source = user_state.source.clone();
     }
     
     // update nick - mainly source
     #[cfg(feature = "dns_lookup")]
     pub(super) fn update_hostname(&mut self, user_state: &ConnUserState) {
-        self.nick = user_state.hostname.clone();
+        self.hostname = user_state.hostname.clone();
         self.source = user_state.source.clone();
     }
     
@@ -251,7 +248,6 @@ impl ChannelDefaultModes {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Channel {
-    pub(super) name: String,
     pub(super) topic: Option<ChannelTopic>,
     pub(super) modes: ChannelModes,
     pub(super) default_modes: ChannelDefaultModes,
@@ -263,10 +259,10 @@ pub(super) struct Channel {
 }
 
 impl Channel {
-    pub(super) fn new(name: String, user_nick: String) -> Channel {
+    pub(super) fn new(user_nick: String) -> Channel {
         let mut users = HashMap::new();
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
-        Channel{ name, topic: None, ban_info: HashMap::new(),
+        Channel{ topic: None, ban_info: HashMap::new(),
             default_modes: ChannelDefaultModes::default(),
             modes: ChannelModes::new_for_channel(user_nick), users,
             creation_time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
@@ -618,7 +614,7 @@ impl VolatileState {
                 let def_ch_modes = ChannelDefaultModes::new_from_modes_and_cleanup(
                             &mut ch_modes);
                 
-                channels.insert(c.name.clone(), Channel{ name: c.name.clone(), 
+                channels.insert(c.name.clone(), Channel{
                     topic: c.topic.as_ref().map(|x| ChannelTopic::new(x.clone())),
                     ban_info: HashMap::new(), default_modes: def_ch_modes,
                     modes: ch_modes, users: HashMap::new(),
@@ -636,17 +632,17 @@ impl VolatileState {
     }
     
     // add user to volatile state - includes stats likes invisible users count, etc.
-    pub(super) fn add_user(&mut self, user: User) {
+    pub(super) fn add_user<'a>(&mut self, unick: &'a str, user: User) {
         if user.modes.invisible {
             self.invisible_users_count += 1;
         }
         if user.modes.wallops {
-            self.wallops_users.insert(user.nick.clone());
+            self.wallops_users.insert(unick.to_string());
         }
         if user.modes.is_local_oper() {
             self.operators_count += 1;
         }
-        self.users.insert(user.nick.clone(), user);
+        self.users.insert(unick.to_string(), user);
         if self.users.len() > self.max_users_count {
             self.max_users_count = self.users.len();
         }
@@ -716,11 +712,12 @@ mod test {
         let (quit_sender, _) = oneshot::channel();
         let user = User::new(&config, &user_state, sender, quit_sender);
         
+        let user_nick = user_state.nick.clone().unwrap();
         assert_eq!(user_state.hostname, user.hostname);
         assert_eq!(user_state.source, user.source);
         assert_eq!(user_state.realname.unwrap(), user.realname);
         assert_eq!(user_state.name.unwrap(), user.name);
-        assert_eq!(user_state.nick.unwrap(), user.nick);
+        assert_eq!(user_state.nick.unwrap(), user_nick);
         assert_eq!(config.default_user_modes, user.modes);
         
         assert_eq!(NickHistoryEntry{ username: user.name.clone(),
@@ -865,8 +862,8 @@ mod test {
     
     #[test]
     fn test_channel_new() {
-        let channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
-        assert_eq!(Channel{ name: "#bobby".to_string(), topic: None,
+        let channel = Channel::new("dizzy".to_string());
+        assert_eq!(Channel{ topic: None,
             modes: ChannelModes::new_for_channel("dizzy".to_string()),
             default_modes: ChannelDefaultModes::default(),
             ban_info: HashMap::new(), users:
@@ -876,7 +873,7 @@ mod test {
     
     #[test]
     fn test_channel_join_remove_user() {
-        let mut channel = Channel::new("#bicycles".to_string(), "runner".to_string());
+        let mut channel = Channel::new("runner".to_string());
         channel.default_modes.founders.insert("fasty".to_string());
         channel.default_modes.protecteds.insert("quicker".to_string());
         channel.default_modes.operators.insert("leader".to_string());
@@ -889,7 +886,7 @@ mod test {
         channel.add_user(&"cyclist".to_string());
         channel.add_user(&"doer".to_string());
         
-        let mut exp_channel = Channel::new("#bicycles".to_string(), "runner".to_string());
+        let mut exp_channel = Channel::new("runner".to_string());
         exp_channel.default_modes = channel.default_modes.clone();
         exp_channel.users.insert("fasty".to_string(), ChannelUserModes{ founder: true,
                 protected: false, operator: false, half_oper: false, voice: false });
@@ -944,9 +941,9 @@ mod test {
     
     #[test]
     fn test_channel_rename_user() {
-        let mut channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
+        let mut channel = Channel::new("dizzy".to_string());
         channel.rename_user(&"dizzy".to_string(), "diggy".to_string());
-        assert_eq!(Channel{ name: "#bobby".to_string(), topic: None,
+        assert_eq!(Channel{ topic: None,
             modes: ChannelModes::new_for_channel("diggy".to_string()),
             default_modes: ChannelDefaultModes::default(),
             ban_info: HashMap::new(), users:
@@ -956,9 +953,9 @@ mod test {
     
     #[test]
     fn test_channel_add_remove_mode() {
-        let mut channel = Channel::new("#bobby".to_string(), "dizzy".to_string());
+        let mut channel = Channel::new("dizzy".to_string());
         
-        let mut exp_channel = Channel{ name: "#bobby".to_string(), topic: None,
+        let mut exp_channel = Channel{ topic: None,
             modes: ChannelModes::new_for_channel("dizzy".to_string()),
             default_modes: ChannelDefaultModes::default(),
             ban_info: HashMap::new(), users: [("dizzy".to_string(), 
@@ -1095,8 +1092,7 @@ mod test {
                 modes: ChannelModes::default() } ]);
         let state = VolatileState::new_from_config(&config);
         assert_eq!(HashMap::from([("#gooddays".to_string(),
-                    Channel{ name: "#gooddays".to_string(),
-                        topic: Some(ChannelTopic::new("About good days".to_string())),
+                    Channel{ topic: Some(ChannelTopic::new("About good days".to_string())),
                         modes: ChannelModes::default(),
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
@@ -1104,8 +1100,7 @@ mod test {
                                     .unwrap().creation_time,
                         preconfigured: true }),
                     ("#pets".to_string(),
-                    Channel{ name: "#pets".to_string(),
-                        topic: Some(ChannelTopic::new("About pets".to_string())),
+                    Channel{ topic: Some(ChannelTopic::new("About pets".to_string())),
                         modes: ChannelModes::default(),
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
@@ -1113,7 +1108,7 @@ mod test {
                                     .unwrap().creation_time,
                         preconfigured: true }),
                     ("&cactuses".to_string(),
-                    Channel{ name: "&cactuses".to_string(), topic: None,
+                    Channel{topic: None,
                         modes: ChannelModes::default(),
                         default_modes: ChannelDefaultModes::default(),
                         ban_info: HashMap::new(), users: HashMap::new(),
@@ -1140,13 +1135,12 @@ mod test {
         let (sender, _) = unbounded_channel();
         let (quit_sender, _) = oneshot::channel();
         let user = User::new(&config, &user_state, sender, quit_sender);
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         
         // create channels and add channel to user structure
         [("#matixichan", "matixi"), ("#tulipchan", "matixi")].iter()
             .for_each(|(chname, nick)| {
-            state.channels.insert(chname.to_string(),
-                    Channel::new(chname.to_string(), nick.to_string()));
+            state.channels.insert(chname.to_string(), Channel::new(nick.to_string()));
             state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
                         chname.to_string());
         });
@@ -1181,7 +1175,7 @@ mod test {
         let (sender, _) = unbounded_channel();
         let (quit_sender, _) = oneshot::channel();
         let user = User::new(&config, &user_state, sender, quit_sender);
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         assert_eq!(1, state.max_users_count);
         
         let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
@@ -1194,7 +1188,7 @@ mod test {
         let (sender, _) = unbounded_channel();
         let (quit_sender, _) = oneshot::channel();
         let user = User::new(&config, &user_state, sender, quit_sender);
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         assert_eq!(2, state.max_users_count);
         
         let user_state = ConnUserState{ ip_addr: "127.0.0.1".parse().unwrap(),
@@ -1208,7 +1202,7 @@ mod test {
         let (quit_sender, _) = oneshot::channel();
         let mut user = User::new(&config, &user_state, sender, quit_sender);
         user.modes.invisible = true;
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         assert_eq!(3, state.max_users_count);
         assert_eq!(1, state.invisible_users_count);
         
@@ -1223,7 +1217,7 @@ mod test {
         let (quit_sender, _) = oneshot::channel();
         let mut user = User::new(&config, &user_state, sender, quit_sender);
         user.modes.wallops = true;
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         assert_eq!(4, state.max_users_count);
         assert_eq!(1, state.invisible_users_count);
         assert_eq!(HashSet::from(["john".to_string()]), state.wallops_users);
@@ -1239,7 +1233,7 @@ mod test {
         let (quit_sender, _) = oneshot::channel();
         let mut user = User::new(&config, &user_state, sender, quit_sender);
         user.modes.oper = true;
-        state.add_user(user);
+        state.add_user(&user_state.nick.clone().unwrap(), user);
         assert_eq!(5, state.max_users_count);
         assert_eq!(1, state.invisible_users_count);
         assert_eq!(1, state.operators_count);
@@ -1259,8 +1253,7 @@ mod test {
         [("#matixichan", "matixi"), ("#tulipchan", "tulipan"),
          ("#gregchan", "greg"), ("#johnchan", "john"), ("#guruchan", "admini")].iter()
             .for_each(|(chname, nick)| {
-            state.channels.insert(chname.to_string(),
-                    Channel::new(chname.to_string(), nick.to_string()));
+            state.channels.insert(chname.to_string(), Channel::new(nick.to_string()));
             state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
                         chname.to_string());
         });

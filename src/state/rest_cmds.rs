@@ -198,7 +198,7 @@ impl super::MainState {
     
     // routine to send who info about user
     pub(super) async fn send_who_info<'a>(&self, conn_state: &mut ConnState,
-            channel: Option<(&'a str, &ChannelUserModes)>,
+            channel: Option<(&'a str, &ChannelUserModes)>, user_nick: &'a str,
             user: &User, cmd_user: &User) -> Result<(), Box<dyn Error>> {
         if !user.modes.invisible || !user.channels.is_disjoint(&cmd_user.channels) {
             let client = conn_state.user_state.client_name();
@@ -215,7 +215,7 @@ impl super::MainState {
             }
             self.feed_msg(&mut conn_state.stream, RplWhoReply352{ client,
                 channel: channel.map(|(c,_)| c).unwrap_or("*"), username: &user.name,
-                host: &user.hostname, server: &self.config.name, nick: &user.nick,
+                host: &user.hostname, server: &self.config.name, nick: &user_nick,
                 flags: &flags, hopcount: 0, realname: &user.realname}).await?;
         }
         Ok(())
@@ -229,23 +229,23 @@ impl super::MainState {
         
         if mask.contains('*') || mask.contains('?') {
             // if wilcards
-            for (_, u) in &state.users {
-                if match_wildcard(mask, &u.nick) || match_wildcard(mask, &u.source) ||
+            for (unick, u) in &state.users {
+                if match_wildcard(mask, &unick) || match_wildcard(mask, &u.source) ||
                     match_wildcard(mask, &u.realname) {
-                    self.send_who_info(conn_state, None, &u, &user).await?;
+                    self.send_who_info(conn_state, None, &unick, &u, &user).await?;
                 }
             }
         } else if validate_channel(mask).is_ok() {
             // if channel
             if let Some(channel) = state.channels.get(mask) {
                 for (u, chum) in &channel.users {
-                    self.send_who_info(conn_state, Some((&channel.name, chum)),
+                    self.send_who_info(conn_state, Some((mask, chum)), &u,
                         state.users.get(u).unwrap(), &user).await?;
                 }
             }
         } else if validate_username(mask).is_ok() {
             if let Some(ref arg_user) = state.users.get(mask) {
-                self.send_who_info(conn_state, None, arg_user, &user).await?;
+                self.send_who_info(conn_state, None, mask, arg_user, &user).await?;
             }
         }
         let client = conn_state.user_state.client_name();
@@ -314,9 +314,9 @@ impl super::MainState {
                     let ch = state.channels.get(chname).unwrap();
                     if !ch.modes.secret {
                         // put channel only if not secret
-                        Some(WhoIsChannelStruct{ prefix: Some(ch.users.get(&arg_user.nick)
+                        Some(WhoIsChannelStruct{ prefix: Some(ch.users.get(&nick)
                             .unwrap().to_string(&conn_state.caps)).clone(),
-                            channel: &ch.name })
+                            channel: chname })
                     } else { None }
                     }).collect::<Vec<_>>();
                 

@@ -196,6 +196,7 @@ impl super::MainState {
         
         if let Some(good) = auth_opt {
             if good {
+                let user_nick = conn_state.user_state.nick.clone().unwrap();
                 let user_modes = {   // add new user to hash map
                     let mut user_state = &mut conn_state.user_state;
                     user_state.registered = registered;
@@ -204,13 +205,13 @@ impl super::MainState {
                                 conn_state.sender.take().unwrap(), 
                                 conn_state.quit_sender.take().unwrap());
                     let umode_str = user.modes.to_string();
-                    if !state.users.contains_key(&user.nick) {
-                        state.add_user(user);
+                    if !state.users.contains_key(&user_nick) {
+                        state.add_user(&user_nick, user);
                         umode_str
                     } else { // if nick already used
                         let client = conn_state.user_state.client_name();
                         self.feed_msg(&mut conn_state.stream,
-                                ErrNicknameInUse433{ client, nick: &user.nick }).await?;
+                                ErrNicknameInUse433{ client, nick: &user_nick }).await?;
                         return Ok(())
                     }
                 };

@@ -39,8 +39,8 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
         for (i, chname_str) in channels.iter().enumerate() {
-            let (join, create) = if let Some(channel) =
-                                state.channels.get(&chname_str.to_string()) {
+            let chname = chname_str.to_string();
+            let (join, create) = if let Some(channel) = state.channels.get(&chname) {
                 // if already created
                 let do_join = if let Some(key) = &channel.modes.key {
                     if let Some(ref keys) = keys_opt {
@@ -71,7 +71,7 @@ impl super::MainState {
                 // check whether must have invitation
                 let do_join = do_join && {
                      if !channel.modes.invite_only ||
-                        user.invited_to.contains(&channel.name) ||
+                        user.invited_to.contains(&chname) ||
                         channel.modes.invite_exception.as_ref().map_or(false,
                             |e| e.iter().any(|e|
                                 match_wildcard(&e, &conn_state.user_state.source))) {
@@ -126,8 +126,8 @@ impl super::MainState {
                 if *create {
                     info!("User {} create channel {}", conn_state.user_state.source,
                                 chname_str);
-                    state.channels.insert(chname.clone(), Channel::new(
-                                chname.clone(), user_nick.clone()));
+                    state.channels.insert(chname, Channel::new(
+                                user_nick.clone()));
                 } else {
                     state.channels.get_mut(&chname).unwrap().add_user(&user_nick);
                 }
@@ -142,7 +142,6 @@ impl super::MainState {
         
         // sending messages
         {
-        let user = state.users.get(user_nick.as_str()).unwrap();
         for ((join, _), chname_str) in joined_created.iter().zip(channels.iter()) {
             if *join {
                 let chanobj = state.channels.get(&chname_str.to_string()).unwrap();
@@ -156,8 +155,8 @@ impl super::MainState {
                                 channel: chname_str, topic: &topic.topic }).await?;
                     }
                 }
-                self.send_names_from_channel(conn_state, chanobj,
-                                &state.users, &user, true).await?;
+                self.send_names_from_channel(conn_state, chname_str, chanobj,
+                                &state.users, true).await?;
                 
                 // send message to other users in channel
                 for (nick, _) in &chanobj.users {
@@ -314,12 +313,13 @@ impl super::MainState {
     }
     
     // routine used for sending names of channel. end argument - if true then send EndOfNames.
-    async fn send_names_from_channel(&self, conn_state: &mut ConnState,
-                channel: &Channel, users: &HashMap<String, User>, conn_user: &User,
-                end: bool) -> Result<(), Box<dyn Error>> {
+    async fn send_names_from_channel<'a>(&self, conn_state: &mut ConnState,
+                channel_name: &'a str, channel: &'a Channel,
+                users: &HashMap<String, User>, end: bool) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
+        let conn_user_nick = conn_state.user_state.nick.as_ref().unwrap();
         
-        let in_channel = channel.users.contains_key(&conn_user.nick);
+        let in_channel = channel.users.contains_key(conn_user_nick);
         // if channel is not secret or user on channel.
         if !channel.modes.secret || in_channel {
             const NAMES_COUNT: usize = 20;
@@ -328,26 +328,26 @@ impl super::MainState {
             let mut name_chunk = vec![];
             name_chunk.reserve(NAMES_COUNT);
             
-            for n in &channel.users {
-                let user = users.get(n.0.as_str()).unwrap();
+            for (unick, chum) in &channel.users {
+                let user = users.get(unick.as_str()).unwrap();
                 // do not send names of invisible users or user on channel
                 if !user.modes.invisible || in_channel {
                     name_chunk.push(NameReplyStruct{
-                        prefix: n.1.to_string(&conn_state.caps), nick: &user.nick });
+                        prefix: chum.to_string(&conn_state.caps), nick: &unick });
                 }
                 if name_chunk.len() == NAMES_COUNT {
                     self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
-                                channel: &channel.name, replies: &name_chunk }).await?;
+                                channel: channel_name, replies: &name_chunk }).await?;
                     name_chunk.clear();
                 }
             }
             if !name_chunk.is_empty() {   // last chunk
                 self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
-                                channel: &channel.name, replies: &name_chunk }).await?;
+                                channel: &channel_name, replies: &name_chunk }).await?;
             }
             if end {
                 self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
-                            channel: &channel.name }).await?;
+                            channel: &channel_name }).await?;
             }
         }
         Ok(())
@@ -356,15 +356,13 @@ impl super::MainState {
     pub(super) async fn process_names<'a>(&self, conn_state: &mut ConnState,
             channels: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
         let state = self.state.read().await;
-        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let user = state.users.get(user_nick).unwrap();
         
         if !channels.is_empty() {
             // send names with EndOfNames
             for c in channels {
                 if let Some(ref channel) = state.channels.get(c) {
-                    self.send_names_from_channel(conn_state, channel, &state.users,
-                                &user, true).await?;
+                    self.send_names_from_channel(conn_state, c, channel, &state.users,
+                                true).await?;
                 } else {
                     let client = conn_state.user_state.client_name();
                     self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
@@ -373,9 +371,8 @@ impl super::MainState {
             }
         } else {
             // send names.
-            for c in state.channels.values() {
-                self.send_names_from_channel(conn_state, &c, &state.users,
-                            &user, false).await?;
+            for (cn, c) in state.channels.iter() {
+                self.send_names_from_channel(conn_state, &cn, &c, &state.users, false).await?;
             }
             let client = conn_state.user_state.client_name();
             // send single EndOfNames with wildcard.
@@ -397,19 +394,21 @@ impl super::MainState {
             self.feed_msg(&mut conn_state.stream, RplListStart321{ client }).await?;
             if !channels.is_empty() {
                 // send channels that are public (not secret).
-                for ch in channels.iter().filter_map(|ch| {
-                        state.channels.get(&ch.to_string()).filter(|ch| !ch.modes.secret)
+                for (chname, ch) in channels.iter().filter_map(|chname| {
+                        state.channels.get(&chname.to_string())
+                            .filter(|ch| !ch.modes.secret).map(|ch| (chname, ch))
                     }) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
-                            channel: &ch.name, client_count: ch.users.len(),
+                            channel: &chname, client_count: ch.users.len(),
                             topic: ch.topic.as_ref().map(|x| &x.topic)
                                 .unwrap_or(&String::new()) }).await?;
                 }
             } else {
                 // send channels that are public (not secret).
-                for ch in state.channels.values().filter(|ch| !ch.modes.secret) {
+                for (chname, ch) in state.channels.iter()
+                        .filter(|(_, ch)| !ch.modes.secret) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
-                        channel: &ch.name, client_count: ch.users.len(),
+                        channel: chname, client_count: ch.users.len(),
                         topic: ch.topic.as_ref().map(|x| &x.topic)
                             .unwrap_or(&String::new()) }).await?;
                 }
@@ -599,7 +598,7 @@ mod test {
             assert_eq!(":irc.irc 366 logan #fruits :End of /NAMES list".to_string(),
                     line_stream3.next().await.unwrap().unwrap());
             
-            let mut exp_channel = Channel{ name: "#fruits".to_string(), topic: None,
+            let mut exp_channel = Channel{ topic: None,
                         creation_time: 0, preconfigured: false,
                         modes: ChannelModes::new_for_channel("charlie".to_string()),
                         default_modes: ChannelDefaultModes::default(),

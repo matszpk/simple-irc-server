@@ -973,8 +973,11 @@ mod test {
                     line_stream.next().await.unwrap().unwrap());
             assert_eq!(":irc.irc 705 timmy MAIN :Use 'HELP COMMANDS' to list of commands."
                     .to_string(), line_stream.next().await.unwrap().unwrap());
-            assert_eq!(":irc.irc 706 timmy MAIN :Use 'HELP <command name>' if you want \
-                    to print help about command.".to_string(),
+            assert_eq!(":irc.irc 705 timmy MAIN :If you want get HELP about commands please \
+                    refer to https://modern.ircdocs.horse/".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            assert_eq!(":irc.irc 706 timmy MAIN :or \
+                    https://datatracker.ietf.org/doc/html/rfc1459.".to_string(),
                     line_stream.next().await.unwrap().unwrap());
             
             line_stream.send("HELP COMMANDS".to_string()).await.unwrap();
