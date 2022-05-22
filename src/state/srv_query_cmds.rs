@@ -960,6 +960,48 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_stats() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "timmy".to_string(),
+                        password: argon2_hash_password("zzzzz"),
+                        mask: None }]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "timmy", "tim",
+                    "Timmy Greater").await;
+            line_stream.send("OPER timmy zzzzz".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("STATS u".to_string()).await.unwrap();
+            let exp_time_str = ":irc.irc 242 timmy :Server Up 0 days 0:00:00".to_string();
+            let exp_time2_str = ":irc.irc 242 timmy :Server Up 0 days 0:00:01".to_string();
+            let reply_str = line_stream.next().await.unwrap().unwrap();
+            assert!(exp_time_str == reply_str || exp_time2_str == reply_str);
+            assert_eq!(":irc.irc 219 timmy u :End of STATS report".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+            
+            line_stream.send("STATS m".to_string()).await.unwrap();
+            for expected in [ ":irc.irc 212 timmy NICK 1",
+                            ":irc.irc 212 timmy USER 1",
+                            ":irc.irc 212 timmy OPER 1",
+                            ":irc.irc 212 timmy STATS 2",
+                            ":irc.irc 219 timmy m :End of STATS report" ] {
+                assert_eq!(expected.to_string(), line_stream.next().await.unwrap().unwrap());
+            }
+            
+            let mut line_stream = login_to_test_and_skip(port, "teddy", "teddy",
+                    "Teddy Bear").await;
+            line_stream.send("STATS u".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 481 teddy :Permission Denied- You're not an IRC \
+                    operator".to_string(), line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_links() {
         let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
         
