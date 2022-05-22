@@ -24,7 +24,7 @@ use std::io;
 #[cfg(feature = "tls_rustls")]
 use std::io::BufReader;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, AtomicU64, Ordering};
 use std::net::{IpAddr, SocketAddr};
 use std::error::Error;
 use tokio::sync::{RwLock, oneshot};
@@ -73,6 +73,7 @@ pub(crate) struct MainState {
     conns_count: Arc<AtomicUsize>,
     state: RwLock<VolatileState>,
     created: String,
+    command_counts: [AtomicU64; NUM_COMMANDS],
 }
 
 impl MainState {
@@ -91,7 +92,25 @@ impl MainState {
         let state = RwLock::new(VolatileState::new_from_config(&config));
         MainState{ config, user_config_idxs, oper_config_idxs, state,
                 conns_count: Arc::new(AtomicUsize::new(0)),
-                created: Local::now().to_rfc2822() }
+                created: Local::now().to_rfc2822(),
+                command_counts: [
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0) ] }
+    }
+    
+    fn count_command(&self, cmd: &Command) {
+        self.command_counts[cmd.index()].fetch_add(1, Ordering::SeqCst);
     }
     
     // try to register connection state - print error if too many connections.
@@ -256,6 +275,8 @@ impl MainState {
                         return Err(Box::new(e));
                     }
                 };
+                
+                self.count_command(&cmd);
                 
                 use crate::Command::*;
                 // if user not authenticated
