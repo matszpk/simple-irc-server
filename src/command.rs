@@ -117,18 +117,19 @@ impl<'a> Message<'a> {
 }
 
 // Needed command ids for command error.
+#[allow(dead_code)]
 #[const_table]
 pub(crate) enum CommandId {
     CommandName{ pub(crate) name: &'static str },
     CAPId = CommandName{ name: "CAP" },
-    //AUTHENTICATEId = CommandName{ name: "AUTHENTICATE" },
+    AUTHENTICATEId = CommandName{ name: "AUTHENTICATE" },
     PASSId = CommandName{ name: "PASS" },
     NICKId = CommandName{ name: "NICK" },
     USERId = CommandName{ name: "USER" },
     PINGId = CommandName{ name: "PING" },
     PONGId = CommandName{ name: "PONG" },
     OPERId = CommandName{ name: "OPER" },
-    //QUITId = CommandName{ name: "QUIT" },
+    QUITId = CommandName{ name: "QUIT" },
     JOINId = CommandName{ name: "JOIN" },
     PARTId = CommandName{ name: "PART" },
     TOPICId = CommandName{ name: "TOPIC" },
@@ -140,12 +141,12 @@ pub(crate) enum CommandId {
     VERSIONId = CommandName{ name: "VERSION" },
     ADMINId = CommandName{ name: "ADMIN" },
     CONNECTId = CommandName{ name: "CONNECT" },
-    //LUSERSId = CommandName{ name: "LUSERS" },
+    LUSERSId = CommandName{ name: "LUSERS" },
     TIMEId = CommandName{ name: "TIME" },
     STATSId = CommandName{ name: "STATS" },
     LINKSId = CommandName{ name: "LINKS" },
-    //HELPId = CommandName{ name: "HELP" },
-    //INFOId = CommandName{ name: "INFO" },
+    HELPId = CommandName{ name: "HELP" },
+    INFOId = CommandName{ name: "INFO" },
     MODEId = CommandName{ name: "MODE" },
     PRIVMSGId = CommandName{ name: "PRIVMSG" },
     NOTICEId = CommandName{ name: "NOTICE" },
@@ -153,10 +154,10 @@ pub(crate) enum CommandId {
     WHOISId = CommandName{ name: "WHOIS" },
     WHOWASId = CommandName{ name: "WHOWAS" },
     KILLId = CommandName{ name: "KILL" },
-    //REHASHId = CommandName{ name: "REHASH" },
-    //RESTARTId = CommandName{ name: "RESTART" },
+    REHASHId = CommandName{ name: "REHASH" },
+    RESTARTId = CommandName{ name: "RESTART" },
     SQUITId = CommandName{ name: "SQUIT" },
-    //AWAYId = CommandName{ name: "AWAY" },
+    AWAYId = CommandName{ name: "AWAY" },
     USERHOSTId = CommandName{ name: "USERHOST" }, 
     WALLOPSId = CommandName{ name: "WALLOPS" },
 }
