@@ -34,7 +34,7 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::task::JoinHandle;
-use futures::SinkExt;
+use futures::{future::Fuse, SinkExt};
 use chrono::prelude::*;
 #[cfg(feature = "tls_rustls")]
 use rustls;
@@ -126,7 +126,7 @@ impl MainState {
         res
     }
     
-    pub(crate) async fn get_quit_receiver(&self) -> oneshot::Receiver<String> {
+    pub(crate) async fn get_quit_receiver(&self) -> Fuse<oneshot::Receiver<String>> {
         let mut state = self.state.write().await;
         state.quit_receiver.take().unwrap()
     }

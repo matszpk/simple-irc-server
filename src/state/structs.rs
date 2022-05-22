@@ -601,7 +601,7 @@ pub(super) struct VolatileState {
     pub(super) max_users_count: usize,
     pub(super) nick_histories: HashMap<String, Vec<NickHistoryEntry>>,
     pub(super) quit_sender: Option<oneshot::Sender<String>>,
-    pub(super) quit_receiver: Option<oneshot::Receiver<String>>
+    pub(super) quit_receiver: Option<Fuse<oneshot::Receiver<String>>>
 }
 
 impl VolatileState {
@@ -628,7 +628,7 @@ impl VolatileState {
         VolatileState{ users: HashMap::new(), channels, wallops_users: HashSet::new(),
                 invisible_users_count: 0, operators_count: 0 , max_users_count: 0,
                 nick_histories: HashMap::new(),
-                quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver) }
+                quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver.fuse()) }
     }
     
     // add user to volatile state - includes stats likes invisible users count, etc.
