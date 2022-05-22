@@ -49,7 +49,7 @@ QUIT
 REHASH
 RESTART
 SQUIT
-STATS - unsupported
+STATS
 TIME
 TOPIC
 USER
@@ -58,7 +58,8 @@ VERSION
 WALLOPS
 WHO
 WHOIS
-WHOWAS"##),
+WHOWAS
+ISON"##),
     ("MAIN", r##"This is Simple IRC Server.
 Use 'HELP COMMANDS' to list of commands.
 If you want get HELP about commands please refer to https://modern.ircdocs.horse/

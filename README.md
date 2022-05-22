@@ -12,7 +12,7 @@ This server have following features:
 * TLS connections support thanks RusTLS and OpenSSL.
 
 Because it is simple IRC server, unfortunatelly some commands have not been supported like: 
-CONNECT, REHASH, RESTART, AUTHENTICATE, STATS. This server should be used to simple
+CONNECT, REHASH, RESTART, AUTHENTICATE. This server should be used to simple
 installation only with local IRC environment.
 
 ## Build
