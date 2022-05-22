@@ -126,7 +126,7 @@ impl super::MainState {
                 if *create {
                     info!("User {} create channel {}", conn_state.user_state.source,
                                 chname_str);
-                    state.channels.insert(chname, Channel::new(
+                    state.channels.insert(chname, Channel::new_on_user_join(
                                 user_nick.clone()));
                 } else {
                     state.channels.get_mut(&chname).unwrap().add_user(&user_nick);

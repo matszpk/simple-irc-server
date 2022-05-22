@@ -259,7 +259,7 @@ pub(super) struct Channel {
 }
 
 impl Channel {
-    pub(super) fn new(user_nick: String) -> Channel {
+    pub(super) fn new_on_user_join(user_nick: String) -> Channel {
         let mut users = HashMap::new();
         users.insert(user_nick.clone(), ChannelUserModes::new_for_created_channel());
         Channel{ topic: None, ban_info: HashMap::new(),
@@ -881,7 +881,7 @@ mod test {
     
     #[test]
     fn test_channel_new() {
-        let channel = Channel::new("dizzy".to_string());
+        let channel = Channel::new_on_user_join("dizzy".to_string());
         assert_eq!(Channel{ topic: None,
             modes: ChannelModes::new_for_channel("dizzy".to_string()),
             default_modes: ChannelDefaultModes::default(),
@@ -892,7 +892,7 @@ mod test {
     
     #[test]
     fn test_channel_join_remove_user() {
-        let mut channel = Channel::new("runner".to_string());
+        let mut channel = Channel::new_on_user_join("runner".to_string());
         channel.default_modes.founders.insert("fasty".to_string());
         channel.default_modes.protecteds.insert("quicker".to_string());
         channel.default_modes.operators.insert("leader".to_string());
@@ -905,7 +905,7 @@ mod test {
         channel.add_user(&"cyclist".to_string());
         channel.add_user(&"doer".to_string());
         
-        let mut exp_channel = Channel::new("runner".to_string());
+        let mut exp_channel = Channel::new_on_user_join("runner".to_string());
         exp_channel.default_modes = channel.default_modes.clone();
         exp_channel.users.insert("fasty".to_string(), ChannelUserModes{ founder: true,
                 protected: false, operator: false, half_oper: false, voice: false });
@@ -960,7 +960,7 @@ mod test {
     
     #[test]
     fn test_channel_rename_user() {
-        let mut channel = Channel::new("dizzy".to_string());
+        let mut channel = Channel::new_on_user_join("dizzy".to_string());
         channel.rename_user(&"dizzy".to_string(), "diggy".to_string());
         assert_eq!(Channel{ topic: None,
             modes: ChannelModes::new_for_channel("diggy".to_string()),
@@ -972,7 +972,7 @@ mod test {
     
     #[test]
     fn test_channel_add_remove_mode() {
-        let mut channel = Channel::new("dizzy".to_string());
+        let mut channel = Channel::new_on_user_join("dizzy".to_string());
         
         let mut exp_channel = Channel{ topic: None,
             modes: ChannelModes::new_for_channel("dizzy".to_string()),
@@ -1159,7 +1159,8 @@ mod test {
         // create channels and add channel to user structure
         [("#matixichan", "matixi"), ("#tulipchan", "matixi")].iter()
             .for_each(|(chname, nick)| {
-            state.channels.insert(chname.to_string(), Channel::new(nick.to_string()));
+            state.channels.insert(chname.to_string(), 
+                        Channel::new_on_user_join(nick.to_string()));
             state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
                         chname.to_string());
         });
@@ -1272,7 +1273,8 @@ mod test {
         [("#matixichan", "matixi"), ("#tulipchan", "tulipan"),
          ("#gregchan", "greg"), ("#johnchan", "john"), ("#guruchan", "admini")].iter()
             .for_each(|(chname, nick)| {
-            state.channels.insert(chname.to_string(), Channel::new(nick.to_string()));
+            state.channels.insert(chname.to_string(), 
+                        Channel::new_on_user_join(nick.to_string()));
             state.users.get_mut(&nick.to_string()).unwrap().channels.insert(
                         chname.to_string());
         });
