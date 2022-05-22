@@ -1793,6 +1793,48 @@ mod test {
     }
     
     #[tokio::test]
+    async fn test_command_ison() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            let mut xstreams = vec![];
+            for i in 0..50 {
+                xstreams.push(login_to_test_and_skip(port, &format!("binny{}", i),
+                        &format!("binny{}", i), &format!("Binny{} BigBang", i)).await);
+            }
+            
+            line_stream.send(format!("ISON {}", (0..50).map(|x| format!("binny{}", x))
+                            .collect::<Vec<_>>().join(" "))).await.unwrap();
+            for range in [(0..20), (20..40), (40..50)] {
+                assert_eq!(":irc.irc 303 funny :".to_string() + &(range.map(
+                    |x| format!("binny{0}", x))
+                            .collect::<Vec<_>>().join(" ")),
+                    line_stream.next().await.unwrap().unwrap());
+            }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_ison_notfound() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            
+            line_stream.send("ISON ziggy".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 303 funny :".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
     async fn test_command_wallops() {
         let mut config = MainConfig::default();
         config.operators = Some(vec![
