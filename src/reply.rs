@@ -62,6 +62,7 @@ pub(crate) enum Reply<'a> {
     //RplWhoIsCertFP276{ client: &'a str, nick: &'a str, fingerprint: &'a str },
     RplAway301{ client: &'a str, nick: &'a str, message: &'a str },
     RplUserHost302{ client: &'a str, replies: &'a [String] },
+    RplIson303{ client: &'a str, nicknames: &'a [String] },
     RplUnAway305{ client: &'a str },
     RplNowAway306{ client: &'a str },
     RplWhoReply352{ client: &'a str, channel: &'a str, username: &'a str, host: &'a str,
@@ -238,6 +239,9 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "301 {} {} :{}", client, nick, message) }
             RplUserHost302{ client, replies } => {
                 write!(f, "302 {} :{}", client, replies.iter()
+                    .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
+            RplIson303{ client, nicknames } => {
+                write!(f, "303 {} :{}", client, nicknames.iter()
                     .map(|x| x.to_string()).collect::<Vec::<_>>().join(" ")) }
             RplUnAway305{ client } => {
                 write!(f, "305 {} :You are no longer marked as being away", client) }
@@ -519,6 +523,10 @@ mod test {
             format!("{}", RplUserHost302{ client: "<client>",
                 replies: &vec![ "<reply1>".to_string(), "<reply2>".to_string(),
                             "<reply3>".to_string()] }));
+        assert_eq!("303 <client> :<nick1> <nick2> <nick3>",
+            format!("{}", RplIson303{ client: "<client>",
+                nicknames: &vec![ "<nick1>".to_string(), "<nick2>".to_string(),
+                            "<nick3>".to_string()] }));
         assert_eq!("305 <client> :You are no longer marked as being away",
             format!("{}", RplUnAway305{ client: "<client>" }));
         assert_eq!("306 <client> :You have been marked as being away",

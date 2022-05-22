@@ -513,7 +513,17 @@ impl super::MainState {
     
     pub(super) async fn process_ison<'a>(&self, conn_state: &mut ConnState,
             nicknames: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
         let state = self.state.read().await;
+        for nicks in nicknames.chunks(20) {
+            let outs = nicks.iter().map(|nick| {
+                if state.users.contains_key(&nick.to_string()) {
+                    nick.to_string()
+                } else { String::default() }
+            }).collect::<Vec<_>>();
+            self.feed_msg(&mut conn_state.stream, RplIson303{ client,
+                    nicknames: &outs }).await?;
+        }
         Ok(())
     }
 }
