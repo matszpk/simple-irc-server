@@ -21,7 +21,7 @@ use std::ops::Drop;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU64, AtomicUsize, Ordering};
 use std::net::IpAddr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::oneshot;
@@ -601,7 +601,8 @@ pub(super) struct VolatileState {
     pub(super) max_users_count: usize,
     pub(super) nick_histories: HashMap<String, Vec<NickHistoryEntry>>,
     pub(super) quit_sender: Option<oneshot::Sender<String>>,
-    pub(super) quit_receiver: Option<Fuse<oneshot::Receiver<String>>>
+    pub(super) quit_receiver: Option<Fuse<oneshot::Receiver<String>>>,
+    pub(super) command_counts: [AtomicU64; NUM_COMMANDS],
 }
 
 impl VolatileState {
@@ -628,7 +629,25 @@ impl VolatileState {
         VolatileState{ users: HashMap::new(), channels, wallops_users: HashSet::new(),
                 invisible_users_count: 0, operators_count: 0 , max_users_count: 0,
                 nick_histories: HashMap::new(),
-                quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver.fuse()) }
+                quit_sender: Some(quit_sender), quit_receiver: Some(quit_receiver.fuse()),
+                command_counts: [
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
+                    AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0) ] }
+    }
+    
+    pub(super) fn count_command(&self, cmd: &Command) {
+        self.command_counts[cmd.index()].fetch_add(1, Ordering::SeqCst);
     }
     
     // add user to volatile state - includes stats likes invisible users count, etc.
