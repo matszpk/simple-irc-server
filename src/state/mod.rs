@@ -73,6 +73,7 @@ pub(crate) struct MainState {
     conns_count: Arc<AtomicUsize>,
     state: RwLock<VolatileState>,
     created: String,
+    created_time: DateTime<Local>,
     command_counts: [AtomicU64; NUM_COMMANDS],
 }
 
@@ -90,9 +91,10 @@ impl MainState {
                 oper_config_idxs.insert(o.name.clone(), i); });
         }
         let state = RwLock::new(VolatileState::new_from_config(&config));
+        let now = Local::now();
         MainState{ config, user_config_idxs, oper_config_idxs, state,
                 conns_count: Arc::new(AtomicUsize::new(0)),
-                created: Local::now().to_rfc2822(),
+                created: now.to_rfc2822(), created_time: now,
                 command_counts: [
                     AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
                     AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),

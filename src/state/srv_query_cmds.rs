@@ -19,6 +19,7 @@
 
 use std::error::Error;
 use std::ops::DerefMut;
+use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::prelude::*;
 use super::*;
@@ -130,11 +131,42 @@ impl super::MainState {
         Ok(())
     }
     
-    pub(super) async fn process_stats<'a>(&self, conn_state: &mut ConnState, _: char,
-            _: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+    pub(super) async fn process_stats<'a>(&self, conn_state: &mut ConnState, stat: char,
+            server: Option<&'a str>) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
+        
+        if server.is_some() {
+            self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "STATS", subcommand: None, info: "Server unsupported" }).await?;
+        } else {
+            let state = self.state.read().await;
+            let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+            let user = state.users.get(user_nick).unwrap();
+            
+            if user.modes.is_local_oper() {
+                match stat {
+                    'u' => {
+                        self.feed_msg(&mut conn_state.stream, RplStatsUptime242{ client,
+                            seconds: (Local::now() -
+                                    self.created_time).num_seconds() as u64}).await?;
+                    }
+                    'm' => {
+                        for (i,x) in CommandId::iter().enumerate() {
+                            let count = self.command_counts[i].load(Ordering::SeqCst);
+                            if count != 0 {
+                                self.feed_msg(&mut conn_state.stream, RplStatsCommands212{
+                                    client, command: x.name, count }).await?;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                self.feed_msg(&mut conn_state.stream,
+                        RplEndOfStats219{ client, stat }).await?;
+            } else { // only for operators
+                self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
+            }
+        }
         Ok(())
     }
     

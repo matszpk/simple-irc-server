@@ -46,7 +46,7 @@ pub(crate) enum Reply<'a> {
     RplStatsCommands212{ client: &'a str, command: &'a str, count: u64 },
     RplEndOfStats219{ client: &'a str, stat: char },
     RplUModeIs221{ client: &'a str, user_modes: &'a str },
-    RPLStatsUptime242{ client: &'a str, seconds: u64 },
+    RplStatsUptime242{ client: &'a str, seconds: u64 },
     RplLUserClient251{ client: &'a str, users_num: usize, inv_users_num: usize,
             servers_num: usize },
     RplLUserOp252{ client: &'a str, ops_num: usize },
@@ -198,13 +198,13 @@ impl<'a> fmt::Display for Reply<'a> {
                 write!(f, "219 {} {} :End of STATS report", client, stat) }
             RplUModeIs221{ client, user_modes } => {
                 write!(f, "221 {} {}", client, user_modes) }
-            RPLStatsUptime242{ client, seconds } => {
+            RplStatsUptime242{ client, seconds } => {
                 let day_time = seconds%(24*3600);
                 let hour = day_time/3600;
                 let minute = (day_time - hour*3600)/60;
                 let second = day_time%60;
-                write!(f, "242 {} :Server Up {} {}:{:02}:{:02}", client, seconds/(24*3600),
-                        hour, minute, second) }
+                write!(f, "242 {} :Server Up {} days {}:{:02}:{:02}", client,
+                        seconds/(24*3600), hour, minute, second) }
             RplLUserClient251{ client, users_num, inv_users_num, servers_num } => {
                 write!(f, "251 {} :There are {} users and {} invisible on {} servers",
                     client, users_num, inv_users_num, servers_num) }
@@ -479,8 +479,8 @@ mod test {
             format!("{}", RplEndOfStats219{ client: "<client>", stat: 'u' }));
         assert_eq!("221 <client> <user modes>",
             format!("{}", RplUModeIs221{ client: "<client>", user_modes: "<user modes>" }));
-        assert_eq!("242 <client> :Server Up 4120 21:34:49",
-            format!("{}", RPLStatsUptime242{ client: "<client>", seconds: 356045689 }));
+        assert_eq!("242 <client> :Server Up 4120 days 21:34:49",
+            format!("{}", RplStatsUptime242{ client: "<client>", seconds: 356045689 }));
         assert_eq!("251 <client> :There are 3 users and 4 invisible on 5 servers",
             format!("{}", RplLUserClient251{ client: "<client>", users_num: 3,
                 inv_users_num: 4, servers_num: 5 }));
