@@ -481,13 +481,15 @@ impl super::MainState {
         let state = self.state.read().await;
         
         for nicks in nicknames.chunks(20) {
-            let replies = nicks.iter().map(|nick| {
+            let replies = nicks.iter().filter_map(|nick|
                 if let Some(user) = state.users.get(&nick.to_string()) {
-                    let asterisk = if user.modes.is_local_oper() { "*" } else { "" };
-                    let away = if user.away.is_some() { '-' } else { '+' };
-                    format!("{}{}={}~{}@{}", nick, asterisk, away, user.name, user.hostname)
-                } else { String::default() }
-            }).collect::<Vec<_>>();
+                    Some((nick, user))
+                } else { None }
+            ).map(|(nick, user)| {
+                let asterisk = if user.modes.is_local_oper() { "*" } else { "" };
+                let away = if user.away.is_some() { '-' } else { '+' };
+                format!("{}{}={}~{}@{}", nick, asterisk, away, user.name, user.hostname) }
+            ).collect::<Vec<_>>();
             self.feed_msg(&mut conn_state.stream, RplUserHost302{ client,
                     replies: &replies }).await?;
         }
@@ -516,11 +518,9 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         let state = self.state.read().await;
         for nicks in nicknames.chunks(20) {
-            let outs = nicks.iter().map(|nick| {
-                if state.users.contains_key(&nick.to_string()) {
-                    nick.to_string()
-                } else { String::default() }
-            }).collect::<Vec<_>>();
+            let outs = nicks.iter().filter(|nick|
+                    state.users.contains_key(&nick.to_string()))
+                            .map(|nick| *nick).collect::<Vec<_>>();
             self.feed_msg(&mut conn_state.stream, RplIson303{ client,
                     nicknames: &outs }).await?;
         }
