@@ -159,6 +159,7 @@ pub(crate) enum CommandId {
     _AWAYId = CommandName{ name: "AWAY" },
     USERHOSTId = CommandName{ name: "USERHOST" }, 
     WALLOPSId = CommandName{ name: "WALLOPS" },
+    ISONId = CommandName{ name: "ISON" },
 }
 
 use CommandId::*;
@@ -250,11 +251,12 @@ pub(crate) enum Command<'a> {
     AWAY{ text: Option<&'a str> },
     USERHOST{ nicknames: Vec<&'a str> }, 
     WALLOPS{ text: &'a str },
+    ISON{ nicknames: Vec<&'a str> },
 }
 
 use Command::*;
 
-pub(crate) const NUM_COMMANDS: usize = 39;
+pub(crate) const NUM_COMMANDS: usize = 40;
 
 impl<'a> Command<'a> {
     pub(crate) fn index(&self) -> usize {
@@ -298,6 +300,7 @@ impl<'a> Command<'a> {
             AWAY{ .. } => 36,
             USERHOST{ .. } => 37,
             WALLOPS{ .. } => 38,
+            ISON{ .. } => 39,
         }
     }
     
@@ -622,6 +625,12 @@ impl<'a> Command<'a> {
                     Ok(WALLOPS{ text: message.params[0] })
                 } else {
                     Err(NeedMoreParams(WALLOPSId)) }
+            }
+            "ISON" => {
+                if !message.params.is_empty() {
+                    Ok(ISON{ nicknames: message.params.clone() })
+                } else {
+                    Err(NeedMoreParams(ISONId)) }
             }
             s => Err(UnknownCommand(s.to_string())),
         }

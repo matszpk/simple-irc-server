@@ -483,7 +483,9 @@ impl super::MainState {
         for nicks in nicknames.chunks(20) {
             let replies = nicks.iter().map(|nick| {
                 if let Some(user) = state.users.get(&nick.to_string()) {
-                    format!("{}=+~{}@{}", nick, user.name, user.hostname)
+                    let asterisk = if user.modes.is_local_oper() { "*" } else { "" };
+                    let away = if user.away.is_some() { '-' } else { '+' };
+                    format!("{}{}={}~{}@{}", nick, asterisk, away, user.name, user.hostname)
                 } else { String::default() }
             }).collect::<Vec<_>>();
             self.feed_msg(&mut conn_state.stream, RplUserHost302{ client,
@@ -506,6 +508,12 @@ impl super::MainState {
             let client = conn_state.user_state.client_name();
             self.feed_msg(&mut conn_state.stream, ErrNoPrivileges481{ client }).await?;
         }
+        Ok(())
+    }
+    
+    pub(super) async fn process_ison<'a>(&self, conn_state: &mut ConnState,
+            nicknames: Vec<&'a str>) -> Result<(), Box<dyn Error>> {
+        let state = self.state.read().await;
         Ok(())
     }
 }
@@ -1711,6 +1719,48 @@ mod test {
                             .collect::<Vec<_>>().join(" ")),
                     line_stream.next().await.unwrap().unwrap());
             }
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_userhost_away() {
+        let (main_state, handle, port) = run_test_server(MainConfig::default()).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Bunny BumBumBum").await;
+            
+            line_stream.send("AWAY :blablam".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("USERHOST funny".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 302 funny :funny=-~funny@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
+        }
+        
+        quit_test_server(main_state, handle).await;
+    }
+    
+    #[tokio::test]
+    async fn test_command_userhost_oper() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: argon2_hash_password("Funny"), mask: None },
+        ]);
+        let (main_state, handle, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "funny", "funny",
+                    "Funny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            
+            line_stream.send("USERHOST funny".to_string()).await.unwrap();
+            assert_eq!(":irc.irc 302 funny :funny*=+~funny@127.0.0.1".to_string(),
+                    line_stream.next().await.unwrap().unwrap());
         }
         
         quit_test_server(main_state, handle).await;
