@@ -21,6 +21,7 @@ use std::error::Error;
 use std::io;
 use std::pin::Pin;
 use std::convert::TryFrom;
+use futures::{Stream, SinkExt};
 use futures::task::{Poll, Context};
 use tokio::io::{ReadBuf};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -30,7 +31,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::server::TlsStream;
 #[cfg(feature = "tls_openssl")]
 use tokio_openssl::SslStream;
-use tokio_util::codec::{LinesCodec, LinesCodecError, Decoder, Encoder};
+use tokio_util::codec::{Framed, LinesCodec, LinesCodecError, Decoder, Encoder};
 use validator::ValidationError;
 use argon2::{self, Argon2};
 use argon2::password_hash;
@@ -92,6 +93,48 @@ impl AsyncWrite for DualTcpStream {
             #[cfg(any(feature = "tls_openssl", feature = "tls_rustls"))]
             DualTcpStream::SecureStream(ref mut t) => Pin::new(t).poll_shutdown(cx),
         }
+    }
+}
+
+// BufferedStream - to avoid deadlocks if no immediately data sent
+#[derive(Debug)]
+pub(crate) struct BufferedLineStream {
+    stream: Framed<DualTcpStream, IRCLinesCodec>,
+    buffer: Vec<String>,
+}
+
+impl BufferedLineStream {
+    pub(crate) fn new(stream: Framed<DualTcpStream, IRCLinesCodec>) -> Self {
+        BufferedLineStream{ stream, buffer: vec![] }
+    }
+    
+    pub(crate) async fn feed(&mut self, msg: String) -> Result<(), LinesCodecError> {
+        self.buffer.push(msg);
+        Ok(())
+    }
+    
+    pub(crate) async fn flush(&mut self) -> Result<(), LinesCodecError> {
+        for msg in self.buffer.drain(..) {
+            self.stream.feed(msg).await?;
+        }
+        self.stream.flush().await?;
+        Ok(())
+    }
+    
+    pub(crate) fn get_ref(&self) -> &DualTcpStream {
+        self.stream.get_ref()
+    }
+}
+
+impl Stream for BufferedLineStream {
+    type Item = Result<String, LinesCodecError>;
+    
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Pin::new(&mut self.get_mut().stream).poll_next(cx)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.stream.size_hint()
     }
 }
 

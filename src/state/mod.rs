@@ -34,7 +34,7 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LinesCodecError};
 use tokio::task::JoinHandle;
-use futures::{future::Fuse, SinkExt};
+use futures::{future::Fuse};
 use chrono::prelude::*;
 #[cfg(feature = "tls_rustls")]
 use rustls;
@@ -378,15 +378,14 @@ impl MainState {
     }
     
     // helper to feed messages
-    async fn feed_msg<T: fmt::Display>(&self,
-            stream: &mut Framed<DualTcpStream, IRCLinesCodec>, t: T)
+    async fn feed_msg<T: fmt::Display>(&self, stream: &mut BufferedLineStream, t: T)
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", self.config.name, t)).await
     }
     
     // helper to feed messages
     async fn feed_msg_source<T: fmt::Display>(&self,
-            stream: &mut Framed<DualTcpStream, IRCLinesCodec>, source: &str, t: T)
+            stream: &mut BufferedLineStream, source: &str, t: T)
             -> Result<(), LinesCodecError> {
         stream.feed(format!(":{} {}", source, t)).await
     }
@@ -643,6 +642,7 @@ pub(crate) async fn run_server(config: MainConfig) ->
 mod test {
     use tokio::net::TcpStream;
     use super::*;
+    pub(crate) use futures::SinkExt;
     pub(crate) use std::time::Duration;
     pub(crate) use std::collections::HashSet;
     pub(crate) use std::iter::FromIterator;

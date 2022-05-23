@@ -478,7 +478,8 @@ impl ConnUserState {
 
 #[derive(Debug)]
 pub(crate) struct ConnState {
-    pub(super) stream: Framed<DualTcpStream, IRCLinesCodec>,
+    // use BufferedLineStream to avoid deadlocks when sending is not still finished.
+    pub(super) stream: BufferedLineStream,
     pub(super) sender: Option<UnboundedSender<String>>,
     pub(super) receiver: UnboundedReceiver<String>,
     // sender and receiver used for sending ping task for 
@@ -520,7 +521,8 @@ impl ConnState {
         #[cfg(not(feature = "dns_lookup"))]
         let (_, dns_lookup_receiver) = oneshot::channel();
         
-        ConnState{ stream, sender: Some(sender), receiver,
+        ConnState{ stream: BufferedLineStream::new(stream),
+            sender: Some(sender), receiver,
             user_state: ConnUserState::new(ip_addr),
             ping_sender: Some(ping_sender), ping_receiver,
             timeout_sender: Arc::new(timeout_sender), timeout_receiver,
