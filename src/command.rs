@@ -160,6 +160,7 @@ pub(crate) enum CommandId {
     USERHOSTId = CommandName{ name: "USERHOST" }, 
     WALLOPSId = CommandName{ name: "WALLOPS" },
     ISONId = CommandName{ name: "ISON" },
+    _DIEId = CommandName{ name: "DIE" },
 }
 
 use CommandId::*;
@@ -252,11 +253,12 @@ pub(crate) enum Command<'a> {
     USERHOST{ nicknames: Vec<&'a str> }, 
     WALLOPS{ text: &'a str },
     ISON{ nicknames: Vec<&'a str> },
+    DIE{ message: Option<&'a str> },
 }
 
 use Command::*;
 
-pub(crate) const NUM_COMMANDS: usize = 40;
+pub(crate) const NUM_COMMANDS: usize = 41;
 
 impl<'a> Command<'a> {
     pub(crate) fn index(&self) -> usize {
@@ -301,6 +303,7 @@ impl<'a> Command<'a> {
             USERHOST{ .. } => 37,
             WALLOPS{ .. } => 38,
             ISON{ .. } => 39,
+            DIE{ .. } => 40,
         }
     }
     
@@ -631,6 +634,12 @@ impl<'a> Command<'a> {
                     Ok(ISON{ nicknames: message.params.clone() })
                 } else {
                     Err(NeedMoreParams(ISONId)) }
+            }
+            "DIE" => {
+                if message.params.len() >= 1 {
+                    Ok(DIE{ message: Some(message.params[0]) })
+                } else {
+                    Ok(DIE{ message: None }) }
             }
             s => Err(UnknownCommand(s.to_string())),
         }
@@ -1524,6 +1533,13 @@ mod test {
                 params: vec![ "This is some message" ] }).map_err(|e| e.to_string()));
         assert_eq!(Err("Command 'WALLOPS' needs more parameters".to_string()),
             Command::from_message(&Message{ source: None, command: "WALLOPS",
+                params: vec![] }).map_err(|e| e.to_string()));
+        
+        assert_eq!(Ok(DIE{ message: Some("This is some message") }),
+            Command::from_message(&Message{ source: None, command: "DIE",
+                params: vec![ "This is some message" ] }).map_err(|e| e.to_string()));
+        assert_eq!(Ok(DIE{ message: None }),
+            Command::from_message(&Message{ source: None, command: "DIE",
                 params: vec![] }).map_err(|e| e.to_string()));
         
         // case-insensitivness

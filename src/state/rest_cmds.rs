@@ -435,24 +435,32 @@ impl super::MainState {
             self.feed_msg(&mut conn_state.stream, ErrUnknownError400{ client,
                     command: "SQUIT", subcommand: None, info: "Server unsupported" }).await?;
         } else {
-            let mut state = self.state.write().await;
-            let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-            let user = state.users.get(user_nick).unwrap();
-            
-            // only operator can kill server
-            if user.modes.oper {
-                for u in state.users.values_mut() {
-                    if let Some(sender) = u.quit_sender.take() {
-                        sender.send((user_nick.to_string(), comment.to_string()))
-                                    .map_err(|_| "error".to_string())?;
-                    }
+            self.process_die(conn_state, Some(comment)).await?;
+        }
+        Ok(())
+    }
+    
+    pub(super) async fn process_die<'a>(&self, conn_state: &mut ConnState,
+            message_opt: Option<&'a str>) -> Result<(), Box<dyn Error>> {
+        let client = conn_state.user_state.client_name();
+        let mut state = self.state.write().await;
+        let user_nick = conn_state.user_state.nick.as_ref().unwrap();
+        let user = state.users.get(user_nick).unwrap();
+        let message = message_opt.unwrap_or("Quitting from DIE");
+        
+        // only operator can kill server
+        if user.modes.oper {
+            for u in state.users.values_mut() {
+                if let Some(sender) = u.quit_sender.take() {
+                    sender.send((user_nick.to_string(), message.to_string()))
+                                .map_err(|_| "error".to_string())?;
                 }
-                if let Some(sender) = state.quit_sender.take() {
-                    sender.send(comment.to_string())?;
-                }
-            } else {
-                self.feed_msg(&mut conn_state.stream, ErrCantKillServer483{ client }).await?;
             }
+            if let Some(sender) = state.quit_sender.take() {
+                sender.send(message.to_string())?;
+            }
+        } else {
+            self.feed_msg(&mut conn_state.stream, ErrCantKillServer483{ client }).await?;
         }
         Ok(())
     }
@@ -1664,6 +1672,42 @@ mod test {
             line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
             line_stream.next().await.unwrap().unwrap();
             line_stream.send("SQUIT irc.irc :Blabla".to_string()).await.unwrap();
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_command_die() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: argon2_hash_password("Funny"), mask: None },
+        ]);
+        let (_, _, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.send("DIE :Blabla".to_string()).await.unwrap();
+        }
+    }
+    
+    #[tokio::test]
+    async fn test_command_die_no_message() {
+        let mut config = MainConfig::default();
+        config.operators = Some(vec![
+            OperatorConfig{ name: "fanny".to_string(),
+                    password: argon2_hash_password("Funny"), mask: None },
+        ]);
+        let (_, _, port) = run_test_server(config).await;
+        
+        {
+            let mut line_stream = login_to_test_and_skip(port, "fanny", "fanny",
+                    "Fanny BumBumBum").await;
+            line_stream.send("OPER fanny Funny".to_string()).await.unwrap();
+            line_stream.next().await.unwrap().unwrap();
+            line_stream.send("DIE".to_string()).await.unwrap();
         }
     }
     

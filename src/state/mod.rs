@@ -109,7 +109,7 @@ impl MainState {
                     AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
                     AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
                     AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
-                    AtomicU64::new(0) ] }
+                    AtomicU64::new(0), AtomicU64::new(0) ] }
     }
     
     fn count_command(&self, cmd: &Command) {
@@ -372,6 +372,8 @@ impl MainState {
                         self.process_wallops(conn_state, &msg).await,
                     ISON{ nicknames } =>
                         self.process_ison(conn_state, nicknames).await,
+                    DIE{ message } =>
+                        self.process_die(conn_state, message).await,
                 }
             },
         }

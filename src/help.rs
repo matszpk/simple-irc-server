@@ -25,8 +25,10 @@ AUTHENTICATE - unsupported
 AWAY
 CAP
 CONNECT - unsupported
+DIE
 HELP
 INFO
+ISON
 INVITE
 JOIN
 KICK
@@ -58,8 +60,7 @@ VERSION
 WALLOPS
 WHO
 WHOIS
-WHOWAS
-ISON"##),
+WHOWAS"##),
     ("MAIN", r##"This is Simple IRC Server.
 Use 'HELP COMMANDS' to list of commands.
 If you want get HELP about commands please refer to https://modern.ircdocs.horse/
