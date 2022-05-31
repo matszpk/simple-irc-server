@@ -1,5 +1,8 @@
 # Simple IRC Server
 
+[![LGPL 2.1 License](https://img.shields.io/badge/License-LGPL--2.1-brightgreen)](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
+[![Crate version](https://img.shields.io/crates/v/simple-irc-server)](https://crates.io/crates/simple-irc-server)
+
 This is a simple IRC server written in the Rust languange. This server supports
 basic set of IRC commands and basic user's mode and channel's modes.
 This server have following features:
@@ -23,7 +26,7 @@ A server can be easily build with Cargo package system. Following features can b
 * tls_rustls - enable TLS connection support.
 * tls_openssl - enable TLS connection support thanks native OpenSSL library.
 
-A tls-openssl should be used in old machines that doesn't support SSE2 instructions.
+A tls_openssl should be used in old machines that doesn't support SSE2 instructions.
 A rustls uses 'ring' crate that need newer instruction set in X86 processors.
 
 To build server with full support just enter:
