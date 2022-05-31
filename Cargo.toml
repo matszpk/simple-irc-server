@@ -43,7 +43,7 @@ tls_rustls = [ "rustls", "tokio-rustls", "rustls-pemfile" ]
 tls_openssl = [ "openssl", "tokio-openssl" ]
 dns_lookup = [ "trust-dns-resolver" ]
 
-[dependencies.tracing-subscriber] 
+[dependencies.tracing-subscriber]
 version = "0.3.1"
 default-features = false
 features = ["fmt", "ansi", "env-filter", "tracing-log"]
