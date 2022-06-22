@@ -91,7 +91,7 @@ impl<'a> Message<'a> {
     }
     
     // convert message to string with custom source.
-    pub(crate) fn to_string_with_source<'b>(&self, source: &'b str) -> String {
+    pub(crate) fn to_string_with_source(&self, source: &str) -> String {
         let mut out = ":".to_string();
         out += source;
         out.push(' ');
@@ -117,6 +117,7 @@ impl<'a> Message<'a> {
 }
 
 // Needed command ids for command error.
+#[allow(clippy::enum_variant_names)]
 #[const_table]
 pub(crate) enum CommandId {
     CommandName{ pub(crate) name: &'static str },
@@ -206,11 +207,13 @@ impl fmt::Display for CommandError {
 impl Error for CommandError {
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) enum CapCommand {
     LS, LIST, REQ, END
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(PartialEq, Eq, Debug)]
 pub(crate) enum Command<'a> {
     CAP{ subcommand: CapCommand, caps: Option<Vec<&'a str>>, version: Option<u32> },
@@ -405,7 +408,7 @@ impl<'a> Command<'a> {
                     let mut param_it = message.params.iter();
                     // channels are separated by ','
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
-                    let reason = param_it.next().map(|x| *x);
+                    let reason = param_it.next().copied();
                     Ok(PART{ channels, reason })
                 } else {
                     Err(NeedMoreParams(PARTId)) }
@@ -414,7 +417,7 @@ impl<'a> Command<'a> {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let channel = param_it.next().unwrap();
-                    let topic = param_it.next().map(|x| *x);
+                    let topic = param_it.next().copied();
                     Ok(TOPIC{ channel, topic })
                 } else {
                     Err(NeedMoreParams(TOPICId)) }
@@ -431,7 +434,7 @@ impl<'a> Command<'a> {
                     let mut param_it = message.params.iter();
                     // channels are separated by ','
                     let channels = param_it.next().unwrap().split(',').collect::<Vec<_>>();
-                    let server = param_it.next().map(|x| *x);
+                    let server = param_it.next().copied();
                     Ok(LIST{ channels, server })
                 } else {
                     Ok(LIST{ channels: vec![], server: None })
@@ -450,26 +453,26 @@ impl<'a> Command<'a> {
                     let channel = param_it.next().unwrap();
                     // users are separated by ','
                     let users = param_it.next().unwrap().split(',').collect::<Vec<_>>();
-                    let comment = param_it.next().map(|x| *x);
+                    let comment = param_it.next().copied();
                     Ok(KICK{ channel, users, comment })
                 } else {
                     Err(NeedMoreParams(KICKId)) }
             }
             "MOTD" => {
-                Ok(MOTD{ target: message.params.iter().next().map(|x| *x) })
+                Ok(MOTD{ target: message.params.get(0).copied() })
             }
             "VERSION" => {
-                Ok(VERSION{ target: message.params.iter().next().map(|x| *x) })
+                Ok(VERSION{ target: message.params.get(0).copied() })
             }
             "ADMIN" => {
-                Ok(ADMIN{ target: message.params.iter().next().map(|x| *x) })
+                Ok(ADMIN{ target: message.params.get(0).copied() })
             }
             "CONNECT" => {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let target_server = param_it.next().unwrap();
                     let port = param_it.next().map(|x| x.parse()).transpose();
-                    let remote_server = param_it.next().map(|x| *x);
+                    let remote_server = param_it.next().copied();
                     // check whether port is number
                     match port {
                         Err(_) => {
@@ -482,13 +485,13 @@ impl<'a> Command<'a> {
             }
             "LUSERS" => Ok(LUSERS{}),
             "TIME" => {
-                Ok(TIME{ server: message.params.iter().next().map(|x| *x) })
+                Ok(TIME{ server: message.params.get(0).copied() })
             }
             "STATS" => {
                 if !message.params.is_empty() {
                     let mut param_it = message.params.iter();
                     let query_str = param_it.next().unwrap();
-                    let server = param_it.next().map(|x| *x);
+                    let server = param_it.next().copied();
                     
                     if query_str.len() == 1 {
                         Ok(STATS{ query: query_str.chars().next().unwrap(), server })
@@ -521,13 +524,13 @@ impl<'a> Command<'a> {
                     let mut param_it = message.params.iter();
                     let target = param_it.next().unwrap();
                     if let Some(s) = param_it.next() {
-                        if s.starts_with("+") || s.starts_with("-") {
+                        if s.starts_with('+') || s.starts_with('-') {
                             
                             let mut modestring = *s;
                             let mut mode_args = vec![];
                             // collect mode arguments until next mode string.
-                            while let Some(s) = param_it.next() {
-                                if s.starts_with("+") || s.starts_with("-") {
+                            for s in param_it {
+                                if s.starts_with('+') || s.starts_with('-') {
                                     // push modestring and mode arguments to modes
                                     modes.push((modestring, mode_args));
                                     // next mode string
@@ -587,7 +590,7 @@ impl<'a> Command<'a> {
                     let mut param_it = message.params.iter();
                     let nickname = param_it.next().unwrap();
                     let count = param_it.next().map(|x| x.parse()).transpose();
-                    let server = param_it.next().map(|x| *x);
+                    let server = param_it.next().copied();
                     // check whether count is number
                     match count {
                         Err(_) => {
@@ -615,7 +618,7 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(SQUITId)) }
             }
             "AWAY" => {
-                Ok(AWAY{ text: message.params.iter().next().map(|x| *x) })
+                Ok(AWAY{ text: message.params.get(0).copied() })
             }
             "USERHOST" => {
                 if !message.params.is_empty() {
@@ -636,7 +639,7 @@ impl<'a> Command<'a> {
                     Err(NeedMoreParams(ISONId)) }
             }
             "DIE" => {
-                if message.params.len() >= 1 {
+                if !message.params.is_empty() {
                     Ok(DIE{ message: Some(message.params[0]) })
                 } else {
                     Ok(DIE{ message: None }) }
@@ -771,12 +774,12 @@ impl<'a> Command<'a> {
             PRIVMSG{ targets, .. } => {
                 targets.iter().try_for_each(|n| validate_username(n)
                     // in PRIVMSG we can use prefixed channels
-                    .map_err(|_| WrongParameter(PRIVMSGId, 0)).or(
+                    .map_err(|_| WrongParameter(PRIVMSGId, 0)).or_else(|_|
                     validate_prefixed_channel(n, WrongParameter(PRIVMSGId, 0)))) }
             NOTICE{ targets, .. } => {
                  targets.iter().try_for_each(|n| validate_username(n)
                     // in NOTICE we can use prefixed channels
-                    .map_err(|_| WrongParameter(NOTICEId, 0)).or(
+                    .map_err(|_| WrongParameter(NOTICEId, 0)).or_else(|_|
                     validate_prefixed_channel(n, WrongParameter(NOTICEId, 0)))) }
             //WHO{ mask } => { Ok(()) }
             WHOIS{ target, nickmasks } => {

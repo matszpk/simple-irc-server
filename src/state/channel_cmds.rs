@@ -74,7 +74,7 @@ impl super::MainState {
                         user.invited_to.contains(&chname) ||
                         channel.modes.invite_exception.as_ref().map_or(false,
                             |e| e.iter().any(|e|
-                                match_wildcard(&e, &conn_state.user_state.source))) {
+                                match_wildcard(e, &conn_state.user_state.source))) {
                         true
                     } else {
                         self.feed_msg(&mut conn_state.stream, ErrInviteOnlyChan473{
@@ -159,7 +159,7 @@ impl super::MainState {
                                 &state.users, true).await?;
                 
                 // send message to other users in channel
-                for (nick, _) in &chanobj.users {
+                for nick in chanobj.users.keys() {
                     if nick != user_nick.as_str() {
                         state.users.get(&nick.clone()).unwrap().send_msg_display(
                             &conn_state.user_state.source, join_msg.as_str())?;
@@ -183,7 +183,7 @@ impl super::MainState {
         let mut something_done = false;
         
         for channel in &channels {
-            if let Some(chanobj) = state.channels.get_mut(channel.clone()) {
+            if let Some(chanobj) = state.channels.get_mut(channel.to_owned()) {
                 // if user in channel
                 let do_it = if chanobj.users.contains_key(&user_nick) {
                     something_done = true;
@@ -202,7 +202,7 @@ impl super::MainState {
                     } else {
                         format!("PART {}", channel)
                     };
-                    for (nick, _) in &chanobj.users {
+                    for nick in chanobj.users.keys() {
                         state.users.get(&nick.clone()).unwrap().send_msg_display(
                                     &conn_state.user_state.source, part_msg.as_str())?;
                     }
@@ -278,7 +278,7 @@ impl super::MainState {
             if do_change_topic {
                 // send message about to all users in channel.
                 let chanobj = state.channels.get(channel).unwrap();
-                for (cu, _) in &chanobj.users {
+                for cu in chanobj.users.keys() {
                     state.users.get(cu).unwrap().send_message(msg,
                                 &conn_state.user_state.source)?;
                 }
@@ -333,7 +333,7 @@ impl super::MainState {
                 // do not send names of invisible users or user on channel
                 if !user.modes.invisible || in_channel {
                     name_chunk.push(NameReplyStruct{
-                        prefix: chum.to_string(&conn_state.caps), nick: &unick });
+                        prefix: chum.to_string(&conn_state.caps), nick: unick });
                 }
                 if name_chunk.len() == NAMES_COUNT {
                     self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
@@ -343,11 +343,11 @@ impl super::MainState {
             }
             if !name_chunk.is_empty() {   // last chunk
                 self.feed_msg(&mut conn_state.stream, RplNameReply353{ client, symbol,
-                                channel: &channel_name, replies: &name_chunk }).await?;
+                                channel: channel_name, replies: &name_chunk }).await?;
             }
             if end {
                 self.feed_msg(&mut conn_state.stream, RplEndOfNames366{ client,
-                            channel: &channel_name }).await?;
+                            channel: channel_name }).await?;
             }
         }
         Ok(())
@@ -360,7 +360,7 @@ impl super::MainState {
         if !channels.is_empty() {
             // send names with EndOfNames
             for c in channels {
-                if let Some(ref channel) = state.channels.get(c) {
+                if let Some(channel) = state.channels.get(c) {
                     self.send_names_from_channel(conn_state, c, channel, &state.users,
                                 true).await?;
                 } else {
@@ -372,7 +372,7 @@ impl super::MainState {
         } else {
             // send names.
             for (cn, c) in state.channels.iter() {
-                self.send_names_from_channel(conn_state, &cn, &c, &state.users, false).await?;
+                self.send_names_from_channel(conn_state, cn, c, &state.users, false).await?;
             }
             let client = conn_state.user_state.client_name();
             // send single EndOfNames with wildcard.
@@ -399,7 +399,7 @@ impl super::MainState {
                             .filter(|ch| !ch.modes.secret).map(|ch| (chname, ch))
                     }) {
                     self.feed_msg(&mut conn_state.stream, RplList322{ client,
-                            channel: &chname, client_count: ch.users.len(),
+                            channel: chname, client_count: ch.users.len(),
                             topic: ch.topic.as_ref().map(|x| &x.topic)
                                 .unwrap_or(&String::new()) }).await?;
                 }
@@ -425,7 +425,7 @@ impl super::MainState {
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
         let client = conn_state.user_state.client_name();
         
-        let do_invite = if let Some(ref chanobj) = state.channels.get(channel) {
+        let do_invite = if let Some(chanobj) = state.channels.get(channel) {
             if chanobj.users.contains_key(user_nick) {
                 let do_invite2 = if chanobj.modes.invite_only {
                     // only operator can invite into channel if channel is invite_only.
@@ -515,14 +515,14 @@ impl super::MainState {
         
         {   // kick users
             for ku in &kicked {
-                state.remove_user_from_channel(channel, &ku);
+                state.remove_user_from_channel(channel, ku);
             }
             let chanobj = state.channels.get(channel).unwrap();
             for ku in &kicked {
                 let kick_msg = format!("KICK {} {} :{}", channel, ku,
                                 comment.unwrap_or("Kicked"));
-                for (nick, _) in &chanobj.users {
-                    state.users.get(&nick.to_string()).unwrap().send_msg_display(
+                for nick in chanobj.users.keys() {
+                    state.users.get(nick).unwrap().send_msg_display(
                             &conn_state.user_state.source, kick_msg.clone())?;
                 }
                 // and send to kicked user

@@ -25,9 +25,7 @@ mod state;
 mod help;
 
 use std::error::Error;
-use clap;
 use clap::Parser;
-use tokio;
 use rpassword::prompt_password;
 
 use config::*;

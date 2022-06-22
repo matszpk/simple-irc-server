@@ -36,7 +36,6 @@ use validator::ValidationError;
 use argon2::{self, Argon2};
 use argon2::password_hash;
 use argon2::password_hash::{SaltString, PasswordHash, PasswordHasher, PasswordVerifier};
-use tokio;
 use lazy_static::lazy_static;
 
 use crate::command::CommandId::*;
@@ -47,7 +46,7 @@ use crate::command::CommandError::*;
 pub(crate) enum DualTcpStream {
     PlainStream(TcpStream),
     #[cfg(feature = "tls_rustls")]
-    SecureStream(TlsStream<TcpStream>),
+    SecureStream(Box<TlsStream<TcpStream>>),
     #[cfg(feature = "tls_openssl")]
     SecureStream(SslStream<TcpStream>),
 }
@@ -240,7 +239,7 @@ pub(crate) fn validate_prefixed_channel<E: Error>(channel: &str, e: E) -> Result
     } else { Err(e) }
 }
 
-pub(crate) fn validate_usermodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
+pub(crate) fn validate_usermodes<'a>(modes: &[(&'a str, Vec<&'a str>)])
                 -> Result<(), CommandError> {
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
@@ -261,7 +260,7 @@ pub(crate) fn validate_usermodes<'a>(modes: &Vec<(&'a str, Vec<&'a str>)>)
     })
 }
 
-pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &Vec<(&'a str, Vec<&'a str>)>)
+pub(crate) fn validate_channelmodes<'a>(target: &'a str, modes: &[(&'a str, Vec<&'a str>)])
                 -> Result<(), CommandError> {
     let mut param_idx = 1;
     modes.iter().try_for_each(|(ms, margs)| {
@@ -367,7 +366,7 @@ pub(crate) fn match_wildcard<'a>(pattern: &'a str, text: &'a str) -> bool {
                 // if first match
                 if !starts_single_wilcards(m, t) { return false; }
                 t = &t[m.len()..];
-            } else if cur_ast || newpat.len() != 0 {
+            } else if cur_ast || !newpat.is_empty() {
                 // after asterisk. only if some rest in pattern and
                 // if last current character is asterisk
                 let mut i = 0;
@@ -400,15 +399,13 @@ pub(crate) fn normalize_sourcemask(mask: &str) -> String {
         if mask[p+1..].find('@').is_none() {
             out += "@*";
         }
+    } else if let Some(p2) = mask.find('@') {
+        out += &mask[..p2];
+        out += "!*";
+        out += &mask[p2..];
     } else {
-        if let Some(p2) = mask.find('@') {
-           out += &mask[..p2]; 
-           out += "!*";
-           out += &mask[p2..];
-        } else {
-            out += mask; // normalized
-            out += "!*@*";
-        }
+        out += mask; // normalized
+        out += "!*@*";
     }
     out
 }

@@ -148,11 +148,9 @@ impl super::MainState {
                         }
                         something_done = true;
                     }
-                } else {
-                    if !notice {
-                        self.feed_msg(&mut conn_state.stream,
-                                ErrNoSuchChannel403{ client, channel: chan_str }).await?;
-                    }
+                } else if !notice {
+                    self.feed_msg(&mut conn_state.stream,
+                            ErrNoSuchChannel403{ client, channel: chan_str }).await?;
                 }
             } else {    // to user
                 if let Some(cur_user) = state.users.get(*target) {
@@ -161,15 +159,13 @@ impl super::MainState {
                         // if user away
                         if let Some(ref away) = cur_user.away {
                             self.feed_msg(&mut conn_state.stream, RplAway301{ client,
-                                        nick: target, message: &away }).await?;
+                                        nick: target, message: away }).await?;
                         }
                     }
                     something_done = true;
-                } else {
-                    if !notice {
-                        self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
-                                        nick: target }).await?;
-                    }
+                } else if !notice {
+                    self.feed_msg(&mut conn_state.stream, ErrNoSuchNick401{ client,
+                                    nick: target }).await?;
                 }
             }
         }
@@ -210,12 +206,12 @@ impl super::MainState {
             if user.modes.is_local_oper() {
                 flags.push('*');
             }
-            if let Some((_, ref chum)) = channel {
+            if let Some((_, chum)) = channel {
                 flags += &chum.to_string(&conn_state.caps);
             }
             self.feed_msg(&mut conn_state.stream, RplWhoReply352{ client,
                 channel: channel.map(|(c,_)| c).unwrap_or("*"), username: &user.name,
-                host: &user.hostname, server: &self.config.name, nick: &user_nick,
+                host: &user.hostname, server: &self.config.name, nick: user_nick,
                 flags: &flags, hopcount: 0, realname: &user.realname}).await?;
         }
         Ok(())
@@ -230,22 +226,22 @@ impl super::MainState {
         if mask.contains('*') || mask.contains('?') {
             // if wilcards
             for (unick, u) in &state.users {
-                if match_wildcard(mask, &unick) || match_wildcard(mask, &u.source) ||
+                if match_wildcard(mask, unick) || match_wildcard(mask, &u.source) ||
                     match_wildcard(mask, &u.realname) {
-                    self.send_who_info(conn_state, None, &unick, &u, &user).await?;
+                    self.send_who_info(conn_state, None, unick, u, user).await?;
                 }
             }
         } else if validate_channel(mask).is_ok() {
             // if channel
             if let Some(channel) = state.channels.get(mask) {
                 for (u, chum) in &channel.users {
-                    self.send_who_info(conn_state, Some((mask, chum)), &u,
-                        state.users.get(u).unwrap(), &user).await?;
+                    self.send_who_info(conn_state, Some((mask, chum)), u,
+                        state.users.get(u).unwrap(), user).await?;
                 }
             }
         } else if validate_username(mask).is_ok() {
-            if let Some(ref arg_user) = state.users.get(mask) {
-                self.send_who_info(conn_state, None, mask, arg_user, &user).await?;
+            if let Some(arg_user) = state.users.get(mask) {
+                self.send_who_info(conn_state, None, mask, arg_user, user).await?;
             }
         }
         let client = conn_state.user_state.client_name();
@@ -273,10 +269,8 @@ impl super::MainState {
                 if nickmask.contains('*') || nickmask.contains('?') {
                     // wildcard
                     real_nickmasks.push(nickmask);
-                } else {
-                    if state.users.contains_key(&nickmask.to_string()) {
-                        nicks.insert(nickmask.to_string());
-                    }
+                } else if state.users.contains_key(&nickmask.to_string()) {
+                    nicks.insert(nickmask.to_string());
                 }
             });
             
@@ -315,7 +309,7 @@ impl super::MainState {
                     if !ch.modes.secret {
                         // put channel only if not secret
                         Some(WhoIsChannelStruct{ prefix: Some(ch.users.get(&nick)
-                            .unwrap().to_string(&conn_state.caps)).clone(),
+                            .unwrap().to_string(&conn_state.caps)),
                             channel: chname })
                     } else { None }
                     }).collect::<Vec<_>>();
@@ -323,7 +317,7 @@ impl super::MainState {
                 // divide channel replies by chunks
                 for chr_chunk in channel_replies.chunks(30) {
                     self.feed_msg(&mut conn_state.stream, RplWhoIsChannels319{ client,
-                            nick: &nick, channels: &chr_chunk }).await?;
+                            nick: &nick, channels: chr_chunk }).await?;
                 }
                 
                 self.feed_msg(&mut conn_state.stream, RplwhoIsIdle317{ client,
@@ -368,10 +362,10 @@ impl super::MainState {
                 // loop to send whowas replies
                 for entry in hist.iter().rev().take(hist_count) {
                     self.feed_msg(&mut conn_state.stream, RplWhoWasUser314{ client,
-                            nick: &nickname, username: &entry.username,
+                            nick: nickname, username: &entry.username,
                             host: &entry.hostname, realname: &entry.realname }).await?;
                     self.feed_msg(&mut conn_state.stream, RplWhoIsServer312{ client,
-                            nick: &nickname, server: &self.config.name,
+                            nick: nickname, server: &self.config.name,
                             server_info: &format!("Logged in at {}",
                                 DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(
                                         entry.signon as i64, 0), Utc)) }).await?;
@@ -490,9 +484,7 @@ impl super::MainState {
         
         for nicks in nicknames.chunks(20) {
             let replies = nicks.iter().filter_map(|nick|
-                if let Some(user) = state.users.get(&nick.to_string()) {
-                    Some((nick, user))
-                } else { None }
+                state.users.get(&nick.to_string()).map(|user| (nick, user))
             ).map(|(nick, user)| {
                 let asterisk = if user.modes.is_local_oper() { "*" } else { "" };
                 let away = if user.away.is_some() { '-' } else { '+' };
@@ -528,7 +520,7 @@ impl super::MainState {
         for nicks in nicknames.chunks(20) {
             let outs = nicks.iter().filter(|nick|
                     state.users.contains_key(&nick.to_string()))
-                            .map(|nick| *nick).collect::<Vec<_>>();
+                            .copied().collect::<Vec<_>>();
             self.feed_msg(&mut conn_state.stream, RplIson303{ client,
                     nicknames: &outs }).await?;
         }

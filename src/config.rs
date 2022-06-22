@@ -24,13 +24,9 @@ use std::str::FromStr;
 use std::fs::File;
 use std::io::Read;
 use std::net::IpAddr;
-use clap;
-use toml;
-use serde;
 use serde::Deserializer;
 use serde_derive::Deserialize;
 use validator::Validate;
-use tracing;
 
 use crate::utils::validate_channel;
 use crate::utils::validate_username;
@@ -131,17 +127,17 @@ impl ChannelModes {
     // create new channel modes for new channel created by user. By default,
     // user that created channel is founder and operator in this channel.
     pub(crate) fn new_for_channel(user_nick: String) -> Self {
-        let mut def = ChannelModes::default();
-        def.operators = Some([ user_nick.clone() ].into());
-        def.founders = Some([ user_nick ].into());
-        def
+        ChannelModes{
+            operators: Some([ user_nick.clone() ].into()),
+            founders: Some([ user_nick ].into()),
+            .. ChannelModes::default() }
     }
     
     pub(crate) fn banned(&self, source: &str) -> bool {
         self.ban.as_ref().map_or(false, |b| b.iter().any(
-                |b| match_wildcard(&b, &source))) &&
+                |b| match_wildcard(b, source))) &&
             (!self.exception.as_ref().map_or(false, |e| e.iter().any(
-                |e| match_wildcard(&e, &source))))
+                |e| match_wildcard(e, source))))
     }
     
     // rename user - just rename nick in lists.
@@ -177,11 +173,11 @@ impl fmt::Display for ChannelModes {
         if self.secret { s.push('s'); }
         if self.protected_topic { s.push('t'); }
         if self.no_external_messages { s.push('n'); }
-        if let Some(_) = self.key { s.push('k'); }
-        if let Some(_) = self.client_limit { s.push('l'); }
+        if self.key.is_some() { s.push('k'); }
+        if self.client_limit.is_some() { s.push('l'); }
         if let Some(ref k) = self.key {
             s.push(' ');
-            s += &k; }
+            s += k; }
         if let Some(l) = self.client_limit {
             s.push(' ');
             s += &l.to_string(); }
@@ -371,7 +367,7 @@ impl MainConfig {
     
     fn validate_nicknames(&self) -> bool {
         if let Some(ref users) = self.users {
-            users.iter().find(|u| u.nick.len() > 200).is_none()
+            !users.iter().any(|u| u.nick.len() > 200)
         } else { true }
     }
 }

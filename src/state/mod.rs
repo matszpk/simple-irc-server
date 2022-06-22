@@ -37,10 +37,6 @@ use tokio::task::JoinHandle;
 use futures::{future::Fuse};
 use chrono::prelude::*;
 #[cfg(feature = "tls_rustls")]
-use rustls;
-#[cfg(feature = "tls_rustls")]
-use rustls_pemfile;
-#[cfg(feature = "tls_rustls")]
 use tokio_rustls::rustls::{Certificate, PrivateKey};
 #[cfg(feature = "tls_rustls")]
 use tokio_rustls::TlsAcceptor;
@@ -200,7 +196,7 @@ impl MainState {
                 let msg = match msg_str_res {
                     Some(Ok(ref msg_str)) => {
                         // try parse message from this line.
-                        match Message::from_shared_str(&msg_str) {
+                        match Message::from_shared_str(msg_str) {
                             Ok(msg) => msg,
                             Err(e) => {
                                 match e {
@@ -251,7 +247,7 @@ impl MainState {
                             UnknownSubcommand(_, _)|ParameterDoesntMatch(_, _)|
                                     WrongParameter(_, _) => {
                                 self.feed_msg(&mut conn_state.stream,
-                                        format!("ERROR :{}", e.to_string())).await?;
+                                        format!("ERROR :{}", e)).await?;
                             }
                             NeedMoreParams(command) => {
                                 self.feed_msg(&mut conn_state.stream,
@@ -261,7 +257,7 @@ impl MainState {
                             UnknownMode(_, modechar, ref channel) => {
                                 self.feed_msg(&mut conn_state.stream,
                                         ErrUnknownMode472{ client,
-                                        modechar, channel: channel }).await?;
+                                        modechar, channel }).await?;
                             }
                             UnknownUModeFlag(_) => {
                                 self.feed_msg(&mut conn_state.stream,
@@ -422,7 +418,7 @@ async fn user_state_process_tls(main_state: Arc<MainState>, stream: TcpStream,
             acceptor: TlsAcceptor, addr: SocketAddr) {
     match acceptor.accept(stream).await {
         Ok(tls_stream) => user_state_process(main_state,
-                DualTcpStream::SecureStream(tls_stream), addr).await,
+                DualTcpStream::SecureStream(Box::new(tls_stream)), addr).await,
         Err(e) => error!("Can't accept TLS connection: {}", e),
     }
 }
@@ -502,7 +498,7 @@ fn initialize_dns_resolver() {
 pub(self) fn dns_lookup(sender: oneshot::Sender<Option<String>>, ip: IpAddr) {
     let r = DNS_RESOLVER.read().unwrap();
     let resolver = (*r).clone().unwrap();
-    tokio::spawn(dns_lookup_process(resolver.clone(), sender, ip));
+    tokio::spawn(dns_lookup_process(resolver, sender, ip));
 }
 
 #[cfg(feature = "dns_lookup")]
@@ -543,10 +539,10 @@ pub(crate) async fn run_server(config: MainConfig) ->
         let config = {
             let tlsconfig = cloned_tls.unwrap();
             let certs = rustls_pemfile::certs(
-                    &mut BufReader::new(File::open(tlsconfig.cert_file.clone())?))
+                    &mut BufReader::new(File::open(tlsconfig.cert_file)?))
                     .map(|mut certs| certs.drain(..).map(Certificate).collect())?;
             let mut keys: Vec<PrivateKey> = rustls_pemfile::pkcs8_private_keys(
-                    &mut BufReader::new(File::open(tlsconfig.cert_key_file.clone())?))
+                    &mut BufReader::new(File::open(tlsconfig.cert_key_file)?))
                     .map(|mut keys| keys.drain(..).map(PrivateKey).collect())?;
             
             rustls::ServerConfig::builder().with_safe_defaults()

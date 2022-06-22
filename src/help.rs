@@ -18,7 +18,7 @@
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 // help topics list with its content.
-pub(crate) static HELP_TOPICS: [(&'static str, &'static str); 2] = [
+pub(crate) static HELP_TOPICS: [(&str, &str); 2] = [
     ("COMMANDS", r##"List of commands:
 ADMIN
 AUTHENTICATE - unsupported

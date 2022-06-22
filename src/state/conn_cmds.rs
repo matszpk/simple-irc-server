@@ -67,12 +67,12 @@ impl ToString for SupportTokenStringValue {
     fn to_string(&self) -> String {
         let mut s = self.name.to_string();
         s.push('=');
-        s.push_str(&self.value);
+        s.push_str(self.value);
         s
     }
 }
 
-static SUPPORT_TOKEN_BOOL_VALUE: [&'static str; 2] = [
+static SUPPORT_TOKEN_BOOL_VALUE: [&str; 2] = [
     "FNC",
     "SAFELIST",
 ];
@@ -157,7 +157,7 @@ impl super::MainState {
                             // match user mask
                             if let Some(ref users) = self.config.users {
                                 if let Some(ref mask) = users[*uidx].mask {
-                                    if match_wildcard(&mask, &user_state.source) {
+                                    if match_wildcard(mask, &user_state.source) {
                                         registered = true;
                                         users[*uidx].password.as_ref()
                                     } else {
@@ -201,7 +201,7 @@ impl super::MainState {
                     let mut user_state = &mut conn_state.user_state;
                     user_state.registered = registered;
                     let mut state = self.state.write().await;
-                    let user = User::new(&self.config, &user_state,
+                    let user = User::new(&self.config, user_state,
                                 conn_state.sender.take().unwrap(), 
                                 conn_state.quit_sender.take().unwrap());
                     let umode_str = user.modes.to_string();
@@ -325,7 +325,7 @@ impl super::MainState {
                         state.wallops_users.insert(nick_str);
                     }
                     
-                    for (_,u) in &state.users {
+                    for u in state.users.values() {
                         u.send_message(msg, &old_source)?;
                     }
                 } else {    // if nick in use
@@ -387,7 +387,7 @@ impl super::MainState {
                         ErrPasswdMismatch464{ client }).await?;
                 false
             } else if let Some(ref op_mask) = op_config.mask {
-                if !match_wildcard(&op_mask, &conn_state.user_state.source) {
+                if !match_wildcard(op_mask, &conn_state.user_state.source) {
                     self.feed_msg(&mut conn_state.stream,
                             ErrNoOperHost491{ client }).await?;
                     false

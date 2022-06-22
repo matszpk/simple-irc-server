@@ -148,7 +148,7 @@ flags! {
 }
 
 impl ChannelUserModes {
-    pub(super) fn to_string(&self, caps: &CapState) -> String {
+    pub(super) fn to_string(self, caps: &CapState) -> String {
         let mut out = String::new();
         if self.founder { out.push('~'); }
         // after put the highest user mode, put other if caps multi-prefix is enabled.
@@ -310,7 +310,7 @@ impl Channel {
     pub(super) fn rename_user(&mut self, old_nick: &String, nick: String) {
         let oldchumode = self.users.remove(old_nick).unwrap();
         self.users.insert(nick.clone(), oldchumode);
-        self.modes.rename_user(old_nick, nick.clone());
+        self.modes.rename_user(old_nick, nick);
     }
     
     // remove user from channel - and from lists
@@ -439,9 +439,9 @@ impl ConnUserState {
             authenticated: false, registered: false }
     }
     
-    pub(super) fn client_name<'a>(&'a self) -> &'a str {
-        if let Some(ref n) = self.nick { &n }
-        else if let Some(ref n) = self.name { &n }
+    pub(super) fn client_name(&self) -> &str {
+        if let Some(ref n) = self.nick { n }
+        else if let Some(ref n) = self.name { n }
         else { &self.hostname }
     }
     
@@ -449,12 +449,12 @@ impl ConnUserState {
         let mut s = String::new();
         // generate source - nick!username@host
         if let Some(ref nick) = self.nick {
-            s.push_str(&nick);
+            s.push_str(nick);
             s.push('!');
         }
         if let Some(ref name) = self.name {
             s.push('~');  // username is defined same user
-            s.push_str(&name);
+            s.push_str(name);
         }
         s.push('@');
         s.push_str(&self.hostname);
@@ -586,7 +586,7 @@ async fn ping_client_waker(d: Duration, quit: Arc<AtomicI32>, sender: UnboundedS
 
 async fn pong_client_timeout(tmo: time::Timeout<oneshot::Receiver<()>>,
                     quit: Arc<AtomicI32>, sender: Arc<UnboundedSender<()>>) {
-    if let Err(_) = tmo.await {
+    if tmo.await.is_err() {
         // do not send if client already quits from IRC server.
         if quit.load(Ordering::SeqCst) == 0 {
             sender.send(()).unwrap();
@@ -634,7 +634,7 @@ impl VolatileState {
     }
     
     // add user to volatile state - includes stats likes invisible users count, etc.
-    pub(super) fn add_user<'a>(&mut self, unick: &'a str, user: User) {
+    pub(super) fn add_user(&mut self, unick: &str, user: User) {
         if user.modes.invisible {
             self.invisible_users_count += 1;
         }
@@ -678,7 +678,7 @@ impl VolatileState {
             user.channels.iter().for_each(|chname| {
                 self.remove_user_from_channel(chname, nick);
             });
-            self.insert_to_nick_history(&nick.to_string(), user.history_entry.clone());
+            self.insert_to_nick_history(&nick.to_string(), user.history_entry);
         }
     }
     
