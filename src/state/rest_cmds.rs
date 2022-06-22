@@ -1,4 +1,4 @@
-// rest_cmds.rs - main state
+// rest_cmds.rs - rest commands
 //
 // simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski

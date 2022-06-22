@@ -1,4 +1,4 @@
-// conn_cmds.rs - main state
+// conn_cmds.rs - connection commands
 //
 // simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski

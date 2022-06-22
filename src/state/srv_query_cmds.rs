@@ -1,4 +1,4 @@
-// srv_query_cmds.rs - main state
+// srv_query_cmds.rs - server query commands
 //
 // simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski

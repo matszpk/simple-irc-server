@@ -1,4 +1,4 @@
-// channel_cmds.rs - main state
+// channel_cmds.rs - channel commands
 //
 // simple-irc-server - simple IRC server
 // Copyright (C) 2022  Mateusz Szpakowski
