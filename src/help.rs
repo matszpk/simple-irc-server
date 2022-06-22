@@ -19,7 +19,9 @@
 
 // help topics list with its content.
 pub(crate) static HELP_TOPICS: [(&str, &str); 2] = [
-    ("COMMANDS", r##"List of commands:
+    (
+        "COMMANDS",
+        r##"List of commands:
 ADMIN
 AUTHENTICATE - unsupported
 AWAY
@@ -60,9 +62,13 @@ VERSION
 WALLOPS
 WHO
 WHOIS
-WHOWAS"##),
-    ("MAIN", r##"This is Simple IRC Server.
+WHOWAS"##,
+    ),
+    (
+        "MAIN",
+        r##"This is Simple IRC Server.
 Use 'HELP COMMANDS' to list of commands.
 If you want get HELP about commands please refer to https://modern.ircdocs.horse/
-or https://datatracker.ietf.org/doc/html/rfc1459."##),
+or https://datatracker.ietf.org/doc/html/rfc1459."##,
+    ),
 ];

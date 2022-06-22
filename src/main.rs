@@ -17,19 +17,19 @@
 // License along with this library; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
-mod config;
-mod reply;
 mod command;
-mod utils;
-mod state;
+mod config;
 mod help;
+mod reply;
+mod state;
+mod utils;
 
-use std::error::Error;
 use clap::Parser;
 use rpassword::prompt_password;
+use std::error::Error;
 
-use config::*;
 use command::*;
+use config::*;
 use state::*;
 use utils::*;
 
