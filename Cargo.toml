@@ -2,7 +2,7 @@
 name = "simple-irc-server"
 authors = ["Mateusz Szpakowski"]
 license = "LGPL-2.1-or-later"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2018"
 rust-version = "1.57"
 description = "Simple IRC server"
