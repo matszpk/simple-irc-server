@@ -157,24 +157,29 @@ impl ChannelModes {
     // rename user - just rename nick in lists.
     pub(crate) fn rename_user(&mut self, old_nick: &String, nick: String) {
         if let Some(ref mut operators) = self.operators {
-            operators.remove(old_nick);
-            operators.insert(nick.clone());
+            if operators.remove(old_nick) {
+                operators.insert(nick.clone());
+            }
         }
         if let Some(ref mut half_operators) = self.half_operators {
-            half_operators.remove(old_nick);
-            half_operators.insert(nick.clone());
+            if half_operators.remove(old_nick) {
+                half_operators.insert(nick.clone());
+            }
         }
         if let Some(ref mut voices) = self.voices {
-            voices.remove(old_nick);
-            voices.insert(nick.clone());
+            if voices.remove(old_nick) {
+                voices.insert(nick.clone());
+            }
         }
         if let Some(ref mut founders) = self.founders {
-            founders.remove(old_nick);
-            founders.insert(nick.clone());
+            if founders.remove(old_nick) {
+                founders.insert(nick.clone());
+            }
         }
         if let Some(ref mut protecteds) = self.protecteds {
-            protecteds.remove(old_nick);
-            protecteds.insert(nick);
+            if protecteds.remove(old_nick) {
+                protecteds.insert(nick);
+            }
         }
     }
 }

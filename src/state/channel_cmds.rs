@@ -40,7 +40,7 @@ impl super::MainState {
 
         {
             let client = conn_state.user_state.client_name();
-            let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
+            let user = state.users.get_mut(user_nick.as_str()).unwrap();
             for (i, chname_str) in channels.iter().enumerate() {
                 let chname = chname_str.to_string();
                 let (join, create) = if let Some(channel) = state.channels.get(&chname) {
@@ -320,7 +320,7 @@ impl super::MainState {
         }
 
         let user_nick = conn_state.user_state.nick.as_ref().unwrap().clone();
-        let mut user = state.users.get_mut(user_nick.as_str()).unwrap();
+        let user = state.users.get_mut(user_nick.as_str()).unwrap();
 
         // if something done then change last activity time
         if something_done {

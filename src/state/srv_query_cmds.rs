@@ -990,7 +990,7 @@ impl super::MainState {
         modes: Vec<(&'a str, Vec<&'a str>)>,
     ) -> Result<(), Box<dyn Error>> {
         let client = conn_state.user_state.client_name();
-        let mut user = state.users.get_mut(target).unwrap();
+        let user = state.users.get_mut(target).unwrap();
         let user_nick = target;
         if modes.is_empty() {
             self.feed_msg(

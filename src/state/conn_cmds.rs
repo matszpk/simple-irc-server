@@ -316,7 +316,7 @@ impl super::MainState {
                 let user_nick = conn_state.user_state.nick.clone().unwrap();
                 let user_modes = {
                     // add new user to hash map
-                    let mut user_state = &mut conn_state.user_state;
+                    let user_state = &mut conn_state.user_state;
                     user_state.registered = registered;
                     let mut state = self.state.write().await;
                     let user = User::new(
@@ -583,7 +583,7 @@ impl super::MainState {
         if let Some(oper_idx) = self.oper_config_idxs.get(nick) {
             // if operator defined in configuration
             let mut state = self.state.write().await;
-            let mut user = state.users.get_mut(user_nick).unwrap();
+            let user = state.users.get_mut(user_nick).unwrap();
             let op_cfg_opt = self.config.operators.as_ref().unwrap().get(*oper_idx);
             let op_config = op_cfg_opt.as_ref().unwrap();
 

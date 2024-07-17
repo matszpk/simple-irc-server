@@ -244,7 +244,7 @@ impl super::MainState {
             // update last activity if something sent
             if something_done {
                 let mut state = self.state.write().await;
-                let mut user = state.users.get_mut(user_nick).unwrap();
+                let user = state.users.get_mut(user_nick).unwrap();
                 user.last_activity = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .unwrap()
@@ -768,7 +768,7 @@ impl super::MainState {
         let client = conn_state.user_state.client_name();
         let mut state = self.state.write().await;
         let user_nick = conn_state.user_state.nick.as_ref().unwrap();
-        let mut user = state.users.get_mut(user_nick).unwrap();
+        let user = state.users.get_mut(user_nick).unwrap();
         if let Some(t) = text {
             // set away
             user.away = Some(t.to_string());
