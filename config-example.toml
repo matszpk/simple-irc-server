@@ -106,7 +106,7 @@ operators = [ "matszpk" ]
 # Optional. List of half operators. It is list of nicks.
 half_operators = [ "matszpk" ]
 # Optional. List of voices. It is list of nicks.
-half_operators = [ "matszpk" ]
+voices = [ "matszpk" ]
 # If true then channel is moderated and user need voice channel's mode.
 moderated = false
 # If true then user need invitation to join channel.
