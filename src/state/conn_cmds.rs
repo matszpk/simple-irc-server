@@ -103,7 +103,7 @@ static SUPPORT_TOKEN_STRING_VALUE: [SupportTokenStringValue; 9] = [
     },
     SupportTokenStringValue {
         name: "CHANMODES",
-        value: "Iabehiklmnopqstv",
+        value: "beI,k,l,ahimnopqstv",
     },
     SupportTokenStringValue {
         name: "CHANTYPES",
@@ -392,7 +392,7 @@ impl super::MainState {
                                 env!("CARGO_PKG_VERSION")
                             ),
                             avail_user_modes: "Oiorw",
-                            avail_chmodes: "Iabehiklmnopqstv",
+                            avail_chmodes: "beI,k,l,ahimnopqstv",
                             avail_chmodes_with_params: None,
                         },
                     )

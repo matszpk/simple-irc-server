@@ -1267,7 +1267,7 @@ mod test {
             );
             assert_eq!(
                 ":irc.irc 005 tommy AWAYLEN=1000 CASEMAPPING=ascii \
-                    CHANMODES=Iabehiklmnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
+                    CHANMODES=beI,k,l,ahimnopqstv CHANNELLEN=1000 CHANTYPES=&# EXCEPTS=e FNC \
                     HOSTLEN=1000 INVEX=I KEYLEN=1000 :are supported by this server"
                     .to_string(),
                 line_stream.next().await.unwrap().unwrap()
